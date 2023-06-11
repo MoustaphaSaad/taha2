@@ -1,0 +1,25 @@
+add_library(core)
+
+target_sources(core
+	PRIVATE
+		include/core/Allocator.h
+		include/core/Mallocator.h
+		src/core/Mallocator.cpp
+)
+
+target_compile_features(core PUBLIC cxx_std_17)
+set_target_properties(core PROPERTIES
+	CXX_EXTENSIONS OFF
+	DEBUG_POSTFIX d
+)
+
+# generate exports header file
+include(GenerateExportHeader)
+generate_export_header(core
+	EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/include/core/Exports.h
+)
+
+target_include_directories(core
+	PUBLIC
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+)
