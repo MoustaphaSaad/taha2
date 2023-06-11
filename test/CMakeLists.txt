@@ -2,6 +2,7 @@ add_executable(unittests
 	main.cpp
 	test_allocator.cpp
 	test_unique.cpp
+	test_shared.cpp
 )
 
 CPMGetPackage(doctest)
