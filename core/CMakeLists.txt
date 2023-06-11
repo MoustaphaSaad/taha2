@@ -4,8 +4,16 @@ target_sources(core
 	PRIVATE
 		include/core/Allocator.h
 		include/core/Mallocator.h
+		include/core/VirtualMem.h
 		src/core/Mallocator.cpp
 )
+
+if (WIN32)
+	target_sources(core
+		PRIVATE
+			src/core/winos/VirtualMem.cpp
+	)
+endif ()
 
 target_compile_features(core PUBLIC cxx_std_17)
 set_target_properties(core PROPERTIES
