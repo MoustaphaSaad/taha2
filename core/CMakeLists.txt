@@ -6,6 +6,7 @@ target_sources(core
 		include/core/Mallocator.h
 		include/core/VirtualMem.h
 		include/core/FastLeak.h
+		include/core/Unique.h
 		src/core/Mallocator.cpp
 		src/core/FastLeak.cpp
 )
