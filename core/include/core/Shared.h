@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <assert.h>
+#include <new>
 
 namespace core
 {

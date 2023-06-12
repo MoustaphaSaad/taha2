@@ -17,6 +17,16 @@ if (WIN32)
 		PRIVATE
 			src/core/winos/VirtualMem.cpp
 	)
+elseif (APPLE)
+	target_sources(core
+		PRIVATE
+			src/core/macos/VirtualMem.cpp
+	)
+elseif (UNIX AND NOT APPLE)
+	target_sources(core
+		PRIVATE
+			src/core/linux/VirtualMem.cpp
+	)
 endif ()
 
 target_compile_features(core PUBLIC cxx_std_17)
