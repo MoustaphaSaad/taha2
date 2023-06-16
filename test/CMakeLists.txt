@@ -4,6 +4,7 @@ add_executable(unittests
 	test_unique.cpp
 	test_shared.cpp
 	test_array.cpp
+	test_hash.cpp
 )
 
 CPMGetPackage(doctest)

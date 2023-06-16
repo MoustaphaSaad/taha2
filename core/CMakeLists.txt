@@ -9,6 +9,7 @@ target_sources(core
 		include/core/Unique.h
 		include/core/Shared.h
 		include/core/Array.h
+		include/core/Hash.h
 		src/core/Mallocator.cpp
 		src/core/FastLeak.cpp
 )
