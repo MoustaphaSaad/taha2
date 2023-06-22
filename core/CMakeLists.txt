@@ -11,9 +11,11 @@ target_sources(core
 		include/core/Array.h
 		include/core/Hash.h
 		include/core/String.h
+		include/core/Rune.h
 		src/core/Mallocator.cpp
 		src/core/FastLeak.cpp
 		src/core/String.cpp
+		src/core/Rune.cpp
 )
 
 if (WIN32)
@@ -32,6 +34,9 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/VirtualMem.cpp
 	)
 endif ()
+
+CPMGetPackage(utf8proc)
+target_link_libraries(core PUBLIC utf8proc)
 
 target_compile_features(core PUBLIC cxx_std_17)
 set_target_properties(core PROPERTIES

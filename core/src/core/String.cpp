@@ -1,5 +1,7 @@
 #include "core/String.h"
 
+#include <utf8proc.h>
+
 namespace core
 {
 	void String::destroy()
