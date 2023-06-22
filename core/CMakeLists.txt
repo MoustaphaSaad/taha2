@@ -10,8 +10,10 @@ target_sources(core
 		include/core/Shared.h
 		include/core/Array.h
 		include/core/Hash.h
+		include/core/String.h
 		src/core/Mallocator.cpp
 		src/core/FastLeak.cpp
+		src/core/String.cpp
 )
 
 if (WIN32)
