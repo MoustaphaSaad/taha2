@@ -52,6 +52,21 @@ namespace core
 		m_capacity = new_capacity;
 	}
 
+	void String::ensureSpaceExists(size_t count)
+	{
+		if (m_count + count > m_capacity)
+		{
+			auto new_capacity = m_capacity * 2;
+			if (new_capacity == 0)
+				new_capacity = 8;
+
+			if (new_capacity < m_count + count)
+				new_capacity = m_count + count;
+
+			grow(new_capacity);
+		}
+	}
+
 	String::String(const char* ptr, Allocator* allocator)
 		: m_allocator(allocator)
 	{
@@ -80,5 +95,14 @@ namespace core
 
 			::memcpy(m_ptr, begin, m_count);
 		}
+	}
+
+	void String::push(const char* begin, const char* end)
+	{
+		auto len = m_count;
+		ensureSpaceExists(end - begin + 1);
+		--m_count;
+		::memcpy(m_ptr + len, begin, end - begin);
+		m_ptr[m_count] = '\0';
 	}
 }

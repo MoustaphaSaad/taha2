@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Allocator.h"
+#include "core/Rune.h"
 
 #include <cstring>
 #include <cassert>
@@ -22,6 +23,8 @@ namespace core
 		void moveFrom(String&& other);
 
 		void grow(size_t new_capacity);
+
+		void ensureSpaceExists(size_t count);
 
 	public:
 		explicit String(Allocator* allocator)
@@ -74,5 +77,8 @@ namespace core
 
 		size_t count() const { return m_count; }
 		size_t capacity() const { return m_capacity; }
+		size_t runeCount() const { return Rune::count(m_ptr); }
+
+		void push(const char* begin, const char* end);
 	};
 }
