@@ -67,6 +67,15 @@ namespace core
 		}
 	}
 
+	void String::resize(size_t new_count)
+	{
+		if (new_count > m_capacity)
+			grow(new_count);
+
+		m_count = new_count;
+		m_ptr[m_count] = '\0';
+	}
+
 	String::String(const char* ptr, Allocator* allocator)
 		: m_allocator(allocator)
 	{
@@ -100,9 +109,21 @@ namespace core
 	void String::push(const char* begin, const char* end)
 	{
 		auto len = m_count;
-		ensureSpaceExists(end - begin + 1);
+		resize(m_count + (end - begin + 1));
 		--m_count;
 		::memcpy(m_ptr + len, begin, end - begin);
+		m_ptr[m_count] = '\0';
+	}
+
+	void String::push(Rune r)
+	{
+		auto old_count = m_count;
+		// +5 = 4 for the rune + 1 for the null termination
+		ensureSpaceExists(m_count + 5);
+
+		auto width = Rune::encode(r, m_ptr + m_count);
+		assert(width > 0 && width <= 4);
+		m_count -= (4 - width) + 1;
 		m_ptr[m_count] = '\0';
 	}
 }

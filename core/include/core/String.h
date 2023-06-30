@@ -26,6 +26,8 @@ namespace core
 
 		void ensureSpaceExists(size_t count);
 
+		void resize(size_t new_count);
+
 	public:
 		explicit String(Allocator* allocator)
 			: m_allocator(allocator)
@@ -80,5 +82,6 @@ namespace core
 		size_t runeCount() const { return Rune::count(m_ptr); }
 
 		void push(const char* begin, const char* end);
+		void push(Rune r);
 	};
 }
