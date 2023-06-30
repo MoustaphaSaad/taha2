@@ -6,6 +6,7 @@ add_executable(unittests
 	test_array.cpp
 	test_hash.cpp
 	test_rune.cpp
+	test_string.cpp
 )
 
 CPMGetPackage(doctest)
