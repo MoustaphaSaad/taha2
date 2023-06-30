@@ -11,6 +11,7 @@ target_sources(core
 		include/core/Array.h
 		include/core/Hash.h
 		include/core/String.h
+		include/core/StringView.h
 		include/core/Rune.h
 		src/core/Mallocator.cpp
 		src/core/FastLeak.cpp

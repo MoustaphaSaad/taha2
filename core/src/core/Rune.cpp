@@ -57,6 +57,17 @@ namespace core
 		return result;
 	}
 
+	size_t Rune::count(const char* begin, const char* end)
+	{
+		size_t result = 0;
+		while(begin != nullptr && *begin != '\0' && begin < end)
+		{
+			result += ((*begin & 0xC0) != 0x80);
+			++begin;
+		}
+		return result;
+	}
+
 	const char* Rune::next(const char* ptr)
 	{
 		++ptr;

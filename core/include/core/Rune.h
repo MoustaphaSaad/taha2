@@ -31,6 +31,7 @@ namespace core
 		bool isValid() const;
 
 		static size_t count(const char* ptr);
+		static size_t count(const char* begin, const char* end);
 		static const char* next(const char* ptr);
 		static const char* prev(const char* ptr);
 		static Rune decode(const char* ptr);
