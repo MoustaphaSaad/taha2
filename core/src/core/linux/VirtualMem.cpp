@@ -2,7 +2,7 @@
 
 #include <sys/mman.h>
 
-#include <assert.h>
+#include <cassert>
 
 namespace core
 {

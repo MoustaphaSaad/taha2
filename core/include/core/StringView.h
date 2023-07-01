@@ -2,9 +2,9 @@
 
 #include "core/Rune.h"
 
-#include <assert.h>
-#include <string.h>
-#include <stdint.h>
+#include <cassert>
+#include <cstring>
+#include <cstdint>
 
 namespace core
 {

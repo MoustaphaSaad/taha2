@@ -3,7 +3,7 @@
 #include "core/Allocator.h"
 
 #include <atomic>
-#include <assert.h>
+#include <cassert>
 #include <new>
 
 namespace core
