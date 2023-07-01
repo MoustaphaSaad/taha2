@@ -176,7 +176,7 @@ namespace core
 			if (new_count > m_count)
 			{
 				ensureSpaceExists(new_count - m_count);
-				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizoef(T));
+				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizeof(T));
 				for (;m_count < new_count; ++m_count)
 					::new (m_ptr + m_count) T();
 			}
@@ -194,7 +194,7 @@ namespace core
 			if (new_count > m_count)
 			{
 				ensureSpaceExists(new_count - m_count);
-				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizoef(T));
+				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizeof(T));
 				for (;m_count < new_count; ++m_count)
 					::new (m_ptr + m_count) T(value);
 			}
