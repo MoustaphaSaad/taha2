@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cassert>
 #include <new>
+#include <utility>
 
 namespace core
 {
