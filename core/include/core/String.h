@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Exports.h"
 #include "core/Allocator.h"
 #include "core/Rune.h"
 #include "core/StringView.h"
@@ -34,8 +35,8 @@ namespace core
 			: m_allocator(allocator)
 		{}
 
-		String(const char* ptr, Allocator* allocator);
-		String(const char* begin, const char* end, Allocator* allocator);
+		CORE_EXPORT String(const char* ptr, Allocator* allocator);
+		CORE_EXPORT String(const char* begin, const char* end, Allocator* allocator);
 
 		String(const String& other)
 		{
@@ -78,11 +79,11 @@ namespace core
 			return m_ptr[i];
 		}
 
-		size_t count() const { return m_count; }
-		size_t capacity() const { return m_capacity; }
-		size_t runeCount() const { return Rune::count(m_ptr); }
+		CORE_EXPORT size_t count() const { return m_count; }
+		CORE_EXPORT size_t capacity() const { return m_capacity; }
+		CORE_EXPORT size_t runeCount() const { return Rune::count(m_ptr); }
 
-		void push(StringView str);
-		void push(Rune r);
+		CORE_EXPORT void push(StringView str);
+		CORE_EXPORT void push(Rune r);
 	};
 }

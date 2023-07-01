@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Exports.h"
 #include "core/Rune.h"
 
 #include <cassert>
@@ -54,9 +55,9 @@ namespace core
 		const char* begin() const { return m_begin; }
 		const char* end() const { return m_begin + m_count; }
 
-		size_t find(StringView target, size_t start = 0) const;
-		size_t findLast(StringView target, size_t start) const;
-		size_t findLast(StringView target) const { return findLast(target, m_count); }
+		CORE_EXPORT size_t find(StringView target, size_t start = 0) const;
+		CORE_EXPORT size_t findLast(StringView target, size_t start) const;
+		CORE_EXPORT size_t findLast(StringView target) const { return findLast(target, m_count); }
 
 		bool operator==(StringView other) const { return cmp(*this, other) == 0; }
 		bool operator!=(StringView other) const { return cmp(*this, other) != 0; }
