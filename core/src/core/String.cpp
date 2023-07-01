@@ -106,12 +106,14 @@ namespace core
 		}
 	}
 
-	void String::push(const char* begin, const char* end)
+	void String::push(StringView str)
 	{
+		auto str_begin = str.begin();
+		auto str_end = str.end();
 		auto len = m_count;
-		resize(m_count + (end - begin + 1));
+		resize(m_count + (str_end - str_begin + 1));
 		--m_count;
-		::memcpy(m_ptr + len, begin, end - begin);
+		::memcpy(m_ptr + len, str_begin, str_end - str_begin);
 		m_ptr[m_count] = '\0';
 	}
 

@@ -33,6 +33,9 @@ namespace core
 
 		size_t count() const { return m_end - m_begin; }
 		size_t runeCount() const { return Rune::count(m_begin, m_end); }
+
+		const char* begin() const { return m_begin; }
+		const char* end() const { return m_end; }
 	};
 }
 

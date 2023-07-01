@@ -2,6 +2,7 @@
 
 #include "core/Allocator.h"
 #include "core/Rune.h"
+#include "core/StringView.h"
 
 #include <cstring>
 #include <cassert>
@@ -81,7 +82,7 @@ namespace core
 		size_t capacity() const { return m_capacity; }
 		size_t runeCount() const { return Rune::count(m_ptr); }
 
-		void push(const char* begin, const char* end);
+		void push(StringView str);
 		void push(Rune r);
 	};
 }
