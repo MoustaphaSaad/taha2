@@ -918,10 +918,10 @@ namespace core
 			allocator->commit(slots, sizeof(HashSlot) * slots_count);
 			::memcpy(slots, other.slots, sizeof(HashSlot) * slots_count);
 
-			values = (T*)allocator->alloc(sizeof(T) * values_count, alignof(T));
-			allocator->commit(values, sizeof(T) * values_count);
+			values = (TValue*)allocator->alloc(sizeof(TValue) * values_count, alignof(TValue));
+			allocator->commit(values, sizeof(TValue) * values_count);
 			for (size_t i = 0; i < values_count; ++i)
-				::new (values + i) T(other.values[i]);
+				::new (values + i) TValue(other.values[i]);
 		}
 
 		void moveFrom(Map&& other)
