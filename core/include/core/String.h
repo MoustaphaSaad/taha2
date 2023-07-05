@@ -110,5 +110,7 @@ namespace core
 		bool operator<=(StringView other) const { return StringView::cmp(*this, other) <= 0; }
 		bool operator>(StringView other) const { return StringView::cmp(*this, other) > 0; }
 		bool operator>=(StringView other) const { return StringView::cmp(*this, other) >= 0; }
+
+		void replace(StringView search, StringView replace);
 	};
 }

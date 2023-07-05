@@ -69,8 +69,9 @@ namespace core
 
 	void String::resize(size_t new_count)
 	{
-		if (new_count > m_capacity)
-			grow(new_count);
+		// +1 for the null terminator
+		if (new_count + 1 > m_capacity)
+			grow(new_count + 1);
 
 		m_count = new_count;
 		m_ptr[m_count] = '\0';
@@ -82,12 +83,13 @@ namespace core
 		if (str.count() != 0)
 		{
 			m_count = str.count();
-			m_capacity = m_count;
+			m_capacity = m_count + 1;
 
 			m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char));
 			m_allocator->commit(m_ptr, m_capacity);
 
 			::memcpy(m_ptr, str.begin(), m_count);
+			m_ptr[m_count] = '\0';
 		}
 	}
 
@@ -128,5 +130,42 @@ namespace core
 	{
 		StringView self = *this;
 		return self.findLast(str, start);
+	}
+
+	void String::replace(StringView search, StringView replace)
+	{
+		String out{m_allocator};
+		out.ensureSpaceExists(m_count);
+		// find the first pattern or -1
+		size_t search_it = find(search, 0);
+		size_t it		 = 0;
+		// while we didn't finish the string
+		while (it < m_count)
+		{
+			// if search_str is not found then put search_it to the end of string
+			if (search_it == SIZE_MAX)
+			{
+				// push the remaining content
+				if (it < m_count)
+					out.push(StringView{m_ptr + it, m_count - it});
+
+				// exit we finished the string
+				break;
+			}
+
+			// push the preceding content
+			if (search_it > it)
+				out.push(StringView{m_ptr + it, search_it - it});
+
+			// push the replacement string
+			out.push(replace);
+
+			// advance content iterator by search string
+			it = search_it + search.count();
+
+			// find for next pattern
+			search_it = find(search, it);
+		}
+		*this = std::move(out);
 	}
 }

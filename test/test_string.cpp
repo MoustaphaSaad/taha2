@@ -73,3 +73,12 @@ TEST_CASE("core::String creation")
 	REQUIRE(str.runeCount() == 5);
 	REQUIRE(str == "مصطفى"_sv);
 }
+
+TEST_CASE("core::String::replace")
+{
+	core::Mallocator allocator;
+
+	core::String str{"hello world"_sv, &allocator};
+	str.replace("world"_sv, "مصطفى"_sv);
+	REQUIRE(str == "hello مصطفى"_sv);
+}
