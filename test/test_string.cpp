@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
 
 #include <core/StringView.h>
+#include <core/Mallocator.h>
+#include <core/String.h>
 
 TEST_CASE("core::StringView basics")
 {
@@ -43,4 +45,24 @@ TEST_CASE("core::StringView findLast")
 	REQUIRE("hello world"_sv.findLast("hello world hello"_sv) == SIZE_MAX);
 	REQUIRE("hello world"_sv.findLast(""_sv) == 11);
 	REQUIRE(""_sv.findLast("hello"_sv) == SIZE_MAX);
+}
+
+TEST_CASE("core::String creation")
+{
+	core::Mallocator allocator;
+
+	core::String str{"Hello"_sv, &allocator};
+	REQUIRE(str.count() == 5);
+	REQUIRE(str.runeCount() == 5);
+	REQUIRE(str[0] == 'H');
+	REQUIRE(str[1] == 'e');
+	REQUIRE(str[2] == 'l');
+	REQUIRE(str[3] == 'l');
+	REQUIRE(str[4] == 'o');
+	REQUIRE(str == "Hello"_sv);
+
+	str = "مصطفى"_sv;
+	REQUIRE(str.count() == 10);
+	REQUIRE(str.runeCount() == 5);
+	REQUIRE(str == "مصطفى"_sv);
 }

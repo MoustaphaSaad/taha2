@@ -61,6 +61,12 @@ namespace core
 			return *this;
 		}
 
+		String& operator=(StringView other)
+		{
+			*this = String(other, m_allocator);
+			return *this;
+		}
+
 		~String()
 		{
 			destroy();
@@ -80,15 +86,28 @@ namespace core
 
 		operator StringView() const { return StringView(m_ptr, m_count); }
 
-		CORE_EXPORT size_t count() const { return m_count; }
-		CORE_EXPORT size_t capacity() const { return m_capacity; }
-		CORE_EXPORT size_t runeCount() const { return Rune::count(m_ptr); }
+		size_t count() const { return m_count; }
+		size_t capacity() const { return m_capacity; }
+		size_t runeCount() const { return Rune::count(m_ptr, m_ptr + m_count); }
 
 		CORE_EXPORT void push(StringView str);
 		CORE_EXPORT void push(Rune r);
 
 		CORE_EXPORT size_t find(StringView str, size_t start = 0) const;
 		CORE_EXPORT size_t findLast(StringView str, size_t start) const;
-		CORE_EXPORT size_t findLast(StringView str) const { return findLast(str, m_count); }
+		size_t findLast(StringView str) const { return findLast(str, m_count); }
+
+		bool operator==(const String& other) const { return StringView::cmp(*this, other) == 0; }
+		bool operator!=(const String& other) const { return StringView::cmp(*this, other) != 0; }
+		bool operator<(const String& other) const { return StringView::cmp(*this, other) < 0; }
+		bool operator<=(const String& other) const { return StringView::cmp(*this, other) <= 0; }
+		bool operator>(const String& other) const { return StringView::cmp(*this, other) > 0; }
+		bool operator>=(const String& other) const { return StringView::cmp(*this, other) >= 0; }
+		bool operator==(StringView other) const { return StringView::cmp(*this, other) == 0; }
+		bool operator!=(StringView other) const { return StringView::cmp(*this, other) != 0; }
+		bool operator<(StringView other) const { return StringView::cmp(*this, other) < 0; }
+		bool operator<=(StringView other) const { return StringView::cmp(*this, other) <= 0; }
+		bool operator>(StringView other) const { return StringView::cmp(*this, other) > 0; }
+		bool operator>=(StringView other) const { return StringView::cmp(*this, other) >= 0; }
 	};
 }

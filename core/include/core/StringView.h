@@ -9,8 +9,12 @@
 
 namespace core
 {
+	class String;
+
 	class StringView
 	{
+		friend class String;
+
 		const char* m_begin = nullptr;
 		size_t m_count = 0;
 
