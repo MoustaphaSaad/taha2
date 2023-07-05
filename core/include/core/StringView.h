@@ -27,7 +27,7 @@ namespace core
 
 		static RabinKarpState hashRabinKarp(StringView v);
 		static RabinKarpState hashRabinKarpReverse(StringView v);
-		static int cmp(StringView a, StringView b);
+		CORE_EXPORT static int cmp(StringView a, StringView b);
 	public:
 		explicit StringView(const char* ptr)
 		{

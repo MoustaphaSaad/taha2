@@ -18,11 +18,11 @@ namespace core
 		size_t m_capacity = 0;
 		size_t m_count = 0;
 
-		void destroy();
+		CORE_EXPORT void destroy();
 
-		void copyFrom(const String& other);
+		CORE_EXPORT void copyFrom(const String& other);
 
-		void moveFrom(String&& other);
+		CORE_EXPORT void moveFrom(String&& other);
 
 		void grow(size_t new_capacity);
 
@@ -111,6 +111,6 @@ namespace core
 		bool operator>(StringView other) const { return StringView::cmp(*this, other) > 0; }
 		bool operator>=(StringView other) const { return StringView::cmp(*this, other) >= 0; }
 
-		void replace(StringView search, StringView replace);
+		CORE_EXPORT void replace(StringView search, StringView replace);
 	};
 }
