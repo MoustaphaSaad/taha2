@@ -76,33 +76,18 @@ namespace core
 		m_ptr[m_count] = '\0';
 	}
 
-	String::String(const char* ptr, Allocator* allocator)
+	String::String(StringView str, Allocator* allocator)
 		: m_allocator(allocator)
 	{
-		if (ptr != nullptr)
+		if (str.count() != 0)
 		{
-			m_count = ::strlen(ptr);
+			m_count = str.count();
 			m_capacity = m_count;
 
 			m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char));
 			m_allocator->commit(m_ptr, m_capacity);
 
-			::memcpy(m_ptr, ptr, m_count);
-		}
-	}
-
-	String::String(const char* begin, const char* end, Allocator* allocator)
-		: m_allocator(allocator)
-	{
-		if (begin != nullptr && end != nullptr)
-		{
-			m_count = end - begin;
-			m_capacity = m_count;
-
-			m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char));
-			m_allocator->commit(m_ptr, m_capacity);
-
-			::memcpy(m_ptr, begin, m_count);
+			::memcpy(m_ptr, str.begin(), m_count);
 		}
 	}
 
@@ -125,5 +110,17 @@ namespace core
 		assert(width > 0 && width <= 4);
 		m_count -= (4 - width) + 1;
 		m_ptr[m_count] = '\0';
+	}
+
+	size_t String::find(StringView str, size_t start) const
+	{
+		StringView self = *this;
+		return self.find(str, start);
+	}
+
+	size_t String::findLast(StringView str, size_t start) const
+	{
+		StringView self = *this;
+		return self.findLast(str, start);
 	}
 }

@@ -35,8 +35,7 @@ namespace core
 			: m_allocator(allocator)
 		{}
 
-		CORE_EXPORT String(const char* ptr, Allocator* allocator);
-		CORE_EXPORT String(const char* begin, const char* end, Allocator* allocator);
+		CORE_EXPORT String(StringView str, Allocator* allocator);
 
 		String(const String& other)
 		{
@@ -79,11 +78,17 @@ namespace core
 			return m_ptr[i];
 		}
 
+		operator StringView() const { return StringView(m_ptr, m_count); }
+
 		CORE_EXPORT size_t count() const { return m_count; }
 		CORE_EXPORT size_t capacity() const { return m_capacity; }
 		CORE_EXPORT size_t runeCount() const { return Rune::count(m_ptr); }
 
 		CORE_EXPORT void push(StringView str);
 		CORE_EXPORT void push(Rune r);
+
+		CORE_EXPORT size_t find(StringView str, size_t start = 0) const;
+		CORE_EXPORT size_t findLast(StringView str, size_t start) const;
+		CORE_EXPORT size_t findLast(StringView str) const { return findLast(str, m_count); }
 	};
 }
