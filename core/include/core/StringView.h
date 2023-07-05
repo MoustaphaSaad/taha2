@@ -60,6 +60,7 @@ namespace core
 		const char* end() const { return m_begin + m_count; }
 
 		CORE_EXPORT size_t find(StringView target, size_t start = 0) const;
+		CORE_EXPORT size_t find(Rune target, size_t start = 0) const;
 		CORE_EXPORT size_t findLast(StringView target, size_t start) const;
 		CORE_EXPORT size_t findLast(StringView target) const { return findLast(target, m_count); }
 

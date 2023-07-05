@@ -118,6 +118,12 @@ namespace core
 		return self.find(str, start);
 	}
 
+	size_t String::find(Rune target, size_t start) const
+	{
+		StringView self = *this;
+		return self.find(target, start);
+	}
+
 	size_t String::findLast(StringView str, size_t start) const
 	{
 		StringView self = *this;

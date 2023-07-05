@@ -47,6 +47,13 @@ TEST_CASE("core::StringView findLast")
 	REQUIRE(""_sv.findLast("hello"_sv) == SIZE_MAX);
 }
 
+TEST_CASE("core::StringView::find Rune")
+{
+	REQUIRE("hello world"_sv.find(core::Rune{'h'}) == 0);
+	REQUIRE("hello world"_sv.find(core::Rune{' '}) == 5);
+	REQUIRE("hello world"_sv.find(core::Rune{'o'}, 6) == 7);
+}
+
 TEST_CASE("core::String creation")
 {
 	core::Mallocator allocator;

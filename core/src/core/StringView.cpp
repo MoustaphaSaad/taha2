@@ -114,6 +114,18 @@ namespace core
 		return SIZE_MAX;
 	}
 
+	size_t StringView::find(Rune target, size_t start) const
+	{
+		assert(start < m_count);
+		for (auto it = m_begin + start; it < m_begin + m_count; it = Rune::next(it))
+		{
+			auto c = Rune::decode(it);
+			if (c == target)
+				return it - m_begin;
+		}
+		return SIZE_MAX;
+	}
+
 	size_t StringView::findLast(StringView target, size_t start) const
 	{
 		auto self = *this;
