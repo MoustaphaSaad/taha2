@@ -82,3 +82,10 @@ TEST_CASE("core::String::replace")
 	str.replace("world"_sv, "مصطفى"_sv);
 	REQUIRE(str == "hello مصطفى"_sv);
 }
+
+TEST_CASE("core::String::format")
+{
+	core::Mallocator allocator;
+	auto output = core::strf(&allocator, "Hello {}!"_sv, "يا عالم 🌎");
+	REQUIRE(output == "Hello يا عالم 🌎!"_sv);
+}

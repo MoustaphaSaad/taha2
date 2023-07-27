@@ -110,7 +110,16 @@ namespace core
 
 		auto width = Rune::encode(r, m_ptr + m_count);
 		assert(width > 0 && width <= 4);
-		m_count -= (4 - width) + 1;
+		m_count += width;
+		m_ptr[m_count] = '\0';
+	}
+
+	void String::pushByte(char v)
+	{
+		// +2 = 1 for the byte + 1 for the null termination
+		ensureSpaceExists(m_count + 2);
+		m_ptr[m_count] = v;
+		++m_count;
 		m_ptr[m_count] = '\0';
 	}
 

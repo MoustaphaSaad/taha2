@@ -38,7 +38,8 @@ elseif (UNIX AND NOT APPLE)
 endif ()
 
 CPMGetPackage(utf8proc)
-target_link_libraries(core PUBLIC utf8proc)
+CPMGetPackage(fmt)
+target_link_libraries(core PUBLIC utf8proc fmt)
 
 target_compile_features(core PUBLIC cxx_std_17)
 set_target_properties(core PROPERTIES

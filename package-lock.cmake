@@ -17,3 +17,11 @@ CPMDeclarePackage(utf8proc
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
 )
+
+CPMDeclarePackage(fmt
+  NAME fmt
+  GIT_TAG 10.0.0
+  GIT_REPOSITORY git@github.com:fmtlib/fmt.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+)
