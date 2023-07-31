@@ -13,6 +13,9 @@ target_sources(core
 		include/core/String.h
 		include/core/StringView.h
 		include/core/Rune.h
+		include/core/Stream.h
+		include/core/File.h
+		include/core/OSStr.h
 		src/core/StringView.cpp
 		src/core/Mallocator.cpp
 		src/core/FastLeak.cpp
@@ -24,7 +27,10 @@ if (WIN32)
 	target_sources(core
 		PRIVATE
 			src/core/winos/VirtualMem.cpp
+			src/core/winos/File.cpp
+			src/core/winos/OSStr.cpp
 	)
+	target_compile_definitions(core PRIVATE UNICODE _UNICODE)
 elseif (APPLE)
 	target_sources(core
 		PRIVATE
