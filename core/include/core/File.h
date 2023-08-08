@@ -60,7 +60,6 @@ namespace core
 
 		static Unique<File> open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode = SHARE_MODE_ALL);
 
-		File() = delete;
 		virtual ~File() = default;
 	};
 }

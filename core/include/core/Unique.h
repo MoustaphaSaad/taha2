@@ -10,56 +10,56 @@ namespace core
 	template<typename T>
 	class Unique
 	{
-		Allocator* allocator = nullptr;
-		T* ptr = nullptr;
+		Allocator* m_allocator = nullptr;
+		T* m_ptr = nullptr;
 
 		void destroy()
 		{
-			if (ptr)
+			if (m_ptr)
 			{
-				ptr->~T();
-				allocator->release(ptr, sizeof(T));
-				allocator->free(ptr, sizeof(T));
-				ptr = nullptr;
+				m_ptr->~T();
+				m_allocator->release(m_ptr, sizeof(T));
+				m_allocator->free(m_ptr, sizeof(T));
+				m_ptr = nullptr;
 			}
 		}
 
-		void moveFrom(Unique&& other)
+		template<typename U>
+		void moveFrom(Unique<U>&& other)
 		{
-			allocator = other.allocator;
-			ptr = other.ptr;
-			other.ptr = nullptr;
+			m_allocator = other.allocator();
+			m_ptr = other.leak();
 		}
 
 	public:
 		Unique() = default;
 
 		Unique(Allocator* a, T* p)
-			: allocator(a),
-			  ptr(p)
+			: m_allocator(a),
+			  m_ptr(p)
 		{}
 
 		Unique(std::nullptr_t){}
 
 		Unique(const Unique&) = delete;
 
-		Unique(Unique&& other)
-			: allocator(other.allocator),
-			  ptr(other.ptr)
-		{
-			other.ptr = nullptr;
-		}
+		template<typename U>
+		Unique(Unique<U>&& other)
+			: m_allocator(other.allocator()),
+			  m_ptr(other.leak())
+		{}
 
 		Unique& operator=(std::nullptr_t)
 		{
 			destroy();
-			ptr = nullptr;
+			m_ptr = nullptr;
 			return *this;
 		}
 
 		Unique& operator=(const Unique&) = delete;
 
-		Unique& operator=(Unique&& other)
+		template<typename U>
+		Unique& operator=(Unique<U>&& other)
 		{
 			destroy();
 			moveFrom(std::move(other));
@@ -71,22 +71,26 @@ namespace core
 			destroy();
 		}
 
-		const T& operator*() const { return *ptr; }
-		T& operator*() { return *ptr; }
+		const T& operator*() const { return *m_ptr; }
+		T& operator*() { return *m_ptr; }
 
-		const T* operator->() const { return ptr; }
-		T* operator->() { return ptr; }
+		const T* operator->() const { return m_ptr; }
+		T* operator->() { return m_ptr; }
 
-		operator bool() const { return ptr != nullptr; }
+		operator bool() const { return m_ptr != nullptr; }
+		bool operator==(std::nullptr_t) const { return m_ptr == nullptr; }
+		bool operator!=(std::nullptr_t) const { return m_ptr != nullptr; }
 
-		T* get() const { return ptr; }
+		T* get() const { return m_ptr; }
 
 		T* leak()
 		{
-			auto p = ptr;
-			ptr = nullptr;
+			auto p = m_ptr;
+			m_ptr = nullptr;
 			return p;
 		}
+
+		Allocator* allocator() const { return m_allocator; }
 	};
 
 	template<typename T, typename... TArgs>

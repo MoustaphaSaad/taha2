@@ -1,4 +1,5 @@
 #include "core/File.h"
+#include "core/OSString.h"
 
 #include <assert.h>
 
@@ -8,13 +9,13 @@
 
 namespace core
 {
-	class WinOSFile : public File
+	class WinOSFile: public File
 	{
-		void* m_handle = nullptr;
+		HANDLE m_handle = INVALID_HANDLE_VALUE;
 
 		void close()
 		{
-			if (m_handle)
+			if (m_handle != INVALID_HANDLE_VALUE)
 			{
 				[[maybe_unused]] auto res = CloseHandle(m_handle);
 				assert(SUCCEEDED(res));
@@ -22,7 +23,10 @@ namespace core
 			}
 		}
 	public:
-		WinOSFile() = default;
+		WinOSFile(HANDLE handle)
+			: m_handle(handle)
+		{}
+
 		~WinOSFile() override
 		{
 			close();
@@ -107,6 +111,26 @@ namespace core
 			break;
 		}
 
-		return nullptr;
+		auto osName = core::OSString{ name, allocator };
+		auto handle = CreateFile(
+			(LPWSTR)osName.data(),
+			dwDesiredAccess,
+			dwShareMode,
+			NULL,
+			dwCreationDisposition,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL
+		);
+
+		if (handle == INVALID_HANDLE_VALUE)
+			return nullptr;
+
+		if (open_mode == OPEN_MODE_CREATE_APPEND ||
+			open_mode == OPEN_MODE_OPEN_APPEND)
+		{
+			SetFilePointer(handle, NULL, NULL, FILE_END);
+		}
+
+		return core::unique_from<WinOSFile>(allocator, handle);
 	}
 }
