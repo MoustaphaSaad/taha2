@@ -2,6 +2,7 @@
 
 #include "core/Exports.h"
 #include <cstdint>
+#include <cstddef>
 
 namespace core
 {

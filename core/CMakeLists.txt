@@ -35,12 +35,14 @@ elseif (APPLE)
 	target_sources(core
 		PRIVATE
 			src/core/macos/VirtualMem.cpp
+			src/core/macos/File.cpp
 			src/core/macos/OSString.cpp
 	)
 elseif (UNIX AND NOT APPLE)
 	target_sources(core
 		PRIVATE
 			src/core/linux/VirtualMem.cpp
+			src/core/linux/File.cpp
 			src/core/linux/OSString.cpp
 	)
 endif ()

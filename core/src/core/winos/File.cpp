@@ -19,7 +19,7 @@ namespace core
 			{
 				[[maybe_unused]] auto res = CloseHandle(m_handle);
 				assert(SUCCEEDED(res));
-				m_handle = nullptr;
+				m_handle = INVALID_HANDLE_VALUE;
 			}
 		}
 	public:
