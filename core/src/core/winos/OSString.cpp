@@ -6,37 +6,6 @@
 
 namespace core
 {
-	void OSString::destroy()
-	{
-		if (m_ptr)
-		{
-			m_allocator->release(m_ptr, m_sizeInBytes);
-			m_allocator->free(m_ptr, m_sizeInBytes);
-			m_ptr = nullptr;
-			m_sizeInBytes = 0;
-		}
-	}
-
-	void OSString::copyFrom(const OSString& other)
-	{
-		m_allocator = other.m_allocator;
-		m_sizeInBytes = other.m_sizeInBytes;
-		m_ptr = (char*)m_allocator->alloc(m_sizeInBytes, alignof(TCHAR));
-		m_allocator->commit(m_ptr, m_sizeInBytes);
-		memcpy(m_ptr, other.m_ptr, m_sizeInBytes);
-	}
-
-	void OSString::moveFrom(OSString&& other)
-	{
-		m_allocator = other.m_allocator;
-		m_sizeInBytes = other.m_sizeInBytes;
-		m_ptr = other.m_ptr;
-
-		other.m_allocator = nullptr;
-		other.m_sizeInBytes = 0;
-		other.m_ptr = nullptr;
-	}
-
 	OSString::OSString(StringView str, Allocator* allocator)
 		: m_allocator(allocator)
 	{

@@ -13,11 +13,36 @@ namespace core
 		char* m_ptr = nullptr;
 		size_t m_sizeInBytes = 0;
 
-		CORE_EXPORT void destroy();
+		void destroy()
+		{
+			if (m_ptr)
+			{
+				m_allocator->release(m_ptr, m_sizeInBytes);
+				m_allocator->free(m_ptr, m_sizeInBytes);
+				m_ptr = nullptr;
+				m_sizeInBytes = 0;
+			}
+		}
 
-		CORE_EXPORT void copyFrom(const OSString& other);
+		void copyFrom(const OSString& other)
+		{
+			m_allocator = other.m_allocator;
+			m_sizeInBytes = other.m_sizeInBytes;
+			m_ptr = (char*)m_allocator->alloc(m_sizeInBytes, alignof(std::max_align_t));
+			m_allocator->commit(m_ptr, m_sizeInBytes);
+			memcpy(m_ptr, other.m_ptr, m_sizeInBytes);
+		}
 
-		CORE_EXPORT void moveFrom(OSString&& other);
+		void moveFrom(OSString&& other)
+		{
+			m_allocator = other.m_allocator;
+			m_sizeInBytes = other.m_sizeInBytes;
+			m_ptr = other.m_ptr;
+
+			other.m_allocator = nullptr;
+			other.m_sizeInBytes = 0;
+			other.m_ptr = nullptr;
+		}
 
 	public:
 		CORE_EXPORT explicit OSString(StringView str, Allocator* allocator);
