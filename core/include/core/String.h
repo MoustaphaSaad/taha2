@@ -14,10 +14,10 @@
 
 namespace core
 {
-	class OSStr;
+	class OSString;
 	class String
 	{
-		friend class OSStr;
+		friend class OSString;
 
 		Allocator* m_allocator = nullptr;
 		char* m_ptr = nullptr;

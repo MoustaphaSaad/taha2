@@ -7,7 +7,7 @@
 
 namespace core
 {
-	class OSStr
+	class OSString
 	{
 		Allocator* m_allocator = nullptr;
 		char* m_ptr = nullptr;
@@ -15,38 +15,38 @@ namespace core
 
 		CORE_EXPORT void destroy();
 
-		CORE_EXPORT void copyFrom(const OSStr& other);
+		CORE_EXPORT void copyFrom(const OSString& other);
 
-		CORE_EXPORT void moveFrom(OSStr&& other);
+		CORE_EXPORT void moveFrom(OSString&& other);
 
 	public:
-		CORE_EXPORT explicit OSStr(StringView str, Allocator* allocator);
+		CORE_EXPORT explicit OSString(StringView str, Allocator* allocator);
 
-		OSStr(const OSStr& other)
+		OSString(const OSString& other)
 		{
 			copyFrom(other);
 		}
 
-		OSStr(OSStr&& other)
+		OSString(OSString&& other)
 		{
 			moveFrom(std::move(other));
 		}
 
-		OSStr& operator=(const OSStr& other)
+		OSString& operator=(const OSString& other)
 		{
 			destroy();
 			copyFrom(other);
 			return *this;
 		}
 
-		OSStr& operator=(OSStr&& other)
+		OSString& operator=(OSString&& other)
 		{
 			destroy();
 			moveFrom(std::move(other));
 			return *this;
 		}
 
-		~OSStr()
+		~OSString()
 		{
 			destroy();
 		}

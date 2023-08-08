@@ -1,4 +1,4 @@
-#include "core/OSStr.h"
+#include "core/OSString.h"
 
 #define NOMINMAX 1
 #define WIN32_LEAN_AND_MEAN 1
@@ -6,7 +6,7 @@
 
 namespace core
 {
-	void OSStr::destroy()
+	void OSString::destroy()
 	{
 		if (m_ptr)
 		{
@@ -17,7 +17,7 @@ namespace core
 		}
 	}
 
-	void OSStr::copyFrom(const OSStr& other)
+	void OSString::copyFrom(const OSString& other)
 	{
 		m_allocator = other.m_allocator;
 		m_sizeInBytes = other.m_sizeInBytes;
@@ -26,7 +26,7 @@ namespace core
 		memcpy(m_ptr, other.m_ptr, m_sizeInBytes);
 	}
 
-	void OSStr::moveFrom(OSStr&& other)
+	void OSString::moveFrom(OSString&& other)
 	{
 		m_allocator = other.m_allocator;
 		m_sizeInBytes = other.m_sizeInBytes;
@@ -37,7 +37,7 @@ namespace core
 		other.m_ptr = nullptr;
 	}
 
-	OSStr::OSStr(StringView str, Allocator* allocator)
+	OSString::OSString(StringView str, Allocator* allocator)
 		: m_allocator(allocator)
 	{
 		auto countNeeded = MultiByteToWideChar(CP_UTF8, 0, str.begin(), str.count(), nullptr, 0);
@@ -52,7 +52,7 @@ namespace core
 		ptr[countNeeded] = TCHAR{0};
 	}
 
-	String OSStr::toUtf8(Allocator* allocator) const
+	String OSString::toUtf8(Allocator* allocator) const
 	{
 		auto countNeeded = WideCharToMultiByte(CP_UTF8, NULL, (LPTSTR)m_ptr, int(m_sizeInBytes / sizeof(TCHAR)), NULL, 0, NULL, NULL);
 		if (countNeeded == 0)
