@@ -31,6 +31,58 @@ namespace core
 		{
 			close();
 		}
+
+		size_t read(void* buffer, size_t size) override
+		{
+			DWORD dwNumberOfBytesRead = 0;
+			auto res = ReadFile(m_handle, buffer, size, &dwNumberOfBytesRead, nullptr);
+			assert(SUCCEEDED(res));
+			return dwNumberOfBytesRead;
+		}
+
+		size_t write(const void* buffer, size_t size) override
+		{
+			DWORD dwNumberOfBytesWritten = 0;
+			auto res = WriteFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesWritten, nullptr);
+			assert(SUCCEEDED(res));
+			return dwNumberOfBytesWritten;
+		}
+
+		int64_t seek(int64_t offset, SEEK_MODE seek_mode) override
+		{
+			DWORD dwMoveMethod = 0;
+			switch (seek_mode)
+			{
+			case SEEK_MODE_BEGIN:
+				dwMoveMethod = FILE_BEGIN;
+				break;
+
+			case SEEK_MODE_CURRENT:
+				dwMoveMethod = FILE_CURRENT;
+				break;
+
+			case SEEK_MODE_END:
+				dwMoveMethod = FILE_END;
+				break;
+			}
+
+			LARGE_INTEGER liDistanceToMove{};
+			liDistanceToMove.QuadPart = offset;
+			LARGE_INTEGER liNewFilePointer{};
+			auto res = SetFilePointerEx(m_handle, liDistanceToMove, &liNewFilePointer, dwMoveMethod);
+			assert(SUCCEEDED(res));
+			return liNewFilePointer.QuadPart;
+		}
+
+		int64_t tell() override
+		{
+			LARGE_INTEGER liDistanceToMove{};
+			liDistanceToMove.QuadPart = 0;
+			LARGE_INTEGER liNewFilePointer{};
+			auto res = SetFilePointerEx(m_handle, liDistanceToMove, &liNewFilePointer, FILE_CURRENT);
+			assert(SUCCEEDED(res));
+			return liNewFilePointer.QuadPart;
+		}
 	};
 
 	Unique<File> File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
