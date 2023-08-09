@@ -30,6 +30,48 @@ namespace core
 		{
 			close();
 		}
+
+		size_t read(void* buffer, size_t size) override
+		{
+			auto res = ::read(m_handle, buffer, size);
+			if (res == -1)
+				return SIZE_MAX;
+			return res;
+		}
+
+		size_t write(const void* buffer, size_t size) override
+		{
+			auto res = ::write(m_handle, buffer, size);
+			if (res == -1)
+				return SIZE_MAX;
+			return res;
+		}
+
+		int64_t seek(int64_t offset, SEEK_MODE seek_mode) override
+		{
+			int whence = 0;
+			switch (seek_mode)
+			{
+			case SEEK_MODE_BEGIN:
+				whence = SEEK_SET;
+				break;
+
+			case SEEK_MODE_CURRENT:
+				whence = SEEK_CUR;
+				break;
+
+			case SEEK_MODE_END:
+				whence = SEEK_END;
+				break;
+			}
+
+			return ::lseek64(m_handle, offset, whence);
+		}
+
+		int64_t tell() override
+		{
+			return ::lseek64(m_handle, 0, SEEK_CUR);
+		}
 	};
 
 	Unique<File> File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
