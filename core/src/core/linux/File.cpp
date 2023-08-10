@@ -11,10 +11,11 @@ namespace core
 	class LinuxFile: public File
 	{
 		int m_handle = -1;
+		bool m_closeHandle = true;
 
 		void close()
 		{
-			if (m_handle != -1)
+			if (m_handle != -1 && m_closeHandle)
 			{
 				[[maybe_unused]] auto res = ::close(m_handle);
 				assert(res == 0);
@@ -22,8 +23,9 @@ namespace core
 			}
 		}
 	public:
-		LinuxFile(int handle)
-			: m_handle(handle)
+		LinuxFile(int handle, bool close_handle = true)
+			: m_handle(handle),
+			  m_closeHandle(close_handle)
 		{}
 
 		~LinuxFile() override
@@ -73,6 +75,14 @@ namespace core
 			return ::lseek64(m_handle, 0, SEEK_CUR);
 		}
 	};
+
+	static LinuxFile STDOUT{STDOUT_FILENO, false};
+	static LinuxFile STDERR{STDERR_FILENO, false};
+	static LinuxFile STDIN{STDIN_FILENO, false};
+
+	File* File::STDOUT = &core::STDOUT;
+	File* File::STDERR = &core::STDERR;
+	File* File::STDIN = &core::STDIN;
 
 	Unique<File> File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
 	{

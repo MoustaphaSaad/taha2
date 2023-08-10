@@ -23,3 +23,12 @@ TEST_CASE("core::File roundtrip")
 	REQUIRE(bytesRead == bytesWritten);
 	REQUIRE(memcmp(buffer, str.data(), bytesRead) == 0);
 }
+
+TEST_CASE("core::File print to std files")
+{
+	auto stdout_msg = "hello from stdout\n"_sv;
+	core::File::STDOUT->write(stdout_msg.data(), stdout_msg.count());
+
+	auto stderr_msg = "hello from stderr\n"_sv;
+	core::File::STDERR->write(stderr_msg.data(), stderr_msg.count());
+}

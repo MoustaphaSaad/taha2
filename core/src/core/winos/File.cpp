@@ -12,10 +12,11 @@ namespace core
 	class WinOSFile: public File
 	{
 		HANDLE m_handle = INVALID_HANDLE_VALUE;
+		bool m_closeHandle = true;
 
 		void close()
 		{
-			if (m_handle != INVALID_HANDLE_VALUE)
+			if (m_handle != INVALID_HANDLE_VALUE && m_closeHandle)
 			{
 				[[maybe_unused]] auto res = CloseHandle(m_handle);
 				assert(SUCCEEDED(res));
@@ -23,8 +24,9 @@ namespace core
 			}
 		}
 	public:
-		WinOSFile(HANDLE handle)
-			: m_handle(handle)
+		WinOSFile(HANDLE handle, bool close_handle = true)
+			: m_handle(handle),
+			  m_closeHandle(close_handle)
 		{}
 
 		~WinOSFile() override
@@ -84,6 +86,14 @@ namespace core
 			return liNewFilePointer.QuadPart;
 		}
 	};
+
+	static WinOSFile STDOUT{GetStdHandle(STD_OUTPUT_HANDLE), false};
+	static WinOSFile STDERR{GetStdHandle(STD_ERROR_HANDLE), false};
+	static WinOSFile STDIN{GetStdHandle(STD_INPUT_HANDLE), false};
+
+	File* File::STDOUT = &core::STDOUT;
+	File* File::STDERR = &core::STDERR;
+	File* File::STDIN = &core::STDIN;
 
 	Unique<File> File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
 	{
