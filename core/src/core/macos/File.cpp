@@ -67,12 +67,12 @@ namespace core
 				break;
 			}
 
-			return ::lseek64(m_handle, offset, whence);
+			return ::lseek(m_handle, offset, whence);
 		}
 
 		int64_t tell() override
 		{
-			return ::lseek64(m_handle, 0, SEEK_CUR);
+			return ::lseek(m_handle, 0, SEEK_CUR);
 		}
 	};
 
