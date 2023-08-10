@@ -14,8 +14,11 @@
 
 namespace core
 {
+	class OSString;
 	class String
 	{
+		friend class OSString;
+
 		Allocator* m_allocator = nullptr;
 		char* m_ptr = nullptr;
 		size_t m_capacity = 0;

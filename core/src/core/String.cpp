@@ -22,7 +22,7 @@ namespace core
 		m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char));
 		m_allocator->commit(m_ptr, m_capacity);
 
-		::memcpy(m_ptr, other.m_ptr, m_count);
+		::memcpy(m_ptr, other.m_ptr, m_capacity);
 	}
 
 	void String::moveFrom(String&& other)
