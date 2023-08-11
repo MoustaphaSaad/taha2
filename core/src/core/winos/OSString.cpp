@@ -9,13 +9,13 @@ namespace core
 	OSString::OSString(StringView str, Allocator* allocator)
 		: m_allocator(allocator)
 	{
-		auto countNeeded = MultiByteToWideChar(CP_UTF8, 0, str.begin(), str.count(), nullptr, 0);
+		auto countNeeded = MultiByteToWideChar(CP_UTF8, 0, str.begin(), DWORD(str.count()), nullptr, 0);
 
 		// +1 for the null termination
 		m_sizeInBytes = (countNeeded + 1) * sizeof(TCHAR);
 		m_ptr = (char*)m_allocator->alloc(m_sizeInBytes, alignof(TCHAR));
 		m_allocator->commit(m_ptr, m_sizeInBytes);
-		MultiByteToWideChar(CP_UTF8, 0, str.begin(), str.count(), (TCHAR*)m_ptr, countNeeded);
+		MultiByteToWideChar(CP_UTF8, 0, str.begin(), DWORD(str.count()), (TCHAR*)m_ptr, countNeeded);
 
 		auto ptr = (TCHAR*)m_ptr;
 		ptr[countNeeded] = TCHAR{0};

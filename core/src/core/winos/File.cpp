@@ -38,7 +38,7 @@ namespace core
 		size_t read(void* buffer, size_t size) override
 		{
 			DWORD dwNumberOfBytesRead = 0;
-			auto res = ReadFile(m_handle, buffer, size, &dwNumberOfBytesRead, nullptr);
+			auto res = ReadFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesRead, nullptr);
 			assert(SUCCEEDED(res));
 			return dwNumberOfBytesRead;
 		}
