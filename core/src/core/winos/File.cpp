@@ -1,5 +1,6 @@
 #include "core/File.h"
 #include "core/OSString.h"
+#include "core/Mallocator.h"
 
 #include <assert.h>
 
@@ -44,10 +45,37 @@ namespace core
 
 		size_t write(const void* buffer, size_t size) override
 		{
-			DWORD dwNumberOfBytesWritten = 0;
-			auto res = WriteFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesWritten, nullptr);
-			assert(SUCCEEDED(res));
-			return dwNumberOfBytesWritten;
+			bool isStdFile = this == File::STDOUT || this == File::STDERR;
+			bool isConsole = false;
+			if (isStdFile)
+			{
+				DWORD dwMode = 0;
+				auto res = GetConsoleMode(m_handle, &dwMode);
+				isConsole = res != 0;
+			}
+
+			if (isConsole)
+			{
+				// TODO: use a better allocator
+				Mallocator allocator{};
+				OSString osStr{StringView{(const char*)buffer, size}, &allocator};
+
+				DWORD nNumberOfCharsWritten = 0;
+				DWORD nNumberOfCharsToWrite = DWORD(osStr.sizeInBytes());
+				if (nNumberOfCharsToWrite > 0)
+					--nNumberOfCharsToWrite;
+				nNumberOfCharsToWrite /= sizeof(TCHAR);
+				auto res = WriteConsole(m_handle, osStr.data(), nNumberOfCharsToWrite, &nNumberOfCharsWritten, nullptr);
+				assert(SUCCEEDED(res));
+				return nNumberOfCharsWritten * sizeof(TCHAR);
+			}
+			else
+			{
+				DWORD dwNumberOfBytesWritten = 0;
+				auto res = WriteFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesWritten, nullptr);
+				assert(SUCCEEDED(res));
+				return dwNumberOfBytesWritten;
+			}
 		}
 
 		int64_t seek(int64_t offset, SEEK_MODE seek_mode) override

@@ -83,7 +83,7 @@ namespace core
 
 		T* get() const { return m_ptr; }
 
-		T* leak()
+		[[nodiscard]] T* leak()
 		{
 			auto p = m_ptr;
 			m_ptr = nullptr;

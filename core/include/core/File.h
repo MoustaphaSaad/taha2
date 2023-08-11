@@ -6,6 +6,9 @@
 #include "core/StringView.h"
 #include "core/Allocator.h"
 
+#include <fmt/core.h>
+#include <fmt/format.h>
+
 namespace core
 {
 	// TODO: inherit from Stream
@@ -80,4 +83,12 @@ namespace core
 		virtual int64_t seek(int64_t offset, SEEK_MODE seek_mode) = 0;
 		virtual int64_t tell() = 0;
 	};
+
+	template<typename ... Args>
+	inline void strf(File* file, StringView format, Args&& ... args)
+	{
+		auto out = fmt::memory_buffer();
+		fmt::format_to(std::back_inserter(out), std::string_view{format.begin(), format.count()}, std::forward<Args>(args)...);
+		file->write(out.data(), out.size());
+	}
 }

@@ -31,4 +31,12 @@ TEST_CASE("core::File print to std files")
 
 	auto stderr_msg = "hello from stderr\n"_sv;
 	core::File::STDERR->write(stderr_msg.data(), stderr_msg.count());
+
+	auto stdout_utf8 = "Hello يا عالم 🌎!\n"_sv;
+	core::File::STDOUT->write(stdout_utf8.data(), stdout_utf8.count());
+}
+
+TEST_CASE("core::File strf to stdout")
+{
+	core::strf(core::File::STDOUT, "Hello {}!\n"_sv, "يا عالم 🌎");
 }
