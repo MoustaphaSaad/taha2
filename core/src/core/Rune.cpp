@@ -14,9 +14,10 @@ namespace core
 		return Rune{utf8proc_toupper(m_value)};
 	}
 
-	size_t Rune::charWidth() const
+	size_t Rune::size() const
 	{
-		return utf8proc_charwidth(m_value);
+		char bytes[4] = {};
+		return encode(*this, bytes);
 	}
 
 	bool Rune::isLetter() const
@@ -108,7 +109,6 @@ namespace core
 
 	size_t Rune::encode(Rune c, char* ptr)
 	{
-		// mn_assert(b.size >= 4);
 		return utf8proc_encode_char(c, (utf8proc_uint8_t*)ptr);
 	}
 }

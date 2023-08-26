@@ -25,7 +25,7 @@ namespace core
 
 		CORE_EXPORT Rune lower() const;
 		CORE_EXPORT Rune upper() const;
-		CORE_EXPORT size_t charWidth() const;
+		CORE_EXPORT size_t size() const;
 		CORE_EXPORT bool isLetter() const;
 		CORE_EXPORT bool isNumber() const;
 		CORE_EXPORT bool isValid() const;
