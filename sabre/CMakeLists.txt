@@ -4,6 +4,7 @@ target_sources(sabre
 	PRIVATE
 		include/sabre/Dummy.h
 		include/sabre/Token.h
+		include/sabre/Unit.h
 		src/sabre/Dummy.cpp
 )
 
