@@ -67,16 +67,6 @@ namespace core
 		}
 	}
 
-	void String::resize(size_t new_count)
-	{
-		// +1 for the null terminator
-		if (new_count + 1 > m_capacity)
-			grow(new_count + 1);
-
-		m_count = new_count;
-		m_ptr[m_count] = '\0';
-	}
-
 	String::String(StringView str, Allocator* allocator)
 		: m_allocator(allocator)
 	{
@@ -91,6 +81,16 @@ namespace core
 			::memcpy(m_ptr, str.begin(), m_count);
 			m_ptr[m_count] = '\0';
 		}
+	}
+
+	void String::resize(size_t new_count)
+	{
+		// +1 for the null terminator
+		if (new_count + 1 > m_capacity)
+			grow(new_count + 1);
+
+		m_count = new_count;
+		m_ptr[m_count] = '\0';
 	}
 
 	void String::push(StringView str)

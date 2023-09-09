@@ -2,10 +2,9 @@ add_library(sabre)
 
 target_sources(sabre
 	PRIVATE
-		include/sabre/Dummy.h
 		include/sabre/Token.h
 		include/sabre/Unit.h
-		src/sabre/Dummy.cpp
+		src/sabre/Unit.cpp
 )
 
 target_link_libraries(sabre PUBLIC core)

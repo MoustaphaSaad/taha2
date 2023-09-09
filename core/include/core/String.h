@@ -34,8 +34,6 @@ namespace core
 
 		void ensureSpaceExists(size_t count);
 
-		void resize(size_t new_count);
-
 	public:
 		explicit String(Allocator* allocator)
 			: m_allocator(allocator)
@@ -95,6 +93,11 @@ namespace core
 		size_t count() const { return m_count; }
 		size_t capacity() const { return m_capacity; }
 		size_t runeCount() const { return Rune::count(m_ptr, m_ptr + m_count); }
+		char* data() { return m_ptr; }
+		const char* data() const { return m_ptr; }
+
+		void resize(size_t new_count);
+		void reserve(size_t extra_count) { ensureSpaceExists(extra_count); }
 
 		CORE_EXPORT void push(StringView str);
 		CORE_EXPORT void push(Rune r);
@@ -162,5 +165,24 @@ namespace std
 		typedef char* pointer;
 		typedef char& reference;
 		typedef std::output_iterator_tag iterator_category;
+	};
+}
+
+namespace fmt
+{
+	template<>
+	struct formatter<core::String>
+	{
+		template<typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
+		{
+			return ctx.begin();
+		}
+
+		template<typename FormatContext>
+		auto format(const core::String& str, FormatContext& ctx)
+		{
+			return format_to(ctx.out(), "{}", StringView{str});
+		}
 	};
 }

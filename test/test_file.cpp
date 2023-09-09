@@ -18,10 +18,9 @@ TEST_CASE("core::File roundtrip")
 	auto cursor = file->seek(0, core::File::SEEK_MODE_BEGIN);
 	REQUIRE(cursor == 0);
 
-	char buffer[1024];
-	auto bytesRead = file->read(buffer, sizeof(buffer));
-	REQUIRE(bytesRead == bytesWritten);
-	REQUIRE(memcmp(buffer, str.data(), bytesRead) == 0);
+	auto buffer_result = core::File::content(&allocator, "test.txt"_sv);
+	REQUIRE(buffer_result.is_error() == false);
+	REQUIRE(str == buffer_result.value());
 }
 
 TEST_CASE("core::File print to std files")

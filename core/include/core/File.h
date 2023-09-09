@@ -5,6 +5,8 @@
 #include "core/Unique.h"
 #include "core/StringView.h"
 #include "core/Allocator.h"
+#include "core/String.h"
+#include "core/Result.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
@@ -72,6 +74,7 @@ namespace core
 		};
 
 		CORE_EXPORT static Unique<File> open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode = SHARE_MODE_ALL);
+		CORE_EXPORT static Result<String> content(Allocator* allocator, StringView name);
 		CORE_EXPORT static File* STDOUT;
 		CORE_EXPORT static File* STDERR;
 		CORE_EXPORT static File* STDIN;

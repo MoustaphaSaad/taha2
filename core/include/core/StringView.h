@@ -3,6 +3,9 @@
 #include "core/Exports.h"
 #include "core/Rune.h"
 
+#include <fmt/core.h>
+#include <fmt/format.h>
+
 #include <cassert>
 #include <cstring>
 #include <cstdint>
@@ -83,4 +86,23 @@ namespace core
 inline static core::StringView operator "" _sv(const char* ptr, size_t len)
 {
 	return core::StringView(ptr, len);
+}
+
+namespace fmt
+{
+	template<>
+	struct formatter<core::StringView>
+	{
+		template<typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
+		{
+			return ctx.begin();
+		}
+
+		template<typename FormatContext>
+		auto format(const core::StringView& str, FormatContext& ctx)
+		{
+			return format_to(ctx.out(), "{}", fmt::string_view{str.data(), str.count()});
+		}
+	};
 }
