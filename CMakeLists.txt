@@ -8,8 +8,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+option(BUILD_SHARED_LIBS "Build all libraries as shared" ON)
+
 include(CPM)
 CPMUsePackageLock(package-lock.cmake)
 
 add_subdirectory(core)
+add_subdirectory(sabre)
 add_subdirectory(test)
