@@ -3,6 +3,7 @@ add_library(sabre)
 target_sources(sabre
 	PRIVATE
 		include/sabre/Dummy.h
+		include/sabre/Token.h
 		src/sabre/Dummy.cpp
 )
 

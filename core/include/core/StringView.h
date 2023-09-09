@@ -65,8 +65,14 @@ namespace core
 		CORE_EXPORT size_t findLast(StringView target, size_t start) const;
 		CORE_EXPORT size_t findLast(StringView target) const { return findLast(target, m_count); }
 
-		bool operator==(StringView other) const { return cmp(*this, other) == 0; }
-		bool operator!=(StringView other) const { return cmp(*this, other) != 0; }
+		bool operator==(StringView other) const
+		{
+			if (m_begin == other.m_begin && m_count == other.m_count)
+				return true;
+
+			return cmp(*this, other) == 0;
+		}
+		bool operator!=(StringView other) const { return !operator==(other); }
 		bool operator<(StringView other) const { return cmp(*this, other) < 0; }
 		bool operator<=(StringView other) const { return cmp(*this, other) <= 0; }
 		bool operator>(StringView other) const { return cmp(*this, other) > 0; }
