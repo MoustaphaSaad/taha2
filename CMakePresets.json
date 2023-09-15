@@ -1,0 +1,63 @@
+{
+	"version": 6,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 0,
+		"patch": 0
+	},
+
+	"configurePresets": [
+		{
+			"name": "msvc-base",
+			"hidden": true,
+			"generator": "Visual Studio 17 2022",
+			"architecture": "x64",
+			"condition": {
+				"type": "equals",
+				"lhs": "${hostSystemName}",
+				"rhs": "Windows"
+			}
+		},
+		{
+			"name": "msvc-debug",
+			"inherits": "msvc-base",
+			"displayName": "MSVC Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "msvc-release",
+			"inherits": "msvc-base",
+			"displayName": "MSVC Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "ninja-base",
+			"hidden": true,
+			"generator": "Ninja"
+		},
+		{
+			"name": "ninja-debug",
+			"inherits": "ninja-base",
+			"displayName": "Ninja Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "ninja-release",
+			"inherits": "ninja-base",
+			"displayName": "Ninja Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		}
+	]
+}
