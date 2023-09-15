@@ -20,7 +20,7 @@ CPMDeclarePackage(utf8proc
 
 CPMDeclarePackage(fmt
   NAME fmt
-  GIT_TAG 10.0.0
+  GIT_TAG 10.1.1
   GIT_REPOSITORY git@github.com:fmtlib/fmt.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
