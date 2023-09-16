@@ -17,12 +17,14 @@ target_sources(core
 		include/core/File.h
 		include/core/OSString.h
 		include/core/Result.h
+		include/core/Buffer.h
 		src/core/StringView.cpp
 		src/core/Mallocator.cpp
 		src/core/FastLeak.cpp
 		src/core/String.cpp
 		src/core/Rune.cpp
 		src/core/File.cpp
+		src/core/Buffer.cpp
 )
 
 if (WIN32)

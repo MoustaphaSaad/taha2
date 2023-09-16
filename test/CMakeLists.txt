@@ -9,6 +9,7 @@ add_executable(unittests
 	test_string.cpp
 	test_osstring.cpp
 	test_file.cpp
+	test_buffer.cpp
 )
 
 CPMGetPackage(doctest)
