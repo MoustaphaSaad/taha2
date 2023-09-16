@@ -10,8 +10,12 @@
 
 namespace core
 {
+	class String;
+
 	class Buffer
 	{
+		friend class String;
+
 		Allocator* m_allocator = nullptr;
 		std::byte* m_ptr = nullptr;
 		size_t m_capacity = 0;
@@ -41,6 +45,8 @@ namespace core
 		{
 			moveFrom(std::move(other));
 		}
+
+		CORE_EXPORT explicit Buffer(String&& str);
 
 		Buffer& operator=(const Buffer& other)
 		{
@@ -94,5 +100,6 @@ namespace core
 		size_t capacity() const { return m_capacity; }
 		std::byte* data() { return m_ptr; }
 		const std::byte* data() const { return m_ptr; }
+		Allocator* allocator() const { return m_allocator; }
 	};
 }

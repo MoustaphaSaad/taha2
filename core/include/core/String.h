@@ -15,9 +15,12 @@
 namespace core
 {
 	class OSString;
+	class Buffer;
+
 	class String
 	{
 		friend class OSString;
+		friend class Buffer;
 
 		Allocator* m_allocator = nullptr;
 		char* m_ptr = nullptr;
@@ -50,6 +53,8 @@ namespace core
 		{
 			moveFrom(std::move(other));
 		}
+
+		explicit String(Buffer&& buffer);
 
 		String& operator=(const String& other)
 		{
@@ -95,6 +100,7 @@ namespace core
 		size_t runeCount() const { return Rune::count(m_ptr, m_ptr + m_count); }
 		char* data() { return m_ptr; }
 		const char* data() const { return m_ptr; }
+		Allocator* allocator() const { return m_allocator; }
 
 		void resize(size_t new_count);
 		void reserve(size_t extra_count) { ensureSpaceExists(extra_count); }

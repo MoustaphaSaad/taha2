@@ -1,4 +1,5 @@
 #include "core/Buffer.h"
+#include "core/String.h"
 
 #include <cstring>
 
@@ -65,6 +66,18 @@ namespace core
 
 			grow(new_capacity);
 		}
+	}
+
+	Buffer::Buffer(String&& str)
+	{
+		m_allocator = str.m_allocator;
+		m_ptr = (std::byte*)str.m_ptr;
+		m_capacity = str.m_capacity;
+		m_count = str.m_count;
+
+		str.m_ptr = nullptr;
+		str.m_capacity = 0;
+		str.m_count = 0;
 	}
 
 	void Buffer::push(const std::byte* ptr, size_t size)

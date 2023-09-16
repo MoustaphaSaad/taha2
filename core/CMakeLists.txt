@@ -1,30 +1,31 @@
 add_library(core)
 
-target_sources(core
-	PRIVATE
-		include/core/Allocator.h
-		include/core/Mallocator.h
-		include/core/VirtualMem.h
-		include/core/FastLeak.h
-		include/core/Unique.h
-		include/core/Shared.h
-		include/core/Array.h
-		include/core/Hash.h
-		include/core/String.h
-		include/core/StringView.h
-		include/core/Rune.h
-		include/core/Stream.h
-		include/core/File.h
-		include/core/OSString.h
-		include/core/Result.h
-		include/core/Buffer.h
-		src/core/StringView.cpp
-		src/core/Mallocator.cpp
-		src/core/FastLeak.cpp
-		src/core/String.cpp
-		src/core/Rune.cpp
-		src/core/File.cpp
-		src/core/Buffer.cpp
+target_sources(core PRIVATE
+	include/core/Allocator.h
+	include/core/Mallocator.h
+	include/core/VirtualMem.h
+	include/core/FastLeak.h
+	include/core/Unique.h
+	include/core/Shared.h
+	include/core/Array.h
+	include/core/Hash.h
+	include/core/String.h
+	include/core/StringView.h
+	include/core/Rune.h
+	include/core/Stream.h
+	include/core/File.h
+	include/core/OSString.h
+	include/core/Result.h
+	include/core/Buffer.h
+	include/core/MemoryStream.h
+	src/core/StringView.cpp
+	src/core/Mallocator.cpp
+	src/core/FastLeak.cpp
+	src/core/String.cpp
+	src/core/Rune.cpp
+	src/core/File.cpp
+	src/core/Buffer.cpp
+	src/core/MemoryStream.cpp
 )
 
 if (WIN32)

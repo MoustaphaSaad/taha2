@@ -1,4 +1,5 @@
 #include "core/String.h"
+#include "core/Buffer.h"
 
 #include <utf8proc.h>
 
@@ -81,6 +82,18 @@ namespace core
 			::memcpy(m_ptr, str.begin(), m_count);
 			m_ptr[m_count] = '\0';
 		}
+	}
+
+	String::String(Buffer&& buffer)
+	{
+		m_allocator = buffer.m_allocator;
+		m_ptr = (char*)buffer.m_ptr;
+		m_capacity = buffer.m_capacity;
+		m_count = buffer.m_count;
+
+		buffer.m_ptr = nullptr;
+		buffer.m_count = 0;
+		buffer.m_capacity = 0;
 	}
 
 	void String::resize(size_t new_count)

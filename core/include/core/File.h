@@ -79,10 +79,10 @@ namespace core
 	};
 
 	template<typename ... Args>
-	inline void strf(File* file, StringView format, Args&& ... args)
+	inline void strf(Stream* stream, StringView format, Args&& ... args)
 	{
 		auto out = fmt::memory_buffer();
 		fmt::format_to(std::back_inserter(out), std::string_view{format.begin(), format.count()}, std::forward<Args>(args)...);
-		file->write(out.data(), out.size());
+		stream->write(out.data(), out.size());
 	}
 }
