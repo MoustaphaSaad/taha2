@@ -182,7 +182,7 @@ namespace fmt
 		template<typename FormatContext>
 		auto format(const core::String& str, FormatContext& ctx)
 		{
-			return format_to(ctx.out(), "{}", StringView{str});
+			return format_to(ctx.out(), "{}", core::StringView{str});
 		}
 	};
 }
