@@ -14,7 +14,7 @@
 namespace core
 {
 	// TODO: inherit from Stream
-	class File
+	class File: public Stream
 	{
 	public:
 		enum OPEN_MODE
@@ -63,28 +63,19 @@ namespace core
 			IO_MODE_READ_WRITE,
 		};
 
-		enum SEEK_MODE
-		{
-			// seek from the beginning of the file
-			SEEK_MODE_BEGIN,
-			// seek from the current position
-			SEEK_MODE_CURRENT,
-			// seek from the end of the file
-			SEEK_MODE_END,
-		};
-
 		CORE_EXPORT static Unique<File> open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode = SHARE_MODE_ALL);
 		CORE_EXPORT static Result<String> content(Allocator* allocator, StringView name);
 		CORE_EXPORT static File* STDOUT;
 		CORE_EXPORT static File* STDERR;
 		CORE_EXPORT static File* STDIN;
 
-		virtual ~File() = default;
-
-		virtual size_t read(void* buffer, size_t size) = 0;
-		virtual size_t write(const void* buffer, size_t size) = 0;
-		virtual int64_t seek(int64_t offset, SEEK_MODE seek_mode) = 0;
-		virtual int64_t tell() = 0;
+		int64_t size()
+		{
+			auto cursor = tell();
+			auto size = seek(0, Stream::SEEK_MODE_END);
+			seek(cursor, Stream::SEEK_MODE_BEGIN);
+			return size;
+		}
 	};
 
 	template<typename ... Args>

@@ -8,12 +8,11 @@ namespace core
 		if (!f)
 			return errf(allocator, "failed to open file '{}'"_sv, name);
 
-		auto size = f->seek(0, SEEK_MODE_END);
+		auto size = f->size();
 
 		core::String res{allocator};
 		res.resize(size);
 
-		f->seek(0, SEEK_MODE_BEGIN);
 		int64_t i = 0;
 		while (i < size)
 		{
