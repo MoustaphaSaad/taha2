@@ -18,6 +18,7 @@ target_sources(core PRIVATE
 	include/core/Result.h
 	include/core/Buffer.h
 	include/core/MemoryStream.h
+	include/core/Intrinsics.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -34,6 +35,7 @@ if (WIN32)
 			src/core/winos/VirtualMem.cpp
 			src/core/winos/File.cpp
 			src/core/winos/OSString.cpp
+			src/core/winos/Intrinsics.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE)
 elseif (APPLE)
@@ -42,6 +44,7 @@ elseif (APPLE)
 			src/core/macos/VirtualMem.cpp
 			src/core/macos/File.cpp
 			src/core/macos/OSString.cpp
+			src/core/macos/Intrinsics.cpp
 	)
 elseif (UNIX AND NOT APPLE)
 	target_sources(core
@@ -49,6 +52,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/VirtualMem.cpp
 			src/core/linux/File.cpp
 			src/core/linux/OSString.cpp
+			src/core/linux/Intrinsics.cpp
 	)
 endif ()
 
