@@ -13,7 +13,7 @@ namespace core
 	{
 		core::String m_message;
 	public:
-		explicit HumanError(core::String message) : m_message(message) {}
+		explicit HumanError(core::String message) : m_message(std::move(message)) {}
 
 		core::StringView message() const { return m_message; }
 
