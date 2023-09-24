@@ -27,7 +27,7 @@ namespace core::msgpack
 	}
 }
 
-TEST_CASE("playground")
+TEST_CASE("basic msgpack encode/decode")
 {
 	core::Mallocator allocator;
 
