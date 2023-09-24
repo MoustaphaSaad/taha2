@@ -244,7 +244,7 @@ namespace core::msgpack
 			auto element = DefaultConstruct<T>{}(reader);
 			if (auto err = msgpack(reader, element))
 				return err;
-			value.push_back(std::move(element));
+			value.push(std::move(element));
 		}
 		return {};
 	}
@@ -396,7 +396,7 @@ namespace core::msgpack
 				}
 			}
 			if (consumed_value == false)
-				reader.skip();
+				if (auto err = reader.skip()) return err;
 		}
 
 		if (required_fields != 0)
@@ -404,6 +404,130 @@ namespace core::msgpack
 
 		return {};
 	}
+
+	class Value
+	{
+	public:
+		enum KIND
+		{
+			KIND_NULL,
+			KIND_BOOL,
+			KIND_INT,
+			KIND_UINT,
+			KIND_FLOAT,
+			KIND_DOUBLE,
+			KIND_STRING,
+			KIND_BYTES,
+			KIND_ARRAY,
+			KIND_MAP,
+		};
+
+		Value() = default;
+		Value(nullptr_t) : m_kind{KIND_NULL} {}
+		Value(bool value) : m_kind{KIND_BOOL}, m_bool{value} {}
+		Value(int64_t value) : m_kind{KIND_INT}, m_int{value} {}
+		Value(uint64_t value) : m_kind{KIND_UINT}, m_uint{value} {}
+		Value(float value) : m_kind{KIND_FLOAT}, m_float{value} {}
+		Value(double value) : m_kind{KIND_DOUBLE}, m_double{value} {}
+
+		CORE_EXPORT Value(StringView value, Allocator* allocator);
+		CORE_EXPORT Value(const std::byte* data, size_t size, Allocator* allocator);
+		CORE_EXPORT Value(Array<Value> value);
+		CORE_EXPORT Value(Map<String, Value> value);
+
+		Value (const Value& other)
+		{
+			copyFrom(other);
+		}
+
+		Value (Value&& other)
+		{
+			moveFrom(std::move(other));
+		}
+
+		Value& operator=(const Value& other)
+		{
+			destroy();
+			copyFrom(other);
+			return *this;
+		}
+
+		Value& operator=(Value&& other)
+		{
+			destroy();
+			moveFrom(std::move(other));
+			return *this;
+		}
+
+		CORE_EXPORT Value& operator=(nullptr_t);
+		CORE_EXPORT Value& operator=(bool value);
+		CORE_EXPORT Value& operator=(int64_t value);
+		CORE_EXPORT Value& operator=(uint64_t value);
+		CORE_EXPORT Value& operator=(float value);
+		CORE_EXPORT Value& operator=(double value);
+		CORE_EXPORT Value& operator=(String value);
+		CORE_EXPORT Value& operator=(Buffer value);
+		CORE_EXPORT Value& operator=(Array<Value> value);
+		CORE_EXPORT Value& operator=(Map<String, Value> value);
+
+		Value& operator=(int8_t value) { return operator=((int64_t)value); }
+		Value& operator=(int16_t value) { return operator=((int64_t)value); }
+		Value& operator=(int32_t value) { return operator=((int64_t)value); }
+		Value& operator=(uint8_t value) { return operator=((uint64_t)value); }
+		Value& operator=(uint16_t value) { return operator=((uint64_t)value); }
+		Value& operator=(uint32_t value) { return operator=((uint64_t)value); }
+
+		~Value()
+		{
+			destroy();
+		}
+
+		KIND kind() const { return m_kind; }
+		bool as_bool() const { assert(m_kind == KIND_BOOL); return m_bool; }
+		int64_t as_int() const { assert(m_kind == KIND_INT); return m_int; }
+		uint64_t as_uint() const { assert(m_kind == KIND_UINT); return m_uint; }
+		float as_float() const { assert(m_kind == KIND_FLOAT); return m_float; }
+		double as_double() const { assert(m_kind == KIND_DOUBLE); return m_double; }
+
+		String& as_string() { assert(m_kind == KIND_STRING); return *m_string; }
+		const String& as_string() const { assert(m_kind == KIND_STRING); return *m_string; }
+
+		Buffer& as_bytes() { assert(m_kind == KIND_BYTES); return *m_bytes; }
+		const Buffer& as_bytes() const { assert(m_kind == KIND_BYTES); return *m_bytes; }
+
+		Array<Value>& as_array() { assert(m_kind == KIND_ARRAY); return *m_array; }
+		const Array<Value>& as_array() const { assert(m_kind == KIND_ARRAY); return *m_array; }
+
+		Map<String, Value>& as_map() { assert(m_kind == KIND_MAP); return *m_map; }
+		const Map<String, Value>& as_map() const { assert(m_kind == KIND_MAP); return *m_map; }
+
+		CORE_EXPORT String release_string();
+		CORE_EXPORT Buffer release_bytes();
+		CORE_EXPORT Array<Value> release_array();
+		CORE_EXPORT Map<String, Value> release_map();
+
+	private:
+		CORE_EXPORT void destroy();
+		CORE_EXPORT void copyFrom(const Value& other);
+		CORE_EXPORT void moveFrom(Value&& other);
+
+		KIND m_kind = KIND_NULL;
+		union
+		{
+			bool m_bool;
+			int64_t m_int;
+			uint64_t m_uint;
+			float m_float;
+			double m_double;
+			String* m_string;
+			Buffer* m_bytes;
+			Array<Value>* m_array;
+			Map<String, Value>* m_map;
+		};
+	};
+
+	CORE_EXPORT HumanError msgpack(Writer& writer, const Value& value);
+	CORE_EXPORT HumanError msgpack(Reader& reader, Value& value);
 
 	template<typename T>
 	inline static HumanError

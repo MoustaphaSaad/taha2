@@ -130,6 +130,7 @@ namespace core
 			return m_ptr[i];
 		}
 
+		Allocator* allocator() const { return m_allocator; }
 		size_t count() const { return m_count; }
 		size_t capacity() const { return m_capacity; }
 

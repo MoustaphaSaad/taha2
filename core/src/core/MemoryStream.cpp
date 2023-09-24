@@ -62,6 +62,7 @@ namespace core
 	{
 		auto res = std::move(m_buffer);
 		m_buffer = Buffer{res.allocator()};
+		m_cursor = 0;
 		return res;
 	}
 }

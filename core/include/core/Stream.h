@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/Exports.h"
+#include "core/StringView.h"
+
 #include <cstdint>
 #include <cstddef>
 
@@ -26,4 +28,12 @@ namespace core
 		virtual int64_t seek(int64_t offset, SEEK_MODE whence) = 0;
 		virtual int64_t tell() = 0;
 	};
+
+	template<typename ... Args>
+	inline void strf(Stream* stream, StringView format, Args&& ... args)
+	{
+		auto out = fmt::memory_buffer();
+		fmt::format_to(std::back_inserter(out), std::string_view{format.begin(), format.count()}, std::forward<Args>(args)...);
+		stream->write(out.data(), out.size());
+	}
 }

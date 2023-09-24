@@ -86,10 +86,14 @@ namespace core
 
 	String::String(Buffer&& buffer)
 	{
+		bool null_terminated = buffer.count() > 0 && buffer[buffer.count() - 1] == std::byte('\0');
+		if (null_terminated == false)
+			buffer.push((std::byte)'\0');
+
 		m_allocator = buffer.m_allocator;
 		m_ptr = (char*)buffer.m_ptr;
 		m_capacity = buffer.m_capacity;
-		m_count = buffer.m_count;
+		m_count = buffer.m_count - 1;
 
 		buffer.m_ptr = nullptr;
 		buffer.m_count = 0;
