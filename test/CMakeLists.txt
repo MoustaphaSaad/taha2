@@ -12,6 +12,7 @@ add_executable(unittests
 	test_buffer.cpp
 	test_memorystream.cpp
 	test_intrinsics.cpp
+	test_msgpack.cpp
 )
 
 CPMGetPackage(doctest)

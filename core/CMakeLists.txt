@@ -19,6 +19,7 @@ target_sources(core PRIVATE
 	include/core/Buffer.h
 	include/core/MemoryStream.h
 	include/core/Intrinsics.h
+	include/core/Msgpack.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -27,6 +28,7 @@ target_sources(core PRIVATE
 	src/core/File.cpp
 	src/core/Buffer.cpp
 	src/core/MemoryStream.cpp
+	src/core/Msgpack.cpp
 )
 
 if (WIN32)

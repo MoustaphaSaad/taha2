@@ -11,11 +11,15 @@ namespace core
 	// error message for humans
 	class [[nodiscard]] HumanError
 	{
-		core::String m_message;
+		String m_message;
 	public:
-		explicit HumanError(core::String message) : m_message(std::move(message)) {}
+		HumanError()
+			: m_message(nullptr)
+		{}
 
-		core::StringView message() const { return m_message; }
+		explicit HumanError(String message) : m_message(std::move(message)) {}
+
+		StringView message() const { return m_message; }
 
 		operator bool() const { return m_message.count() > 0; }
 	};
