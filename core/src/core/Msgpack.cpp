@@ -583,6 +583,123 @@ namespace core::msgpack
 		return {};
 	}
 
+	HumanError Reader::skip()
+	{
+		uint8_t prefix{};
+		if (auto err = read_uint8(prefix)) return err;
+
+		if (prefix <= 0x7f || (prefix >= 0xcc && prefix <= 0xcf))
+		{
+			uint64_t value{};
+			if (auto err = read_uint(prefix, value)) return err;
+		}
+		else if (prefix >= 0xe0 || (prefix >= 0xd0 && prefix <= 0xd3))
+		{
+			int64_t value{};
+			if (auto err = read_int(prefix, value)) return err;
+		}
+		else if (prefix == 0xca)
+		{
+			float value{};
+			if (auto err = read_float32(value)) return err;
+		}
+		else if (prefix == 0xcb)
+		{
+			double value{};
+			if (auto err = read_float64(value)) return err;
+		}
+		else if (prefix == 0xc2 || prefix == 0xc3)
+		{
+			// bool is already encoded in the prefix
+		}
+		else if ((prefix >= 0xa0 && prefix <= 0xbf) || (prefix >= 0xd9 && prefix <= 0xdb))
+		{
+			String value{m_allocator};
+
+			auto count = read_string_count(prefix);
+			if (count.is_error()) return count.release_error();
+
+			value.resize(count.value());
+			if (auto err = read_blob(value.data(), value.count())) return err;
+		}
+		else if (prefix >= 0xc4 && prefix <= 0xc6)
+		{
+			Buffer value{m_allocator};
+
+			auto count = read_bin_count(prefix);
+			if (count.is_error()) return count.release_error();
+
+			value.resize(count.value());
+			if (auto err = read_blob(value.data(), value.count())) return err;
+		}
+		else if (prefix >= 0x90 && prefix <= 0x9f)
+		{
+			auto count = prefix & 0xf;
+			for (int i = 0; i < count; ++i)
+				if (auto err = skip()) return err;
+		}
+		else if (prefix == 0xdc)
+		{
+			uint16_t count{};
+			if (auto err = read_uint16(count)) return err;
+
+			for (uint16_t i = 0; i < count; ++i)
+				if (auto err = skip()) return err;
+		}
+		else if (prefix == 0xdd)
+		{
+			uint32_t count{};
+			if (auto err = read_uint32(count)) return err;
+
+			for (uint32_t i = 0; i < count; ++i)
+				if (auto err = skip()) return err;
+		}
+		else if (prefix >= 0x80 && prefix <= 0x8f)
+		{
+			auto count = prefix & 0xf;
+			for (int i = 0; i < count; ++i)
+			{
+				// name
+				if (auto err = skip()) return err;
+				// value
+				if (auto err = skip()) return err;
+			}
+		}
+		else if (prefix == 0xde)
+		{
+			uint16_t count{};
+			if (auto err = read_uint16(count)) return err;
+
+			for (uint16_t i = 0; i < count; ++i)
+			{
+				// name
+				if (auto err = skip()) return err;
+				// value
+				if (auto err = skip()) return err;
+			}
+		}
+		else if (prefix == 0xdf)
+		{
+			uint32_t count{};
+			if (auto err = read_uint32(count)) return err;
+
+			for (uint32_t i = 0; i < count; ++i)
+			{
+				// name
+				if (auto err = skip()) return err;
+				// value
+				if (auto err = skip()) return err;
+			}
+		}
+		else
+		{
+			assert(false);
+			return errf(m_allocator, "invalid prefix: {:x}"_sv, prefix);
+		}
+
+		return {};
+	}
+
 	HumanError msgpack(Reader& reader, bool& value)
 	{
 		uint8_t rep{};

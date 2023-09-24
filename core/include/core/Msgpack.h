@@ -180,6 +180,8 @@ namespace core::msgpack
 
 		CORE_EXPORT HumanError read_uint(uint8_t prefix, uint64_t& value);
 		CORE_EXPORT HumanError read_int(uint8_t prefix, int64_t& value);
+
+		CORE_EXPORT HumanError skip();
 	};
 
 	CORE_EXPORT HumanError msgpack(Reader& reader, bool& value);
@@ -393,8 +395,8 @@ namespace core::msgpack
 					break;
 				}
 			}
-			// if (consumed_value == false)
-				// skip the value;
+			if (consumed_value == false)
+				reader.skip();
 		}
 
 		if (required_fields != 0)
