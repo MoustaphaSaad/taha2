@@ -1318,5 +1318,7 @@ namespace core::msgpack
 			assert(false);
 			return errf(reader.allocator(), "invalid prefix: {:x}"_sv, prefix);
 		}
+
+		return {};
 	}
 }
