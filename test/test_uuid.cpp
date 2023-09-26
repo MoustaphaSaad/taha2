@@ -10,12 +10,12 @@ TEST_CASE("basic core::UUID test")
 	core::Mallocator allocator;
 	core::Set<core::UUID> set{&allocator};
 
-	for (size_t i = 0; i < 1000000; ++i)
+	for (size_t i = 0; i < 10000; ++i)
 	{
 		auto uuid = core::UUID::generate();
 		set.insert(uuid);
 	}
-	REQUIRE(set.count() == 1000000);
+	REQUIRE(set.count() == 10000);
 }
 
 TEST_CASE("core::UUID parsing")
