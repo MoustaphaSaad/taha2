@@ -20,6 +20,7 @@ target_sources(core PRIVATE
 	include/core/MemoryStream.h
 	include/core/Intrinsics.h
 	include/core/Msgpack.h
+	include/core/UUID.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -29,6 +30,7 @@ target_sources(core PRIVATE
 	src/core/Buffer.cpp
 	src/core/MemoryStream.cpp
 	src/core/Msgpack.cpp
+	src/core/UUID.cpp
 )
 
 if (WIN32)
@@ -38,6 +40,7 @@ if (WIN32)
 			src/core/winos/File.cpp
 			src/core/winos/OSString.cpp
 			src/core/winos/Intrinsics.cpp
+			src/core/winos/UUID.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE)
 elseif (APPLE)
@@ -47,6 +50,7 @@ elseif (APPLE)
 			src/core/macos/File.cpp
 			src/core/macos/OSString.cpp
 			src/core/macos/Intrinsics.cpp
+			src/core/macos/UUID.cpp
 	)
 elseif (UNIX AND NOT APPLE)
 	target_sources(core
@@ -55,12 +59,17 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/File.cpp
 			src/core/linux/OSString.cpp
 			src/core/linux/Intrinsics.cpp
+			src/core/linux/UUID.cpp
 	)
 endif ()
 
 CPMGetPackage(utf8proc)
 CPMGetPackage(fmt)
 target_link_libraries(core PUBLIC utf8proc fmt)
+target_link_libraries(core
+	PRIVATE
+		"$<$<PLATFORM_ID:Windows>:bcrypt>"
+)
 
 target_compile_features(core PUBLIC cxx_std_17)
 set_target_properties(core PROPERTIES

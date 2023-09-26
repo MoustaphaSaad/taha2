@@ -3,6 +3,7 @@
 #include "core/Allocator.h"
 #include "core/String.h"
 #include "core/Buffer.h"
+#include "core/UUID.h"
 
 #include <cstdint>
 #include <cstring>
@@ -269,6 +270,15 @@ namespace core
 		inline size_t operator()(const Buffer& value) const
 		{
 			return murmurHash(value.data(), value.count());
+		}
+	};
+
+	template<>
+	struct Hash<UUID>
+	{
+		inline size_t operator()(UUID value) const
+		{
+			return murmurHash(&value, sizeof(value));
 		}
 	};
 
