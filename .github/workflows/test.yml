@@ -36,7 +36,7 @@ jobs:
     - name: unittests debug
       if: matrix.os == 'windows-latest'
       run: ./build/bin/Debug/unittests
-      - name: unittests debug
+    - name: unittests debug
       if: matrix.os != 'windows-latest'
       run: ./build/bin/unittests
     - name: configure release
