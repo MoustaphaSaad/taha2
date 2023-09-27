@@ -14,6 +14,7 @@ add_executable(unittests
 	test_intrinsics.cpp
 	test_msgpack.cpp
 	test_uuid.cpp
+	test_func.cpp
 )
 
 CPMGetPackage(doctest)

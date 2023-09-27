@@ -21,6 +21,7 @@ target_sources(core PRIVATE
 	include/core/Intrinsics.h
 	include/core/Msgpack.h
 	include/core/UUID.h
+	include/core/Func.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
