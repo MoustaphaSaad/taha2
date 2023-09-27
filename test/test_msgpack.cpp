@@ -191,7 +191,7 @@ TEST_CASE("msgpack: numbers")
 	bytes = encode(int64_t(-2147483649LL), &allocator);
 	REQUIRE(bytes == "[0xd3, 0xff, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff]"_sv);
 
-	bytes = encode(int64_t(-9223372036854775808LL), &allocator);
+	bytes = encode(int64_t(INT64_MIN), &allocator);
 	REQUIRE(bytes == "[0xd3, 0x80, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]"_sv);
 
 	bytes = encode(float(42.42), &allocator);
@@ -224,7 +224,7 @@ TEST_CASE("msgpack: numbers")
 	decode(int64_t(-32769), &allocator);
 	decode(int64_t(-2147483648LL), &allocator);
 	decode(int64_t(-2147483649LL), &allocator);
-	decode(int64_t(-9223372036854775808LL), &allocator);
+	decode(int64_t(INT64_MIN), &allocator);
 	decode(float(42.42), &allocator);
 	decode(double(42.42), &allocator);
 }
