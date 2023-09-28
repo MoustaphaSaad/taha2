@@ -1,6 +1,5 @@
 #include "core/File.h"
 
-#define _LARGEFILE64_SOURCE 1
 #include <assert.h>
 #include <fcntl.h>
 #include <sys/stat.h>

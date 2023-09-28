@@ -42,8 +42,9 @@ if (WIN32)
 			src/core/winos/OSString.cpp
 			src/core/winos/Intrinsics.cpp
 			src/core/winos/UUID.cpp
+			src/core/winos/Mutex.cpp
 	)
-	target_compile_definitions(core PRIVATE UNICODE _UNICODE)
+	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
 	target_sources(core
 		PRIVATE
@@ -52,7 +53,9 @@ elseif (APPLE)
 			src/core/macos/OSString.cpp
 			src/core/macos/Intrinsics.cpp
 			src/core/macos/UUID.cpp
+			src/core/macos/Mutex.cpp
 	)
+	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
 	target_sources(core
 		PRIVATE
@@ -61,7 +64,9 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/OSString.cpp
 			src/core/linux/Intrinsics.cpp
 			src/core/linux/UUID.cpp
+			src/core/linux/Mutex.cpp
 	)
+	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()
 
 CPMGetPackage(utf8proc)
@@ -70,6 +75,8 @@ target_link_libraries(core PUBLIC utf8proc fmt)
 target_link_libraries(core
 	PRIVATE
 		"$<$<PLATFORM_ID:Windows>:bcrypt>"
+		"$<$<PLATFORM_ID:Linux>:pthread>"
+		"$<$<PLATFORM_ID:Darwin>:pthread>"
 )
 
 target_compile_features(core PUBLIC cxx_std_17)
