@@ -13,7 +13,7 @@ namespace core
 
 	Thread::Thread(Allocator* allocator, Func<void()> func)
 	{
-		auto thread_start = +[](void* user_data) -> DWORD WINAPI
+		auto thread_start = +[](void* user_data) -> void*
 		{
 			auto thread = (Thread::IThread*)(user_data);
 			thread->func();
