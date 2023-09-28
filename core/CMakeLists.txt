@@ -22,6 +22,7 @@ target_sources(core PRIVATE
 	include/core/Msgpack.h
 	include/core/UUID.h
 	include/core/Func.h
+	include/core/Thread.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -43,6 +44,7 @@ if (WIN32)
 			src/core/winos/Intrinsics.cpp
 			src/core/winos/UUID.cpp
 			src/core/winos/Mutex.cpp
+			src/core/winos/Thread.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
@@ -54,6 +56,7 @@ elseif (APPLE)
 			src/core/macos/Intrinsics.cpp
 			src/core/macos/UUID.cpp
 			src/core/macos/Mutex.cpp
+			src/core/macos/Thread.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
@@ -65,6 +68,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/Intrinsics.cpp
 			src/core/linux/UUID.cpp
 			src/core/linux/Mutex.cpp
+			src/core/linux/Thread.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()

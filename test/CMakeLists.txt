@@ -15,6 +15,7 @@ add_executable(unittests
 	test_msgpack.cpp
 	test_uuid.cpp
 	test_func.cpp
+	test_thread.cpp
 )
 
 CPMGetPackage(doctest)
