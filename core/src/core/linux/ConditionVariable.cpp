@@ -25,7 +25,7 @@ namespace core
 
 	void ConditionVariable::wait(Mutex& mutex)
 	{
-		[[maybe_unused]] auto res = pthread_cond_wait(&m_condition_variable->cv, &mutex.m_mutex->mutex);
+		[[maybe_unused]] auto res = pthread_cond_wait(&m_condition_variable->cv, &mutex.m_mutex->handle);
 	}
 
 	void ConditionVariable::notify_one()
