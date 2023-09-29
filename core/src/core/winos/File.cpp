@@ -2,7 +2,7 @@
 #include "core/OSString.h"
 #include "core/Mallocator.h"
 
-#include <assert.h>
+#include <cassert>
 
 #include <Windows.h>
 

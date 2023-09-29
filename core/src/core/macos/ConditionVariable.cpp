@@ -2,7 +2,7 @@
 #include "core/macos/IMutex.h"
 
 #include <pthread.h>
-#include <assert.h>
+#include <cassert>
 
 namespace core
 {

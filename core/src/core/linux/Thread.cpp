@@ -1,7 +1,7 @@
 #include "core/Thread.h"
 
 #include <pthread.h>
-#include <assert.h>
+#include <cassert>
 
 namespace core
 {
