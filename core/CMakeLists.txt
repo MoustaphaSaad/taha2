@@ -25,6 +25,7 @@ target_sources(core PRIVATE
 	include/core/Thread.h
 	include/core/ConditionVariable.h
 	include/core/Queue.h
+	include/core/NotificationQueue.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp

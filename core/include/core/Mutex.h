@@ -19,4 +19,21 @@ namespace core
 		CORE_EXPORT bool try_lock();
 		CORE_EXPORT void unlock();
 	};
+
+	template<typename T>
+	class Lock
+	{
+		T& m_lockable;
+	public:
+		Lock(T& lockable)
+			: m_lockable(lockable)
+		{
+			m_lockable.lock();
+		}
+
+		~Lock()
+		{
+			m_lockable.unlock();
+		}
+	};
 }
