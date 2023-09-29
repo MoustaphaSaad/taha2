@@ -1,15 +1,11 @@
 #include "core/Mutex.h"
+#include "core/macos/IMutex.h"
 
 #include <pthread.h>
 #include <assert.h>
 
 namespace core
 {
-	struct Mutex::IMutex
-	{
-		pthread_mutex_t handle;
-	};
-
 	Mutex::Mutex(Allocator* allocator)
 	{
 		m_mutex = unique_from<IMutex>(allocator);

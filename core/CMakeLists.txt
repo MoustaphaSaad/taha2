@@ -23,6 +23,7 @@ target_sources(core PRIVATE
 	include/core/UUID.h
 	include/core/Func.h
 	include/core/Thread.h
+	include/core/ConditionVariable.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -45,6 +46,8 @@ if (WIN32)
 			src/core/winos/UUID.cpp
 			src/core/winos/Mutex.cpp
 			src/core/winos/Thread.cpp
+			src/core/winos/ConditionVariable.cpp
+			src/core/winos/IMutex.h
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
@@ -57,6 +60,8 @@ elseif (APPLE)
 			src/core/macos/UUID.cpp
 			src/core/macos/Mutex.cpp
 			src/core/macos/Thread.cpp
+			src/core/macos/ConditionVariable.cpp
+			src/core/macos/IMutex.h
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
@@ -69,6 +74,8 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/UUID.cpp
 			src/core/linux/Mutex.cpp
 			src/core/linux/Thread.cpp
+			src/core/linux/ConditionVariable.cpp
+			src/core/linux/IMutex.h
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()
@@ -98,4 +105,6 @@ generate_export_header(core
 target_include_directories(core
 	PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/include
+	PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/src
 )

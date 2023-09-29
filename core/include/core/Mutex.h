@@ -5,8 +5,10 @@
 
 namespace core
 {
+	class ConditionVariable;
 	class Mutex
 	{
+		friend class ConditionVariable;
 		struct IMutex;
 		Unique<IMutex> m_mutex;
 	public:

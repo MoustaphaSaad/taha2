@@ -1,14 +1,10 @@
 #include "core/Mutex.h"
+#include "core/winos/IMutex.h"
 
 #include <Windows.h>
 
 namespace core
 {
-	struct Mutex::IMutex
-	{
-		CRITICAL_SECTION cs;
-	};
-
 	Mutex::Mutex(Allocator* allocator)
 	{
 		m_mutex = unique_from<IMutex>(allocator);
