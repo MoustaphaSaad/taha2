@@ -3,6 +3,8 @@
 
 #include <pthread.h>
 
+#include <assert.h>
+
 namespace core
 {
 	struct ConditionVariable::IConditionVariable
