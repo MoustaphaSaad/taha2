@@ -24,16 +24,32 @@ namespace core
 	class Lock
 	{
 		T& m_lockable;
+		bool m_locked = false;
+
+		Lock(T& lockable, bool locked)
+			: m_lockable(lockable),
+			  m_locked(locked)
+		{}
 	public:
-		Lock(T& lockable)
-			: m_lockable(lockable)
+		static Lock lock(T& lockable)
 		{
-			m_lockable.lock();
+			lockable.lock();
+			return Lock{lockable, true};
+		}
+
+		static Lock try_lock(T& lockable)
+		{
+			if (lockable.try_lock())
+				return Lock{lockable, true};
+			return Lock(lockable, false);
 		}
 
 		~Lock()
 		{
-			m_lockable.unlock();
+			if (m_locked)
+				m_lockable.unlock();
 		}
+
+		bool is_locked() const { return m_locked; }
 	};
 }
