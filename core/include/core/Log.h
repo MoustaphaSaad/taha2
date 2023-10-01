@@ -14,14 +14,36 @@ namespace core
 	{
 		Shared<spdlog::logger> m_logger;
 	public:
-		Log(Allocator* allocator)
+		using level = spdlog::level::level_enum;
+
+		explicit Log(Allocator* allocator)
 		{
 			auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 			m_logger = shared_from<spdlog::logger>(allocator, "console", sink);
-			m_logger->set_pattern("[%H:%M:%S %z] [thread %t] [%^%l%$] [%n] %v");
+			setPattern("[%H:%M:%S %z] [thread %t] [%^%l%$] [%n] %v"_sv);
+			setFlushLevel(level::err);
+
+			#if defined(DEBUG)
+			setLevel(level::trace);
+			#endif
 		}
 
 		explicit Log(Shared<spdlog::logger> logger) : m_logger(std::move(logger)) {}
+
+		void setLevel(level level)
+		{
+			m_logger->set_level(level);
+		}
+
+		void setPattern(StringView pattern)
+		{
+			m_logger->set_pattern(std::string{pattern.data(), pattern.count()});
+		}
+
+		void setFlushLevel(level level)
+		{
+			m_logger->flush_on(level);
+		}
 
 		template<typename ... TArgs>
 		void trace(StringView format, TArgs&& ... args)

@@ -96,6 +96,10 @@ target_link_libraries(core
 		"$<$<PLATFORM_ID:Linux>:pthread>"
 		"$<$<PLATFORM_ID:Darwin>:pthread>"
 )
+target_compile_definitions(core
+	PUBLIC
+		"$<$<CONFIG:DEBUG>:DEBUG>"
+)
 
 target_compile_features(core PUBLIC cxx_std_17)
 set_target_properties(core PROPERTIES
