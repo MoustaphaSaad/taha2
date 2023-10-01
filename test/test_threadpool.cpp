@@ -9,16 +9,16 @@ TEST_CASE("core::ThreadPool basics")
 
 	std::atomic<int> count = 0;
 
-	{
-		core::ThreadPool pool{&allocator};
+	core::ThreadPool pool{&allocator};
 
-		for (size_t i = 0; i < 1000; ++i)
-		{
-			pool.run([&]() {
-				count += 1;
-			});
-		}
+	for (size_t i = 0; i < 1000; ++i)
+	{
+		pool.run([&]() {
+			count += 1;
+		});
 	}
+
+	pool.flush();
 
 	REQUIRE(count == 1000);
 }

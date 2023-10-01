@@ -5,7 +5,8 @@ namespace core
 	ThreadPool::ThreadPool(Allocator* allocator, size_t threads_count)
 		: m_threads_count(threads_count),
 		  m_threads(allocator),
-		  m_queue(allocator)
+		  m_queue(allocator),
+		  m_wait_group(allocator)
 	{
 		m_queue.reserve(threads_count);
 		for (size_t i = 0; i < threads_count; ++i)
@@ -25,6 +26,7 @@ namespace core
 					if (!func && !m_queue[n].pop(func))
 						break;
 					func();
+					m_wait_group.done();
 				}
 			});
 			m_threads.push(std::move(thread));
