@@ -11,9 +11,13 @@ namespace core
 		InitializeCriticalSectionAndSpinCount(&m_mutex->cs, 1 << 14);
 	}
 
+	Mutex::Mutex(Mutex&& other) = default;
+	Mutex& Mutex::operator=(Mutex&& other) = default;
+
 	Mutex::~Mutex()
 	{
-		DeleteCriticalSection(&m_mutex->cs);
+		if (m_mutex)
+			DeleteCriticalSection(&m_mutex->cs);
 	}
 
 	void Mutex::lock()

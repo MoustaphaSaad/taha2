@@ -26,6 +26,7 @@ target_sources(core PRIVATE
 	include/core/ConditionVariable.h
 	include/core/Queue.h
 	include/core/NotificationQueue.h
+	include/core/ThreadPool.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -36,6 +37,7 @@ target_sources(core PRIVATE
 	src/core/MemoryStream.cpp
 	src/core/Msgpack.cpp
 	src/core/UUID.cpp
+	src/core/ThreadPool.cpp
 )
 
 if (WIN32)

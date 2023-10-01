@@ -13,10 +13,16 @@ namespace core
 		assert(res == 0);
 	}
 
+	Mutex::Mutex(Mutex&& other) = default;
+	Mutex& Mutex::operator=(Mutex&& other) = default;
+
 	Mutex::~Mutex()
 	{
-		[[maybe_unused]] auto res = pthread_mutex_destroy(&m_mutex->handle);
-		assert(res == 0);
+		if (m_mutex)
+		{
+			[[maybe_unused]] auto res = pthread_mutex_destroy(&m_mutex->handle);
+			assert(res == 0);
+		}
 	}
 
 	void Mutex::lock()

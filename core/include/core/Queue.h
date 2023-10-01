@@ -107,11 +107,12 @@ namespace core
 			destroy();
 		}
 
-		void push_back(const T& value)
+		template<typename R>
+		void push_back(R&& value)
 		{
 			auto node = (Node*)m_allocator->alloc(sizeof(Node), alignof(Node));
 			m_allocator->commit(node, sizeof(Node));
-			new (node) Node{ nullptr, nullptr, value };
+			new (node) Node{ nullptr, nullptr, std::forward<R>(value) };
 			if (m_tail)
 			{
 				m_tail->next = node;
@@ -126,11 +127,12 @@ namespace core
 			++m_count;
 		}
 
-		void push_front(const T& value)
+		template<typename R>
+		void push_front(R&& value)
 		{
 			auto node = (Node*)m_allocator->alloc(sizeof(Node), alignof(Node));
 			m_allocator->commit(node, sizeof(Node));
-			new (node) Node{ nullptr, nullptr, value };
+			new (node) Node{ nullptr, nullptr, std::forward<R>(value) };
 			if (m_head)
 			{
 				m_head->prev = node;

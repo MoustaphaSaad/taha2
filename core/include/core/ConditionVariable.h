@@ -12,6 +12,8 @@ namespace core
 		Unique<IConditionVariable> m_condition_variable;
 	public:
 		CORE_EXPORT ConditionVariable(Allocator* allocator);
+		CORE_EXPORT ConditionVariable(ConditionVariable&& other);
+		CORE_EXPORT ConditionVariable& operator=(ConditionVariable&& other);
 		CORE_EXPORT ~ConditionVariable();
 
 		CORE_EXPORT void wait(Mutex& mutex);

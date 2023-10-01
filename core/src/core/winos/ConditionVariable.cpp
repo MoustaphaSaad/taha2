@@ -16,9 +16,9 @@ namespace core
 		InitializeConditionVariable(&m_condition_variable->cv);
 	}
 
-	ConditionVariable::~ConditionVariable()
-	{
-	}
+	ConditionVariable::ConditionVariable(ConditionVariable&& other) = default;
+	ConditionVariable& ConditionVariable::operator=(ConditionVariable&& other) = default;
+	ConditionVariable::~ConditionVariable() = default;
 
 	void ConditionVariable::wait(Mutex& mutex)
 	{

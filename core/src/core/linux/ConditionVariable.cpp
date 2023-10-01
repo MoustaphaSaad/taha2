@@ -19,10 +19,16 @@ namespace core
 		assert(res == 0);
 	}
 
+	ConditionVariable::ConditionVariable(ConditionVariable&& other) = default;
+	ConditionVariable& ConditionVariable::operator=(ConditionVariable&& other) = default;
+
 	ConditionVariable::~ConditionVariable()
 	{
-		[[maybe_unused]] auto res = pthread_cond_destroy(&m_condition_variable->cv);
-		assert(res == 0);
+		if (m_condition_variable)
+		{
+			[[maybe_unused]] auto res = pthread_cond_destroy(&m_condition_variable->cv);
+			assert(res == 0);
+		}
 	}
 
 	void ConditionVariable::wait(Mutex& mutex)

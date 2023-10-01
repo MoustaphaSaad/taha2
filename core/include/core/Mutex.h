@@ -13,6 +13,8 @@ namespace core
 		Unique<IMutex> m_mutex;
 	public:
 		CORE_EXPORT Mutex(Allocator* allocator);
+		CORE_EXPORT Mutex(Mutex&& other);
+		CORE_EXPORT Mutex& operator=(Mutex&& other);
 		CORE_EXPORT ~Mutex();
 
 		CORE_EXPORT void lock();
