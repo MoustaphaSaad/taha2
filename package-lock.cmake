@@ -25,3 +25,14 @@ CPMDeclarePackage(fmt
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
 )
+
+CPMDeclarePackage(spdlog
+  NAME spdlog
+  GIT_TAG v1.12.0
+  GIT_REPOSITORY git@github.com:gabime/spdlog.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "SPDLOG_FMT_EXTERNAL ON"
+    "SPDLOG_NO_EXCEPTIONS ON"
+)

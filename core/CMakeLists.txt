@@ -28,6 +28,7 @@ target_sources(core PRIVATE
 	include/core/NotificationQueue.h
 	include/core/ThreadPool.h
 	include/core/WaitGroup.h
+	include/core/Log.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -87,7 +88,8 @@ endif ()
 
 CPMGetPackage(utf8proc)
 CPMGetPackage(fmt)
-target_link_libraries(core PUBLIC utf8proc fmt)
+CPMGetPackage(spdlog)
+target_link_libraries(core PUBLIC utf8proc fmt spdlog)
 target_link_libraries(core
 	PRIVATE
 		"$<$<PLATFORM_ID:Windows>:bcrypt>"

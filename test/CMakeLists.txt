@@ -18,6 +18,7 @@ add_executable(unittests
 	test_thread.cpp
 	test_queue.cpp
 	test_threadpool.cpp
+	test_log.cpp
 )
 
 CPMGetPackage(doctest)
