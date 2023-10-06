@@ -705,6 +705,8 @@ namespace core
 		}
 
 	public:
+		using iterator = T*;
+
 		explicit Set(Allocator* a)
 			: m_allocator(a)
 		{}
@@ -838,7 +840,7 @@ namespace core
 		}
 
 		template<typename R>
-		const T* lookup(const R& key) const
+		const iterator lookup(const R& key) const
 		{
 			auto res = findSlotForLookup(key);
 			if (res.index == m_slots_count)
@@ -886,12 +888,12 @@ namespace core
 			return true;
 		}
 
-		const T* begin() const
+		const iterator begin() const
 		{
 			return m_values;
 		}
 
-		const T* end() const
+		const iterator end() const
 		{
 			return m_values + m_values_count;
 		}
@@ -1222,6 +1224,8 @@ namespace core
 		}
 
 	public:
+		using iterator = KeyValue<const TKey, TValue>*;
+
 		explicit Map(Allocator* a)
 			: m_allocator(a)
 		{}
@@ -1355,7 +1359,7 @@ namespace core
 		}
 
 		template<typename R>
-		KeyValue<const TKey, TValue>* lookup(const R& key) const
+		const iterator lookup(const R& key) const
 		{
 			auto res = findSlotForLookup(key);
 			if (res.index == m_slots_count)
@@ -1403,22 +1407,22 @@ namespace core
 			return true;
 		}
 
-		KeyValue<const TKey, TValue>* begin()
+		iterator begin()
 		{
 			return m_values;
 		}
 
-		const KeyValue<const TKey, TValue>* begin() const
+		const iterator begin() const
 		{
 			return m_values;
 		}
 
-		KeyValue<const TKey, TValue>* end()
+		iterator end()
 		{
 			return m_values + m_values_count;
 		}
 
-		const KeyValue<const TKey, TValue>* end() const
+		const iterator end() const
 		{
 			return m_values + m_values_count;
 		}

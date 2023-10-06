@@ -59,7 +59,7 @@ namespace core
 			m_state = STATE_ERROR;
 		}
 
-		bool is_error() const { return m_state == STATE_ERROR; }
+		bool isError() const { return m_state == STATE_ERROR; }
 
 		T& value()
 		{
@@ -83,13 +83,13 @@ namespace core
 			return *reinterpret_cast<E*>(m_storage);
 		}
 
-		T release_value()
+		T releaseValue()
 		{
 			assert(m_state == STATE_VALUE);
 			m_state = STATE_EMPTY;
 			return std::move(*reinterpret_cast<T*>(m_storage));
 		}
-		E release_error()
+		E releaseError()
 		{
 			assert(m_state == STATE_ERROR);
 			m_state = STATE_EMPTY;

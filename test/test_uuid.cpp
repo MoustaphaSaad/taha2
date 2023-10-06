@@ -25,32 +25,32 @@ TEST_CASE("core::UUID parsing")
 	auto id = core::UUID::generate();
 	auto str = core::strf(&allocator, "{}"_sv, id);
 	auto id2 = core::UUID::parse(str, &allocator);
-	REQUIRE(id2.is_error() == false);
+	REQUIRE(id2.isError() == false);
 	REQUIRE(id == id2.value());
 
 	auto res = core::UUID::parse("this is not an UUID"_sv, &allocator);
-	REQUIRE(res.is_error());
+	REQUIRE(res.isError());
 
 	res = core::UUID::parse("62013B88-FA54-4008-8D42-F9CA4889e0B5"_sv, &allocator);
-	REQUIRE(res.is_error() == false);
+	REQUIRE(res.isError() == false);
 
 	res = core::UUID::parse("62013BX88-FA54-4008-8D42-F9CA4889e0B5"_sv, &allocator);
-	REQUIRE(res.is_error() == true);
+	REQUIRE(res.isError() == true);
 
 	res = core::UUID::parse("62013B88-FA54-4008-8D42-F9CA4889e0B5"_sv, &allocator);
-	REQUIRE(res.is_error() == false);
+	REQUIRE(res.isError() == false);
 
 	res = core::UUID::parse("62013B88,FA54-4008-8D42-F9CA4889e0B5"_sv, &allocator);
-	REQUIRE(res.is_error() == true);
+	REQUIRE(res.isError() == true);
 
 	res = core::UUID::parse("62013B88-FA54-4008-8D42-F9CA4889e0B5AA"_sv, &allocator);
-	REQUIRE(res.is_error() == true);
+	REQUIRE(res.isError() == true);
 
 	auto nil = core::strf(&allocator, "{}"_sv, core::UUID{});
 	REQUIRE(nil == "00000000-0000-0000-0000-000000000000"_sv);
 
 	res = core::UUID::parse("00000000-0000-0000-0000-000000000000"_sv, &allocator);
-	REQUIRE(res.is_error() == false);
+	REQUIRE(res.isError() == false);
 	REQUIRE(res.value() == core::UUID{});
 }
 

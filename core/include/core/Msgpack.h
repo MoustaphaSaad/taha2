@@ -235,7 +235,7 @@ namespace core::msgpack
 		if (auto err = reader.read_uint8(prefix)) return err;
 
 		auto count = reader.read_array_count(prefix);
-		if (count.is_error()) return count.release_error();
+		if (count.isError()) return count.releaseError();
 
 		value.clear();
 		value.reserve(count.value());
@@ -256,7 +256,7 @@ namespace core::msgpack
 		if (auto err = reader.read_uint8(prefix)) return err;
 
 		auto count = reader.read_array_count(prefix);
-		if (count.is_error()) return count.release_error();
+		if (count.isError()) return count.releaseError();
 
 		if (count.value() != N)
 			return errf(reader.allocator(), "array size mismatch"_sv);
@@ -276,7 +276,7 @@ namespace core::msgpack
 		if (auto err = reader.read_uint8(prefix)) return err;
 
 		auto count = reader.read_map_count(prefix);
-		if (count.is_error()) return count.release_error();
+		if (count.isError()) return count.releaseError();
 
 		res.clear();
 		for (size_t i = 0; i < count.value(); ++i)

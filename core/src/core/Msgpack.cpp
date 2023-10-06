@@ -617,7 +617,7 @@ namespace core::msgpack
 			String value{m_allocator};
 
 			auto count = read_string_count(prefix);
-			if (count.is_error()) return count.release_error();
+			if (count.isError()) return count.releaseError();
 
 			value.resize(count.value());
 			if (auto err = read_blob(value.data(), value.count())) return err;
@@ -627,7 +627,7 @@ namespace core::msgpack
 			Buffer value{m_allocator};
 
 			auto count = read_bin_count(prefix);
-			if (count.is_error()) return count.release_error();
+			if (count.isError()) return count.releaseError();
 
 			value.resize(count.value());
 			if (auto err = read_blob(value.data(), value.count())) return err;
@@ -827,8 +827,8 @@ namespace core::msgpack
 		if (auto err = reader.read_uint8(prefix)) return err;
 
 		auto count = reader.read_string_count(prefix);
-		if (count.is_error())
-			return count.release_error();
+		if (count.isError())
+			return count.releaseError();
 
 		value.resize(count.value());
 		if (auto err = reader.read_blob(value.data(), value.count())) return err;
@@ -841,8 +841,8 @@ namespace core::msgpack
 		if (auto err = reader.read_uint8(prefix)) return err;
 
 		auto count = reader.read_bin_count(prefix);
-		if (count.is_error())
-			return count.release_error();
+		if (count.isError())
+			return count.releaseError();
 
 		value.resize(count.value());
 		if (auto err = reader.read_blob(value.data(), value.count())) return err;

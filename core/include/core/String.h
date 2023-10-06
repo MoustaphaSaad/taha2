@@ -128,6 +128,7 @@ namespace core
 		bool operator>=(StringView other) const { return StringView::cmp(*this, other) >= 0; }
 
 		CORE_EXPORT void replace(StringView search, StringView replace);
+		StringRunes runes() const { return StringView{*this}.runes(); }
 	};
 
 	class StringBackInserter

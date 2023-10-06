@@ -178,4 +178,17 @@ namespace core
 		}
 		return SIZE_MAX;
 	}
+
+	size_t StringView::findFirstByte(StringView str, size_t start) const
+	{
+		for (size_t i = start; i < m_count; ++i)
+		{
+			for (auto r: str)
+			{
+				if (r == m_begin[i])
+					return i;
+			}
+		}
+		return SIZE_MAX;
+	}
 }

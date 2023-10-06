@@ -19,7 +19,7 @@ TEST_CASE("core::File roundtrip")
 	REQUIRE(cursor == 0);
 
 	auto buffer_result = core::File::content(&allocator, "test.txt"_sv);
-	REQUIRE(buffer_result.is_error() == false);
+	REQUIRE(buffer_result.isError() == false);
 	REQUIRE(str == buffer_result.value());
 }
 

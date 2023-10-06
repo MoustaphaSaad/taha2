@@ -14,6 +14,50 @@ namespace core
 {
 	class String;
 
+	class RuneIterator
+	{
+		const char* m_ptr = nullptr;
+		Rune m_rune;
+	public:
+		RuneIterator(const char* ptr, Rune rune)
+			: m_ptr(ptr)
+			, m_rune(rune)
+		{}
+
+		RuneIterator& operator++()
+		{
+			m_ptr = Rune::next(m_ptr);
+			m_rune = Rune::decode(m_ptr);
+			return *this;
+		}
+
+		RuneIterator operator++(int)
+		{
+			auto copy = *this;
+			++(*this);
+			return copy;
+		}
+
+		bool operator==(RuneIterator other) const { return m_ptr == other.m_ptr; }
+		bool operator!=(RuneIterator other) const { return m_ptr != other.m_ptr; }
+		const Rune& operator*() const { return m_rune; }
+		const Rune* operator->() const { return &m_rune; }
+	};
+
+	class StringRunes
+	{
+		const char* m_begin = nullptr;
+		const char* m_end = nullptr;
+	public:
+		StringRunes(const char* begin, const char* end)
+			: m_begin(begin)
+			, m_end(end)
+		{}
+
+		RuneIterator begin() const { return RuneIterator(m_begin, Rune::decode(m_begin)); }
+		RuneIterator end() const { return RuneIterator(m_end, Rune{}); }
+	};
+
 	class StringView
 	{
 		friend class String;
@@ -67,6 +111,7 @@ namespace core
 		CORE_EXPORT size_t find(Rune target, size_t start = 0) const;
 		CORE_EXPORT size_t findLast(StringView target, size_t start) const;
 		CORE_EXPORT size_t findLast(StringView target) const { return findLast(target, m_count); }
+		CORE_EXPORT size_t findFirstByte(StringView str, size_t start = 0) const;
 
 		bool operator==(StringView other) const
 		{
@@ -80,6 +125,13 @@ namespace core
 		bool operator<=(StringView other) const { return cmp(*this, other) <= 0; }
 		bool operator>(StringView other) const { return cmp(*this, other) > 0; }
 		bool operator>=(StringView other) const { return cmp(*this, other) >= 0; }
+
+		StringRunes runes() const { return StringRunes{m_begin, m_begin + m_count}; }
+		StringView slice(size_t start, size_t end) const
+		{
+			assert(start <= end && end - start <= m_count);
+			return StringView{m_begin + start, end - start};
+		}
 	};
 }
 

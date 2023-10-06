@@ -29,6 +29,7 @@ target_sources(core PRIVATE
 	include/core/ThreadPool.h
 	include/core/WaitGroup.h
 	include/core/Log.h
+	include/core/Url.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -40,6 +41,7 @@ target_sources(core PRIVATE
 	src/core/Msgpack.cpp
 	src/core/UUID.cpp
 	src/core/ThreadPool.cpp
+	src/core/Url.cpp
 )
 
 if (WIN32)
