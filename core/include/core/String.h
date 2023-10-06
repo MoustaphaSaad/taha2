@@ -130,6 +130,11 @@ namespace core
 		CORE_EXPORT void replace(StringView search, StringView replace);
 		StringRunes runes() const { return StringView{*this}.runes(); }
 		size_t findFirstByte(StringView str, size_t start = 0) const { return StringView{*this}.findFirstByte(str, start); }
+
+		const char* begin() const { return m_ptr; }
+		char* begin() { return m_ptr; }
+		const char* end() const { return m_ptr + m_count; }
+		char* end() { return m_ptr + m_count; }
 	};
 
 	class StringBackInserter
