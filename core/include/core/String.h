@@ -129,6 +129,7 @@ namespace core
 
 		CORE_EXPORT void replace(StringView search, StringView replace);
 		StringRunes runes() const { return StringView{*this}.runes(); }
+		size_t findFirstByte(StringView str, size_t start = 0) const { return StringView{*this}.findFirstByte(str, start); }
 	};
 
 	class StringBackInserter

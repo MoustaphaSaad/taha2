@@ -1,4 +1,5 @@
 #include "core/Url.h"
+#include "core/MemoryStream.h"
 
 namespace core
 {
@@ -25,6 +26,8 @@ namespace core
 		0,	  0,	0,	  0,	0,	  0,	0,	  0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0,	  0,	0,	  0,	0,	  0,	0,	  0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	};
+
+	constexpr static auto HEX_DIGITS = "0123456789ABCDEF";
 
 	static bool isAllowedChar(char c, uint8_t mask)
 	{
@@ -89,6 +92,28 @@ namespace core
 				c = (a << 4) | b;
 			}
 			res.pushByte(c);
+		}
+
+		return res;
+	}
+
+	static String encodeString(StringView str, uint8_t mask, Allocator* allocator)
+	{
+		String res{allocator};
+		res.reserve(str.count());
+
+		for (auto c: str)
+		{
+			if (isAllowedChar(c, mask))
+			{
+				res.pushByte(c);
+			}
+			else
+			{
+				res.pushByte('%');
+				res.pushByte(HEX_DIGITS[c >> 4]);
+				res.pushByte(HEX_DIGITS[c & 0x0F]);
+			}
 		}
 
 		return res;
@@ -168,5 +193,115 @@ namespace core
 	{
 		assert(it != m_keyToIndex.end());
 		return m_keyValues[it->value].value;
+	}
+
+	String Url::encodeQueryElement(StringView str, Allocator* allocator)
+	{
+		String res{allocator};
+		res.reserve(str.count());
+
+		for (auto c: str)
+		{
+			if (c == ' ')
+			{
+				res.pushByte('+');
+			}
+			else if (c >= '!' && c <= ',')
+			{
+				res.pushByte('%');
+				res.pushByte(HEX_DIGITS[c >> 4]);
+				res.pushByte(HEX_DIGITS[c & 0xF]);
+			}
+			else if (c == '=')
+			{
+				res.push("%3D"_sv);
+			}
+			else if (c == ';')
+			{
+				res.push("%3B"_sv);
+			}
+			else if (isAllowedChar(c, 0x01))
+			{
+				res.pushByte(c);
+			}
+			else
+			{
+				res.pushByte('%');
+				res.pushByte("0123456789ABCDEF"[uint8_t(c) >> 4]);
+				res.pushByte("0123456789ABCDEF"[uint8_t(c) & 0xF]);
+			}
+		}
+
+		return res;
+	}
+
+	Result<String> Url::toString(core::Allocator *allocator) const
+	{
+		MemoryStream stream{allocator};
+
+		if (m_scheme.count() > 0)
+			strf(&stream, "{}:"_sv, m_scheme);
+
+		if (m_host.count() > 0)
+		{
+			strf(&stream, "//"_sv);
+			if (m_user.count() > 0)
+				strf(&stream, "{}@"_sv, encodeString(m_user, 0x05, allocator));
+
+			if (m_ipVersion == 0 || m_ipVersion == 4)
+				strf(&stream, "{}"_sv, m_host);
+			else if (m_ipVersion == 6)
+				strf(&stream, "[{}]"_sv, m_host);
+			else
+				strf(&stream, "[v{:x}.{}]"_sv, m_ipVersion, m_host);
+
+			if (m_port.count() > 0)
+				if (isDefaultPort() == false)
+					strf(&stream, ":{}"_sv, m_port);
+		}
+		else
+		{
+			if (m_user.count() > 0)
+				return errf(allocator, "User is only allowed if host is present"_sv);
+
+			if (m_port.count() > 0)
+				return errf(allocator, "Port is only allowed if host is present"_sv);
+
+			if (m_path.count() > 0)
+			{
+				auto p = m_path.findFirstByte(":/"_sv);
+				if (p != SIZE_MAX && m_path[p] == ':')
+					return errf(allocator, "Port is only allowed if host is present"_sv);
+			}
+		}
+
+		if (m_path.count() > 0)
+		{
+			if (m_path[0] != '/' && m_host.count() > 0)
+				return errf(allocator, "Path must start with '/' if host is empty"_sv);
+			strf(&stream, "{}"_sv, encodeString(m_path, 0x0F, allocator));
+		}
+
+		if (m_query.count() > 0)
+		{
+			strf(&stream, "?"_sv);
+			for (size_t i = 0; i < m_query.count(); ++i)
+			{
+				if (m_query[i].key.count() == 0)
+					return errf(allocator, "Empty key in query"_sv);
+
+				if (i != 0)
+					strf(&stream, "&"_sv);
+
+				strf(&stream, "{}"_sv, encodeQueryElement(m_query[i].key, allocator));
+				if (m_query[i].value.count() > 0)
+					strf(&stream, "={}"_sv, encodeQueryElement(m_query[i].value, allocator));
+			}
+		}
+
+		if (m_fragment.count() > 0)
+			strf(&stream, "#{}"_sv, encodeString(m_fragment, 0x1F, allocator));
+
+		return stream.releaseString();
 	}
 }
