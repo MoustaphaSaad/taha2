@@ -64,8 +64,7 @@ namespace core
 		if (start >= m_count || m_count - start < target.m_count)
 			return SIZE_MAX;
 
-		auto self = *this;
-		self.m_begin += start;
+		auto self = slice(start, m_count);
 
 		if (target.m_count == 0)
 		{
@@ -73,7 +72,7 @@ namespace core
 		}
 		else if (target.m_count == 1)
 		{
-			for (size_t i = 0; i < m_count; ++i)
+			for (size_t i = 0; i < self.count(); ++i)
 				if (self.m_begin[i] == target.m_begin[0])
 					return start + i;
 			return SIZE_MAX;
@@ -190,5 +189,36 @@ namespace core
 			}
 		}
 		return SIZE_MAX;
+	}
+
+	Array<StringView> StringView::split(StringView delim, bool skipEmpty, Allocator* allocator) const
+	{
+		Array<StringView> res{allocator};
+
+		size_t ix = 0;
+		while (true)
+		{
+			if (ix + delim.count() > m_count)
+				break;
+
+			size_t delim_ix = find(delim, ix);
+			if (delim_ix == SIZE_MAX)
+				break;
+
+			auto skip = skipEmpty && ix == delim_ix;
+			if (!skip)
+				res.push(slice(ix, delim_ix));
+
+			ix = delim_ix + delim.count();
+			if (ix == m_count)
+				break;
+		}
+
+		if (ix != m_count)
+			res.push(slice(ix, m_count));
+		else if (!skipEmpty && ix == m_count)
+			res.push(StringView{});
+
+		return res;
 	}
 }

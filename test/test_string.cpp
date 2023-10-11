@@ -89,3 +89,62 @@ TEST_CASE("core::String::format")
 	auto output = core::strf(&allocator, "Hello {}!"_sv, "يا عالم 🌎");
 	REQUIRE(output == "Hello يا عالم 🌎!"_sv);
 }
+
+TEST_CASE("core::String::split")
+{
+	core::Mallocator allocator;
+
+	auto res = ",A,B,C,"_sv.split(","_sv, true, &allocator);
+	REQUIRE(res.count() == 3);
+	REQUIRE(res[0] == "A"_sv);
+	REQUIRE(res[1] == "B"_sv);
+	REQUIRE(res[2] == "C"_sv);
+
+	res = "A,B,C"_sv.split(","_sv, false, &allocator);
+	REQUIRE(res.count() == 3);
+	REQUIRE(res[0] == "A"_sv);
+	REQUIRE(res[1] == "B"_sv);
+	REQUIRE(res[2] == "C"_sv);
+
+	res = ",A,B,C,"_sv.split(","_sv, false, &allocator);
+	REQUIRE(res.count() == 5);
+	REQUIRE(res[0] == ""_sv);
+	REQUIRE(res[1] == "A"_sv);
+	REQUIRE(res[2] == "B"_sv);
+	REQUIRE(res[3] == "C"_sv);
+	REQUIRE(res[4] == ""_sv);
+
+	res = "A"_sv.split(";;;"_sv, true, &allocator);
+	REQUIRE(res.count() == 1);
+	REQUIRE(res[0] == "A"_sv);
+
+	res = ""_sv.split(","_sv, false, &allocator);
+	REQUIRE(res.count() == 1);
+	REQUIRE(res[0] == ""_sv);
+
+	res = ""_sv.split(","_sv, true, &allocator);
+	REQUIRE(res.count() == 0);
+
+	res = ",,,,,"_sv.split(","_sv, true, &allocator);
+	REQUIRE(res.count() == 0);
+
+	res = ",,,"_sv.split(","_sv, false, &allocator);
+	REQUIRE(res.count() == 4);
+	REQUIRE(res[0] == ""_sv);
+	REQUIRE(res[1] == ""_sv);
+	REQUIRE(res[2] == ""_sv);
+	REQUIRE(res[3] == ""_sv);
+
+	res = ",,,"_sv.split(",,"_sv, false, &allocator);
+	REQUIRE(res.count() == 2);
+	REQUIRE(res[0] == ""_sv);
+	REQUIRE(res[1] == ","_sv);
+
+	res = "test"_sv.split(",,,,,,,,"_sv, false, &allocator);
+	REQUIRE(res.count() == 1);
+	REQUIRE(res[0] == "test"_sv);
+
+	res = "test"_sv.split(",,,,,,,,"_sv, true, &allocator);
+	REQUIRE(res.count() == 1);
+	REQUIRE(res[0] == "test"_sv);
+}

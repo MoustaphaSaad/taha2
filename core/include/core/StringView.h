@@ -2,6 +2,7 @@
 
 #include "core/Exports.h"
 #include "core/Rune.h"
+#include "core/Array.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
@@ -76,6 +77,8 @@ namespace core
 		static RabinKarpState hashRabinKarpReverse(StringView v);
 		CORE_EXPORT static int cmp(StringView a, StringView b);
 	public:
+		StringView() = default;
+
 		explicit StringView(const char* ptr)
 		{
 			m_begin = ptr;
@@ -132,6 +135,8 @@ namespace core
 			assert(start <= end && end - start <= m_count);
 			return StringView{m_begin + start, end - start};
 		}
+
+		CORE_EXPORT Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const;
 	};
 }
 

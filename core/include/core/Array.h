@@ -19,6 +19,9 @@ namespace core
 
 		void destroy()
 		{
+			if (m_ptr == nullptr)
+				return;
+
 			for (size_t i = 0; i < m_count; ++i)
 				m_ptr[i].~T();
 			m_allocator->release(m_ptr, m_capacity * sizeof(T));
