@@ -18,12 +18,13 @@ namespace core
 	{
 		m_allocator = other.m_allocator;
 		m_count = other.m_count;
-		m_capacity = m_count;
+		m_capacity = m_count + 1;
 
 		m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char));
 		m_allocator->commit(m_ptr, m_capacity);
 
-		::memcpy(m_ptr, other.m_ptr, m_capacity);
+		::memcpy(m_ptr, other.m_ptr, m_count);
+		m_ptr[m_count] = '\0';
 	}
 
 	void String::moveFrom(String&& other)

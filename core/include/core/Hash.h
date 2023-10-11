@@ -950,7 +950,7 @@ namespace core
 		void copyFrom(const Map& other)
 		{
 			m_allocator = other.m_allocator;
-			m_slots_count = other.count();
+			m_slots_count = other.m_slots_count;
 			m_deleted_count = other.m_deleted_count;
 			m_used_count_threshold = other.m_used_count_threshold;
 			m_used_count_shrink_threshold = other.m_used_count_shrink_threshold;
@@ -1363,7 +1363,7 @@ namespace core
 		{
 			auto res = findSlotForLookup(key);
 			if (res.index == m_slots_count)
-				return nullptr;
+				return end();
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
 			return m_values + index;

@@ -14,6 +14,11 @@ namespace core
 		struct KeyValue
 		{
 			String key, value;
+
+			KeyValue(String key, String value)
+				: key(std::move(key))
+				, value(std::move(value))
+			{}
 		};
 
 	private:
@@ -23,13 +28,13 @@ namespace core
 	public:
 		using KeyIterator = Map<StringView, size_t>::iterator;
 
-		static Result<UrlQuery> parse(StringView query, Allocator* allocator);
+		CORE_EXPORT static Result<UrlQuery> parse(StringView query, Allocator* allocator);
 
-		explicit UrlQuery(Allocator* allocator);
+		CORE_EXPORT explicit UrlQuery(Allocator* allocator);
 
-		void add(StringView key, StringView value);
-		const KeyIterator find(StringView key) const;
-		StringView get(const KeyIterator) const;
+		CORE_EXPORT void add(StringView key, StringView value);
+		CORE_EXPORT const KeyIterator find(StringView key) const;
+		CORE_EXPORT StringView get(const KeyIterator) const;
 
 		size_t count() const { return m_keyValues.count(); }
 		const KeyValue& operator[](size_t index) const { return m_keyValues[index]; }
@@ -46,7 +51,8 @@ namespace core
 		String m_fragment;
 		int m_ipVersion = 0;
 	public:
-		static String encodeQueryElement(StringView str, Allocator* allocator);
+		CORE_EXPORT static String encodeQueryElement(StringView str, Allocator* allocator);
+		CORE_EXPORT static Result<Url> parse(StringView url, Allocator* allocator);
 
 		explicit Url(Allocator* allocator)
 			: m_scheme(allocator),
@@ -68,7 +74,7 @@ namespace core
 		StringView fragment() const { return m_fragment; }
 		int ipVersion() const { return m_ipVersion; }
 
-		Result<String> toString(Allocator* allocator) const;
+		CORE_EXPORT Result<String> toString(Allocator* allocator) const;
 
 		bool isDefaultPort() const
 		{

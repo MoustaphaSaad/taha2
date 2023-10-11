@@ -162,6 +162,14 @@ namespace core
 			++m_count;
 		}
 
+		void pop()
+		{
+			assert(m_count > 0);
+			m_ptr[m_count - 1].~T();
+			m_allocator->release(m_ptr + m_count - 1, sizeof(T));
+			--m_count;
+		}
+
 		void clear()
 		{
 			for (size_t i = 0; i < m_count; ++i)
