@@ -13,7 +13,6 @@
 
 namespace core
 {
-	// TODO: inherit from Stream
 	class File: public Stream
 	{
 	public:

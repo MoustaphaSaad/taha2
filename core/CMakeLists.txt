@@ -30,6 +30,7 @@ target_sources(core PRIVATE
 	include/core/WaitGroup.h
 	include/core/Log.h
 	include/core/Url.h
+	include/core/Socket.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -56,6 +57,7 @@ if (WIN32)
 			src/core/winos/Thread.cpp
 			src/core/winos/ConditionVariable.cpp
 			src/core/winos/IMutex.h
+			src/core/winos/Socket.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
@@ -70,6 +72,7 @@ elseif (APPLE)
 			src/core/macos/Thread.cpp
 			src/core/macos/ConditionVariable.cpp
 			src/core/macos/IMutex.h
+			src/core/macos/Socket.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
@@ -84,6 +87,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/Thread.cpp
 			src/core/linux/ConditionVariable.cpp
 			src/core/linux/IMutex.h
+			src/core/linux/Socket.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()
@@ -94,7 +98,7 @@ CPMGetPackage(spdlog)
 target_link_libraries(core PUBLIC utf8proc fmt spdlog)
 target_link_libraries(core
 	PRIVATE
-		"$<$<PLATFORM_ID:Windows>:bcrypt>"
+		"$<$<PLATFORM_ID:Windows>:bcrypt;ws2_32>"
 		"$<$<PLATFORM_ID:Linux>:pthread>"
 		"$<$<PLATFORM_ID:Darwin>:pthread>"
 )
