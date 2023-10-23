@@ -11,11 +11,20 @@ namespace core
 {
 	class WinOSServer: public Server
 	{
-		HANDLE m_port;
+		HANDLE m_port = INVALID_HANDLE_VALUE;
 	public:
 		WinOSServer(HANDLE port)
 			: m_port(port)
 		{}
+
+		~WinOSServer() override
+		{
+			if (m_port != INVALID_HANDLE_VALUE)
+			{
+				[[maybe_unused]] auto res = CloseHandle(m_port);
+				assert(SUCCEEDED(res));
+			}
+		}
 
 		virtual void run() override
 		{
