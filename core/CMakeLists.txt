@@ -31,6 +31,7 @@ target_sources(core PRIVATE
 	include/core/Log.h
 	include/core/Url.h
 	include/core/Socket.h
+	include/core/Websocket.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -58,6 +59,7 @@ if (WIN32)
 			src/core/winos/ConditionVariable.cpp
 			src/core/winos/IMutex.h
 			src/core/winos/Socket.cpp
+			src/core/winos/Websocket.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
