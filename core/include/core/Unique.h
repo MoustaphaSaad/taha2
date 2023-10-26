@@ -80,6 +80,10 @@ namespace core
 		operator bool() const { return m_ptr != nullptr; }
 		bool operator==(std::nullptr_t) const { return m_ptr == nullptr; }
 		bool operator!=(std::nullptr_t) const { return m_ptr != nullptr; }
+		template<typename R>
+		bool operator==(const Unique<R>& other) const { return m_ptr == other.m_ptr; }
+		template<typename R>
+		bool operator!=(const Unique<R>& other) const { return m_ptr != other.m_ptr; }
 
 		T* get() const { return m_ptr; }
 

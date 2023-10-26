@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Allocator.h"
+#include "core/HashFunction.h"
 
 #include <atomic>
 #include <cassert>
@@ -148,6 +149,13 @@ namespace core
 			return control != nullptr;
 		}
 
+		bool operator==(std::nullptr_t) const { return control == nullptr; }
+		bool operator!=(std::nullptr_t) const { return control != nullptr; }
+		template<typename R>
+		bool operator==(const Shared<R>& other) const { return control == other.control; }
+		template<typename R>
+		bool operator!=(const Shared<R>& other) const { return control != other.control; }
+
 		int ref_count() const
 		{
 			if (control == nullptr)
@@ -175,8 +183,19 @@ namespace core
 	};
 
 	template<typename T>
+	struct Hash<Shared<T>>
+	{
+		inline size_t operator()(const Shared<T>& value) const
+		{
+			return Hash<T*>{}(value.get());
+		}
+	};
+
+	template<typename T>
 	class Weak
 	{
+		friend struct Hash<Weak<T>>;
+
 		Allocator* allocator = nullptr;
 		typename Shared<T>::Control* control = nullptr;
 
@@ -254,6 +273,18 @@ namespace core
 			unref();
 		}
 
+		operator bool() const
+		{
+			return control != nullptr;
+		}
+
+		bool operator==(std::nullptr_t) const { return control == nullptr; }
+		bool operator!=(std::nullptr_t) const { return control != nullptr; }
+		template<typename R>
+		bool operator==(const Weak<R>& other) const { return control == other.control; }
+		template<typename R>
+		bool operator!=(const Weak<R>& other) const { return control != other.control; }
+
 		int ref_count() const
 		{
 			if (control == nullptr)
@@ -286,6 +317,15 @@ namespace core
 			}
 
 			return Shared<T>{};
+		}
+	};
+
+	template<typename T>
+	struct Hash<Weak<T>>
+	{
+		inline size_t operator()(const Weak<T>& value) const
+		{
+			return Hash<void*>{}(value.control);
 		}
 	};
 

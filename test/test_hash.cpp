@@ -2,6 +2,8 @@
 
 #include <core/Hash.h>
 #include <core/Mallocator.h>
+#include <core/Unique.h>
+#include <core/Shared.h>
 
 TEST_CASE("basic core::Hash test")
 {
@@ -23,4 +25,45 @@ TEST_CASE("basic core::Hash test")
 
 	numbers.reserve(100);
 	REQUIRE(numbers.capacity() >= 100);
+}
+
+TEST_CASE("basic core::Set test with core::Unique")
+{
+	core::Mallocator allocator;
+	core::Set<core::Unique<int>> numbers{&allocator};
+	numbers.insert(core::unique_from<int>(&allocator, 1));
+}
+
+TEST_CASE("basic core::Map test with core::Unique")
+{
+	core::Mallocator allocator;
+	core::Map<int, core::Unique<int>> numbers{&allocator};
+	numbers.insert(1, core::unique_from<int>(&allocator, 1));
+	numbers.remove(1);
+}
+
+TEST_CASE("basic core::Set test with core::Shared")
+{
+	core::Mallocator allocator;
+	core::Set<core::Shared<int>> numbers{&allocator};
+	auto val = core::shared_from<int>(&allocator, 1);
+	numbers.insert(val);
+	numbers.remove(val);
+}
+
+TEST_CASE("basic core::Map test with core::Shared")
+{
+	core::Mallocator allocator;
+	core::Map<int, core::Shared<int>> numbers{&allocator};
+	numbers.insert(1, core::shared_from<int>(&allocator, 1));
+	numbers.remove(1);
+}
+
+TEST_CASE("basic core::Set test with core::Weak")
+{
+	core::Mallocator allocator;
+	core::Set<core::Weak<int>> numbers{&allocator};
+	auto val = core::shared_from<int>(&allocator, 1);
+	numbers.insert(val);
+	numbers.remove(val);
 }
