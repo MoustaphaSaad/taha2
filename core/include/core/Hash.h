@@ -4,6 +4,8 @@
 #include "core/String.h"
 #include "core/Buffer.h"
 #include "core/UUID.h"
+#include "core/Unique.h"
+#include "core/Shared.h"
 
 #include <cstdint>
 #include <cstring>
@@ -128,6 +130,24 @@ namespace core
 		inline size_t operator()(unsigned long long value) const
 		{
 			return size_t(value);
+		}
+	};
+
+	template<typename T>
+	struct Hash<Unique<T>>
+	{
+		inline size_t operator()(const Unique<T>& value) const
+		{
+			return Hash<T*>{}(value.get());
+		}
+	};
+
+	template<typename T>
+	struct Hash<Shared<T>>
+	{
+		inline size_t operator()(const Shared<T>& value) const
+		{
+			return Hash<T*>{}(value.get());
 		}
 	};
 
@@ -789,7 +809,7 @@ namespace core
 			m_deleted_count = 0;
 		}
 
-		Allocator* allocator() const { return allocator; }
+		Allocator* allocator() const { return m_allocator; }
 
 		size_t count() const
 		{
