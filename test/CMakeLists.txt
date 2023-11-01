@@ -20,7 +20,8 @@ add_executable(unittests
 	test_threadpool.cpp
 	test_log.cpp
 	test_url.cpp
+	test_vector.cpp
 )
 
 CPMGetPackage(doctest)
-target_link_libraries(unittests PRIVATE doctest core)
+target_link_libraries(unittests PUBLIC doctest core math)

@@ -15,5 +15,6 @@ CPMUsePackageLock(package-lock.cmake)
 
 add_subdirectory(external)
 add_subdirectory(core)
+add_subdirectory(math)
 add_subdirectory(sabre)
 add_subdirectory(test)
