@@ -15,21 +15,22 @@ namespace core
 	{
 		class Op: public OVERLAPPED
 		{
-		protected:
+		public:
 			enum KIND
 			{
 				KIND_NONE,
 				KIND_ACCEPT,
 			};
 
-			KIND m_kind;
-
-		public:
 			Op(KIND kind)
 				: m_kind(kind)
 			{}
 
 			virtual ~Op() = default;
+
+			KIND kind() const { return m_kind; }
+		private:
+			KIND m_kind = KIND_NONE;
 		};
 
 		class AcceptOp: public Op
@@ -84,6 +85,41 @@ namespace core
 			m_scheduledOperations.remove(op);
 		}
 
+		void scheduleAccept()
+		{
+			auto op = getOp<AcceptOp>();
+			// TODO: we can receive on accept operation, it's a little bit more efficient so consider doing that in the future
+			DWORD bytesReceived = 0;
+			auto res = AcceptEx(
+				m_listenSocket,
+				op->acceptSocket(),
+				op->buffer(),
+				0,
+				sizeof(SOCKADDR_IN) + 16,
+				sizeof(SOCKADDR_IN) + 16,
+				&bytesReceived,
+				(OVERLAPPED*)op
+			);
+			if (res == TRUE)
+			{
+				handleAccept();
+			}
+			else
+			{
+				auto error = WSAGetLastError();
+				if (error != ERROR_IO_PENDING)
+				{
+					// TODO: return error of execution here
+					assert(false);
+				}
+			}
+		}
+
+		void handleAccept()
+		{
+			// TODO: handle accept here
+		}
+
 	public:
 		WinOSServer(HANDLE port, SOCKET listenSocket, Allocator* allocator)
 			: m_allocator(allocator),
@@ -110,31 +146,28 @@ namespace core
 		virtual void run() override
 		{
 			// schedule an accept operation
-			auto op = getOp<AcceptOp>();
-			// TODO: we can receive on accept operation, it's a little bit more efficient so consider doing that in the future
-			DWORD bytesReceived = 0;
-			auto res = AcceptEx(
-				m_listenSocket,
-				op->acceptSocket(),
-				op->buffer(),
-				0,
-				sizeof(SOCKADDR_IN) + 16,
-				sizeof(SOCKADDR_IN) + 16,
-				&bytesReceived,
-				(OVERLAPPED*)op
-			);
-			if (res == TRUE)
+			scheduleAccept();
+
+			while (true)
 			{
-				// TODO: handle immediate completion here
-				assert(false);
-			}
-			else
-			{
-				auto error = WSAGetLastError();
-				if (error != ERROR_IO_PENDING)
+				DWORD bytesReceived = 0;
+				ULONG_PTR completionKey = 0;
+				OVERLAPPED* overlapped = nullptr;
+				auto res = GetQueuedCompletionStatus(m_port, &bytesReceived, &completionKey, &overlapped, INFINITE);
+				if (res == FALSE)
 				{
-					// TODO: return error of execution here
+					// TODO: handle error here
+				}
+
+				auto op = (Op*)overlapped;
+				switch (op->kind())
+				{
+				case Op::KIND_ACCEPT:
+					handleAccept();
+					break;
+				default:
 					assert(false);
+					break;
 				}
 			}
 		}
