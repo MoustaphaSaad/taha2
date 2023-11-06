@@ -85,7 +85,7 @@ namespace core
 			m_scheduledOperations.remove(op);
 		}
 
-		void scheduleAccept()
+		HumanError scheduleAccept()
 		{
 			auto op = getOp<AcceptOp>();
 			// TODO: we can receive on accept operation, it's a little bit more efficient so consider doing that in the future
@@ -109,8 +109,7 @@ namespace core
 				auto error = WSAGetLastError();
 				if (error != ERROR_IO_PENDING)
 				{
-					// TODO: return error of execution here
-					assert(false);
+					return errf(m_allocator, "Failed to schedule accept operation: ErrorCode({})"_sv, error);
 				}
 			}
 		}
@@ -143,10 +142,10 @@ namespace core
 			}
 		}
 
-		virtual void run() override
+		virtual HumanError run() override
 		{
 			// schedule an accept operation
-			scheduleAccept();
+			if (auto err = scheduleAccept()) return err;
 
 			while (true)
 			{
@@ -156,7 +155,8 @@ namespace core
 				auto res = GetQueuedCompletionStatus(m_port, &bytesReceived, &completionKey, &overlapped, INFINITE);
 				if (res == FALSE)
 				{
-					// TODO: handle error here
+					auto error = GetLastError();
+					return errf(m_allocator, "Failed to get queued completion status: ErrorCode({})"_sv, error);
 				}
 
 				auto op = (Op*)overlapped;
@@ -170,6 +170,8 @@ namespace core
 					break;
 				}
 			}
+
+			return {};
 		}
 
 		virtual void stop() override

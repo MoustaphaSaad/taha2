@@ -2,6 +2,7 @@
 
 #include "core/Exports.h"
 #include "core/Unique.h"
+#include "core/Result.h"
 
 namespace core
 {
@@ -11,7 +12,7 @@ namespace core
 		CORE_EXPORT Unique<Server> open(Allocator* allocator);
 
 		virtual ~Server() = default;
-		virtual void run() = 0;
+		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 	};
 }
