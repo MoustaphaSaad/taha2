@@ -102,7 +102,7 @@ namespace core
 			);
 			if (res == TRUE)
 			{
-				handleAccept();
+				handleAccept(op);
 			}
 			else
 			{
@@ -112,11 +112,14 @@ namespace core
 					return errf(m_allocator, "Failed to schedule accept operation: ErrorCode({})"_sv, error);
 				}
 			}
+
+			return {};
 		}
 
-		void handleAccept()
+		void handleAccept(AcceptOp* op)
 		{
 			// TODO: handle accept here
+			putOp(op);
 		}
 
 	public:
@@ -163,7 +166,7 @@ namespace core
 				switch (op->kind())
 				{
 				case Op::KIND_ACCEPT:
-					handleAccept();
+					handleAccept((AcceptOp*)(op));
 					break;
 				default:
 					assert(false);
