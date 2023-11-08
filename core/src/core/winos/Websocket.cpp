@@ -13,6 +13,29 @@ namespace core
 {
 	class WinOSServer: public Server
 	{
+		class Connection
+		{
+			SOCKET m_socket = INVALID_SOCKET;
+		public:
+			Connection(SOCKET socket)
+				: m_socket(socket)
+			{}
+
+			~Connection()
+			{
+				if (m_socket != INVALID_SOCKET)
+				{
+					[[maybe_unused]] auto res = ::closesocket(m_socket);
+					assert(res == 0);
+				}
+			}
+
+			SOCKET socket() const
+			{
+				return m_socket;
+			}
+		};
+
 		class Op: public OVERLAPPED
 		{
 		public:
@@ -68,6 +91,7 @@ namespace core
 		HANDLE m_port = INVALID_HANDLE_VALUE;
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
+		Set<Unique<Connection>> m_connections;
 
 		template<typename T>
 		T* getOp()
@@ -118,7 +142,9 @@ namespace core
 
 		void handleAccept(AcceptOp* op)
 		{
-			// TODO: handle accept here
+			auto connection = core::unique_from<Connection>(m_allocator, op->acceptSocket());
+			// schedule reads here
+			m_connections.insert(std::move(connection));
 			putOp(op);
 		}
 
@@ -127,7 +153,8 @@ namespace core
 			: m_allocator(allocator),
 			  m_port(port),
 			  m_listenSocket(listenSocket),
-			  m_scheduledOperations(allocator)
+			  m_scheduledOperations(allocator),
+			  m_connections(allocator)
 		{}
 
 		~WinOSServer() override
