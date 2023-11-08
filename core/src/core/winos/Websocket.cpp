@@ -16,6 +16,7 @@ namespace core
 		class Connection
 		{
 			SOCKET m_socket = INVALID_SOCKET;
+			CHAR m_readBuffer[4 * 1024];
 		public:
 			Connection(SOCKET socket)
 				: m_socket(socket)
@@ -34,6 +35,16 @@ namespace core
 			{
 				return m_socket;
 			}
+
+			CHAR* readBuffer()
+			{
+				return m_readBuffer;
+			}
+
+			ULONG readBufferSize() const
+			{
+				return sizeof(m_readBuffer);
+			}
 		};
 
 		class Op: public OVERLAPPED
@@ -43,6 +54,7 @@ namespace core
 			{
 				KIND_NONE,
 				KIND_ACCEPT,
+				KIND_READ,
 			};
 
 			Op(KIND kind)
@@ -87,16 +99,29 @@ namespace core
 			}
 		};
 
+		class ReadOp: public Op
+		{
+			friend class WinOSServer;
+
+			Connection* m_connection = nullptr;
+			DWORD m_bytesReceived = 0;
+		public:
+			ReadOp(Connection* connection)
+				: Op(KIND_READ),
+				  m_connection(connection)
+			{}
+		};
+
 		Allocator* m_allocator = nullptr;
 		HANDLE m_port = INVALID_HANDLE_VALUE;
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
 		Set<Unique<Connection>> m_connections;
 
-		template<typename T>
-		T* getOp()
+		template<typename T, typename ... TArgs>
+		T* getOp(TArgs&& ... args)
 		{
-			auto op = core::unique_from<T>(m_allocator);
+			auto op = core::unique_from<T>(m_allocator, std::forward<TArgs>(args)...);
 			op->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 			auto rawOp = op.get();
 			m_scheduledOperations.insert(rawOp, std::move(op));
@@ -126,7 +151,7 @@ namespace core
 			);
 			if (res == TRUE)
 			{
-				handleAccept(op);
+				return handleAccept(op);
 			}
 			else
 			{
@@ -140,12 +165,51 @@ namespace core
 			return {};
 		}
 
-		void handleAccept(AcceptOp* op)
+		HumanError handleAccept(AcceptOp* op)
 		{
 			auto connection = core::unique_from<Connection>(m_allocator, op->acceptSocket());
-			// schedule reads here
-			m_connections.insert(std::move(connection));
 			putOp(op);
+			if (auto err = scheduleRead(connection.get())) return err;
+			m_connections.insert(std::move(connection));
+			return {};
+		}
+
+		HumanError scheduleRead(Connection* conn)
+		{
+			auto op = getOp<ReadOp>(conn);
+
+			WSABUF buf;
+			buf.buf = conn->readBuffer();
+			buf.len = conn->readBufferSize();
+			auto res = WSARecv(
+				conn->socket(),
+				&buf,
+				1,
+				&op->m_bytesReceived,
+				0,
+				(OVERLAPPED*)op,
+				NULL
+			);
+			if (res == TRUE)
+			{
+				return handleRead(op);
+			}
+			else
+			{
+				auto err = WSAGetLastError();
+				if (err != ERROR_IO_PENDING)
+				{
+					return errf(m_allocator, "Failed to schedule read operation: ErrorCode({})"_sv, err);
+				}
+			}
+
+			return {};
+		}
+
+		HumanError handleRead(ReadOp* op)
+		{
+			putOp(op);
+			return {};
 		}
 
 	public:
@@ -193,7 +257,10 @@ namespace core
 				switch (op->kind())
 				{
 				case Op::KIND_ACCEPT:
-					handleAccept((AcceptOp*)(op));
+					if (auto err = handleAccept((AcceptOp*)(op))) return err;
+					break;
+				case Op::KIND_READ:
+					if (auto err = handleRead((ReadOp*)(op))) return err;
 					break;
 				default:
 					assert(false);
