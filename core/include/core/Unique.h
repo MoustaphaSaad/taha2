@@ -106,4 +106,10 @@ namespace core
 		::new (ptr) T(std::forward<TArgs>(args)...);
 		return Unique<T>{allocator, (T*)ptr};
 	}
+
+	template<typename T, typename R>
+	inline Unique<T> unique_static_cast(Unique<R> other)
+	{
+		return Unique<T>{other.allocator(), static_cast<T*>(other.leak())};
+	}
 }

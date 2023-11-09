@@ -59,9 +59,15 @@ namespace core
 
 			Op(KIND kind)
 				: m_kind(kind)
-			{}
+			{
+				memset(this, 0, sizeof(OVERLAPPED));
+				hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+			}
 
-			virtual ~Op() = default;
+			virtual ~Op()
+			{
+				CloseHandle(hEvent);
+			}
 
 			KIND kind() const { return m_kind; }
 		private:
@@ -118,25 +124,23 @@ namespace core
 		Map<Op*, Unique<Op>> m_scheduledOperations;
 		Set<Unique<Connection>> m_connections;
 
-		template<typename T, typename ... TArgs>
-		T* getOp(TArgs&& ... args)
+		void pushPendingOp(Unique<Op> op)
 		{
-			auto op = core::unique_from<T>(m_allocator, std::forward<TArgs>(args)...);
-			op->hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-			auto rawOp = op.get();
-			m_scheduledOperations.insert(rawOp, std::move(op));
-			return rawOp;
+			m_scheduledOperations.insert(op.get(), std::move(op));
 		}
 
-		void putOp(Op* op)
+		Unique<Op> popPendingOp(Op* op)
 		{
-			CloseHandle(op->hEvent);
+			auto it = m_scheduledOperations.lookup(op);
+			if (it == m_scheduledOperations.end()) return nullptr;
+			auto res = std::move(it->value);
 			m_scheduledOperations.remove(op);
+			return res;
 		}
 
 		HumanError scheduleAccept()
 		{
-			auto op = getOp<AcceptOp>();
+			auto op = unique_from<AcceptOp>(m_allocator);
 			// TODO: we can receive on accept operation, it's a little bit more efficient so consider doing that in the future
 			DWORD bytesReceived = 0;
 			auto res = AcceptEx(
@@ -147,16 +151,20 @@ namespace core
 				sizeof(SOCKADDR_IN) + 16,
 				sizeof(SOCKADDR_IN) + 16,
 				&bytesReceived,
-				(OVERLAPPED*)op
+				(OVERLAPPED*)op.get()
 			);
 			if (res == TRUE)
 			{
-				return handleAccept(op);
+				return handleAccept(std::move(op));
 			}
 			else
 			{
 				auto error = WSAGetLastError();
-				if (error != ERROR_IO_PENDING)
+				if (error == ERROR_IO_PENDING)
+				{
+					pushPendingOp(std::move(op));
+				}
+				else
 				{
 					return errf(m_allocator, "Failed to schedule accept operation: ErrorCode({})"_sv, error);
 				}
@@ -165,10 +173,9 @@ namespace core
 			return {};
 		}
 
-		HumanError handleAccept(AcceptOp* op)
+		HumanError handleAccept(Unique<AcceptOp> op)
 		{
 			auto connection = core::unique_from<Connection>(m_allocator, op->acceptSocket());
-			putOp(op);
 			if (auto err = scheduleRead(connection.get())) return err;
 			m_connections.insert(std::move(connection));
 			return {};
@@ -176,7 +183,7 @@ namespace core
 
 		HumanError scheduleRead(Connection* conn)
 		{
-			auto op = getOp<ReadOp>(conn);
+			auto op = unique_from<ReadOp>(m_allocator, conn);
 
 			WSABUF buf;
 			buf.buf = conn->readBuffer();
@@ -187,17 +194,21 @@ namespace core
 				1,
 				&op->m_bytesReceived,
 				0,
-				(OVERLAPPED*)op,
+				(OVERLAPPED*)op.get(),
 				NULL
 			);
 			if (res == TRUE)
 			{
-				return handleRead(op);
+				return handleRead(std::move(op));
 			}
 			else
 			{
 				auto err = WSAGetLastError();
-				if (err != ERROR_IO_PENDING)
+				if (err == ERROR_IO_PENDING)
+				{
+					pushPendingOp(std::move(op));
+				}
+				else
 				{
 					return errf(m_allocator, "Failed to schedule read operation: ErrorCode({})"_sv, err);
 				}
@@ -206,9 +217,8 @@ namespace core
 			return {};
 		}
 
-		HumanError handleRead(ReadOp* op)
+		HumanError handleRead(Unique<ReadOp> op)
 		{
-			putOp(op);
 			return {};
 		}
 
@@ -253,14 +263,16 @@ namespace core
 					return errf(m_allocator, "Failed to get queued completion status: ErrorCode({})"_sv, error);
 				}
 
-				auto op = (Op*)overlapped;
+				auto op = popPendingOp((Op*)overlapped);
+				assert(op != nullptr);
+
 				switch (op->kind())
 				{
 				case Op::KIND_ACCEPT:
-					if (auto err = handleAccept((AcceptOp*)(op))) return err;
+					if (auto err = handleAccept(unique_static_cast<AcceptOp>(std::move(op)))) return err;
 					break;
 				case Op::KIND_READ:
-					if (auto err = handleRead((ReadOp*)(op))) return err;
+					if (auto err = handleRead(unique_static_cast<ReadOp>(std::move(op)))) return err;
 					break;
 				default:
 					assert(false);
