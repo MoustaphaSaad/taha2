@@ -7,11 +7,11 @@
 #include <WS2tcpip.h>
 #include <Mswsock.h>
 
-#include <assert.h>
+#include <cassert>
 
 namespace core
 {
-	class WinOSServer: public Server
+	class WinOSServer: public WebSocketServer
 	{
 		class Connection
 		{
@@ -248,7 +248,7 @@ namespace core
 			}
 		}
 
-		virtual HumanError run() override
+		HumanError run() override
 		{
 			// schedule an accept operation
 			if (auto err = scheduleAccept()) return err;
@@ -285,34 +285,35 @@ namespace core
 			return {};
 		}
 
-		virtual void stop() override
+		void stop() override
 		{
 			// TODO: Implement this function
 		}
 	};
 
-	Unique<Server> Server::open(Allocator* allocator)
+	Result<Unique<WebSocketServer>> WebSocketServer::open(StringView ip, StringView port, Allocator* allocator)
 	{
-		auto port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
-		if (port == NULL) return nullptr;
+		auto completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+		if (completionPort == NULL) return errf(allocator, "failed to create completion port"_sv);
 
 		auto listenSocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
-		if (listenSocket == INVALID_SOCKET) return nullptr;
+		if (listenSocket == INVALID_SOCKET) return errf(allocator, "failed to create listening socket"_sv);
 
 		PADDRINFOA addressInfo = nullptr;
-		auto res = getaddrinfo("127.0.0.1", "123", nullptr, &addressInfo);
+		String ipString{ip, allocator};
+		String portString{port, allocator};
+		auto res = getaddrinfo(ipString.data(), portString.data(), nullptr, &addressInfo);
 		if (res != 0)
-			return nullptr;
-			// return errf(allocator, "failed to get address info, ErrorCode({})"_sv, res);
+			return errf(allocator, "failed to get address info, ErrorCode({})"_sv, res);
 
 		res = bind(listenSocket, addressInfo->ai_addr, (int)addressInfo->ai_addrlen);
 		freeaddrinfo(addressInfo);
 		if (res != 0)
-			return nullptr;
+			return errf(allocator, "failed to bind listening socket, ErrorCode({})"_sv, res);
 
 		res = listen(listenSocket, SOMAXCONN);
 		if (res != 0)
-			return nullptr;
+			return errf(allocator, "failed to move listening socket to listen state, ErrorCode({})"_sv, res);
 
 		LPFN_ACCEPTEX acceptEx = nullptr;
 		GUID guidAcceptEx = WSAID_ACCEPTEX;
@@ -328,10 +329,9 @@ namespace core
 			NULL,
 			NULL
 		);
-
 		if (res == SOCKET_ERROR)
-			return nullptr;
+			return errf(allocator, "failed to get the AcceptEx function pointer, ErrorCode({})"_sv, res);
 
-		return core::unique_from<WinOSServer>(allocator, port, listenSocket, acceptEx, allocator);
+		return core::unique_from<WinOSServer>(allocator, completionPort, listenSocket, acceptEx, allocator);
 	}
 }

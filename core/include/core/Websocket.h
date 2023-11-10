@@ -6,12 +6,12 @@
 
 namespace core
 {
-	class Server
+	class WebSocketServer
 	{
 	public:
-		static CORE_EXPORT Unique<Server> open(Allocator* allocator);
+		static CORE_EXPORT Result<Unique<WebSocketServer>> open(StringView ip, StringView port, Allocator* allocator);
 
-		virtual ~Server() = default;
+		virtual ~WebSocketServer() = default;
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 	};
