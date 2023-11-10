@@ -100,7 +100,7 @@ CPMGetPackage(spdlog)
 target_link_libraries(core PUBLIC utf8proc fmt spdlog)
 target_link_libraries(core
 	PRIVATE
-		"$<$<PLATFORM_ID:Windows>:bcrypt;ws2_32;Mswsock>"
+		"$<$<PLATFORM_ID:Windows>:bcrypt;ws2_32>"
 		"$<$<PLATFORM_ID:Linux>:pthread>"
 		"$<$<PLATFORM_ID:Darwin>:pthread>"
 )

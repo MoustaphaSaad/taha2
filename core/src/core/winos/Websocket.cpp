@@ -119,6 +119,7 @@ namespace core
 		};
 
 		Allocator* m_allocator = nullptr;
+		LPFN_ACCEPTEX m_acceptFn = nullptr;
 		HANDLE m_port = INVALID_HANDLE_VALUE;
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
@@ -143,15 +144,15 @@ namespace core
 			auto op = unique_from<AcceptOp>(m_allocator);
 			// TODO: we can receive on accept operation, it's a little bit more efficient so consider doing that in the future
 			DWORD bytesReceived = 0;
-			auto res = AcceptEx(
-				m_listenSocket,
-				op->acceptSocket(),
-				op->buffer(),
-				0,
-				sizeof(SOCKADDR_IN) + 16,
-				sizeof(SOCKADDR_IN) + 16,
-				&bytesReceived,
-				(OVERLAPPED*)op.get()
+			auto res = m_acceptFn(
+				m_listenSocket, // listen socket
+				op->acceptSocket(), // accept socket
+				op->buffer(), // pointer to a buffer that receives the first block of data sent on new connection
+				0, // number of bytes for receive data (it doesn't include server and client address)
+				sizeof(SOCKADDR_IN) + 16, // local address length
+				sizeof(SOCKADDR_IN) + 16, // remote address length
+				&bytesReceived, // bytes received in case of sync completion
+				(OVERLAPPED*)op.get() // overlapped structure
 			);
 			if (res == TRUE)
 			{
@@ -223,8 +224,9 @@ namespace core
 		}
 
 	public:
-		WinOSServer(HANDLE port, SOCKET listenSocket, Allocator* allocator)
+		WinOSServer(HANDLE port, SOCKET listenSocket, LPFN_ACCEPTEX acceptEx, Allocator* allocator)
 			: m_allocator(allocator),
+			  m_acceptFn(acceptEx),
 			  m_port(port),
 			  m_listenSocket(listenSocket),
 			  m_scheduledOperations(allocator),
@@ -297,6 +299,39 @@ namespace core
 		auto listenSocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
 		if (listenSocket == INVALID_SOCKET) return nullptr;
 
-		return core::unique_from<WinOSServer>(allocator, port, listenSocket, allocator);
+		PADDRINFOA addressInfo = nullptr;
+		auto res = getaddrinfo("127.0.0.1", "123", nullptr, &addressInfo);
+		if (res != 0)
+			return nullptr;
+			// return errf(allocator, "failed to get address info, ErrorCode({})"_sv, res);
+
+		res = bind(listenSocket, addressInfo->ai_addr, (int)addressInfo->ai_addrlen);
+		freeaddrinfo(addressInfo);
+		if (res != 0)
+			return nullptr;
+
+		res = listen(listenSocket, SOMAXCONN);
+		if (res != 0)
+			return nullptr;
+
+		LPFN_ACCEPTEX acceptEx = nullptr;
+		GUID guidAcceptEx = WSAID_ACCEPTEX;
+		DWORD bytesReturned = 0;
+		res = WSAIoctl(
+			listenSocket,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			&guidAcceptEx,
+			sizeof(guidAcceptEx),
+			&acceptEx,
+			sizeof(acceptEx),
+			&bytesReturned,
+			NULL,
+			NULL
+		);
+
+		if (res == SOCKET_ERROR)
+			return nullptr;
+
+		return core::unique_from<WinOSServer>(allocator, port, listenSocket, acceptEx, allocator);
 	}
 }

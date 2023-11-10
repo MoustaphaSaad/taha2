@@ -6,6 +6,8 @@
 #include <utility>
 #include <cassert>
 
+#include <fmt/core.h>
+
 namespace core
 {
 	// error message for humans
@@ -102,4 +104,23 @@ namespace core
 	{
 		return HumanError{strf(allocator, format, std::forward<Args>(args)...)};
 	}
+}
+
+namespace fmt
+{
+	template<>
+	struct formatter<core::HumanError>
+	{
+		template<typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
+		{
+			return ctx.begin();
+		}
+
+		template<typename FormatContext>
+		auto format(const core::HumanError& err, FormatContext& ctx)
+		{
+			return format_to(ctx.out(), "{}", err.message());
+		}
+	};
 }

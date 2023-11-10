@@ -9,7 +9,7 @@ namespace core
 	class Server
 	{
 	public:
-		CORE_EXPORT Unique<Server> open(Allocator* allocator);
+		static CORE_EXPORT Unique<Server> open(Allocator* allocator);
 
 		virtual ~Server() = default;
 		virtual HumanError run() = 0;
