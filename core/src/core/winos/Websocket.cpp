@@ -76,6 +76,8 @@ namespace core
 
 		class AcceptOp: public Op
 		{
+			friend class WinOSServer;
+
 			SOCKET m_acceptSocket = INVALID_SOCKET;
 			std::byte m_buffer[2 * (sizeof(SOCKADDR_IN) + 16)];
 		public:
@@ -94,9 +96,11 @@ namespace core
 				}
 			}
 
-			SOCKET acceptSocket() const
+			SOCKET releaseAcceptSocket()
 			{
-				return m_acceptSocket;
+				auto res = m_acceptSocket;
+				m_acceptSocket = INVALID_SOCKET;
+				return res;
 			}
 
 			void* buffer()
@@ -111,11 +115,21 @@ namespace core
 
 			Connection* m_connection = nullptr;
 			DWORD m_bytesReceived = 0;
+			DWORD m_flags = 0;
+			WSABUF m_recvBuf{};
 		public:
 			ReadOp(Connection* connection)
 				: Op(KIND_READ),
 				  m_connection(connection)
-			{}
+			{
+				m_recvBuf.buf = connection->readBuffer();
+				m_recvBuf.len = connection->readBufferSize();
+			}
+
+			WSABUF* recvBuf()
+			{
+				return &m_recvBuf;
+			}
 		};
 
 		Allocator* m_allocator = nullptr;
@@ -146,7 +160,7 @@ namespace core
 			DWORD bytesReceived = 0;
 			auto res = m_acceptFn(
 				m_listenSocket, // listen socket
-				op->acceptSocket(), // accept socket
+				op->m_acceptSocket, // accept socket
 				op->buffer(), // pointer to a buffer that receives the first block of data sent on new connection
 				0, // number of bytes for receive data (it doesn't include server and client address)
 				sizeof(SOCKADDR_IN) + 16, // local address length
@@ -176,7 +190,7 @@ namespace core
 
 		HumanError handleAccept(Unique<AcceptOp> op)
 		{
-			auto connection = core::unique_from<Connection>(m_allocator, op->acceptSocket());
+			auto connection = core::unique_from<Connection>(m_allocator, op->releaseAcceptSocket());
 			if (auto err = scheduleRead(connection.get())) return err;
 			m_connections.insert(std::move(connection));
 			return {};
@@ -186,19 +200,16 @@ namespace core
 		{
 			auto op = unique_from<ReadOp>(m_allocator, conn);
 
-			WSABUF buf;
-			buf.buf = conn->readBuffer();
-			buf.len = conn->readBufferSize();
 			auto res = WSARecv(
 				conn->socket(),
-				&buf,
+				op->recvBuf(),
 				1,
 				&op->m_bytesReceived,
-				0,
+				&op->m_flags,
 				(OVERLAPPED*)op.get(),
 				NULL
 			);
-			if (res == TRUE)
+			if (res != SOCKET_ERROR)
 			{
 				return handleRead(std::move(op));
 			}
@@ -331,6 +342,9 @@ namespace core
 		);
 		if (res == SOCKET_ERROR)
 			return errf(allocator, "failed to get the AcceptEx function pointer, ErrorCode({})"_sv, res);
+
+		auto newPort = CreateIoCompletionPort((HANDLE)listenSocket, completionPort, NULL, 0);
+		assert(newPort == completionPort);
 
 		return core::unique_from<WinOSServer>(allocator, completionPort, listenSocket, acceptEx, allocator);
 	}
