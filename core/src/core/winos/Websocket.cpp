@@ -15,12 +15,20 @@ namespace core
 	{
 		class Connection
 		{
-			SOCKET m_socket = INVALID_SOCKET;
-			CHAR m_readBuffer[4 * 1024];
 		public:
-			Connection(SOCKET socket)
-				: m_socket(socket)
-			{}
+			enum STATE
+			{
+				STATE_NONE,
+				STATE_HANDSHAKE,
+			};
+
+			Connection(SOCKET socket, Allocator* allocator)
+				: m_socket(socket),
+				  m_handshakeBuffer(allocator)
+			{
+				::memset(m_readBuffer, 0, sizeof(m_readBuffer));
+				m_handshakeBuffer.reserve(1 * 1024);
+			}
 
 			~Connection()
 			{
@@ -45,6 +53,24 @@ namespace core
 			{
 				return sizeof(m_readBuffer);
 			}
+
+			STATE state() const
+			{
+				return m_state;
+			}
+
+			void setState(STATE state)
+			{
+				m_state = state;
+			}
+
+		private:
+			friend class WinOSServer;
+
+			STATE m_state = STATE_NONE;
+			SOCKET m_socket = INVALID_SOCKET;
+			CHAR m_readBuffer[1 * 1024];
+			Buffer m_handshakeBuffer;
 		};
 
 		class Op: public OVERLAPPED
@@ -126,9 +152,19 @@ namespace core
 				m_recvBuf.len = connection->readBufferSize();
 			}
 
+			DWORD bytesReceived() const
+			{
+				return m_bytesReceived;
+			}
+
 			WSABUF* recvBuf()
 			{
 				return &m_recvBuf;
+			}
+
+			Connection* connection() const
+			{
+				return m_connection;
 			}
 		};
 
@@ -190,7 +226,11 @@ namespace core
 
 		HumanError handleAccept(Unique<AcceptOp> op)
 		{
-			auto connection = core::unique_from<Connection>(m_allocator, op->releaseAcceptSocket());
+			auto res = CreateIoCompletionPort((HANDLE)op->m_acceptSocket, m_port, NULL, 0);
+			assert(res == m_port);
+
+			auto connection = core::unique_from<Connection>(m_allocator, op->releaseAcceptSocket(), m_allocator);
+			connection->setState(Connection::STATE_HANDSHAKE);
 			if (auto err = scheduleRead(connection.get())) return err;
 			m_connections.insert(std::move(connection));
 			return {};
@@ -231,7 +271,38 @@ namespace core
 
 		HumanError handleRead(Unique<ReadOp> op)
 		{
-			return {};
+			auto conn = op->connection();
+
+			switch (conn->state())
+			{
+			case Connection::STATE_NONE: return errf(m_allocator, "Connection in none state"_sv);
+			case Connection::STATE_HANDSHAKE:
+			{
+				auto totalHandshakeBuffer = conn->m_handshakeBuffer.count() + op->bytesReceived();
+				if (totalHandshakeBuffer > conn->m_handshakeBuffer.capacity())
+				{
+					return errf(m_allocator, "Handshake buffer overflow, max handshake buffer size is {} bytes, but {} bytes is needed"_sv, totalHandshakeBuffer, conn->m_handshakeBuffer.capacity());
+				}
+
+				conn->m_handshakeBuffer.push((const std::byte*)op->recvBuf()->buf, op->bytesReceived());
+
+				if (StringView{conn->m_handshakeBuffer}.endsWith("\r\n\r\n"_sv))
+				{
+					// TODO: handle handshake here
+					int x = 234;
+				}
+				else
+				{
+					// schedule another read operation to continue reading the handshake
+					if (auto err = scheduleRead(conn)) return err;
+				}
+
+				return {};
+			};
+			default:
+				assert(false);
+				return errf(m_allocator, "Invalid connection state"_sv);
+			}
 		}
 
 	public:
@@ -285,8 +356,17 @@ namespace core
 					if (auto err = handleAccept(unique_static_cast<AcceptOp>(std::move(op)))) return err;
 					break;
 				case Op::KIND_READ:
-					if (auto err = handleRead(unique_static_cast<ReadOp>(std::move(op)))) return err;
+				{
+					auto readOp = unique_static_cast<ReadOp>(std::move(op));
+					DWORD dwFlags = 0;
+					auto res = WSAGetOverlappedResult(readOp->connection()->socket(), overlapped, &readOp->m_bytesReceived, FALSE, &dwFlags);
+					if (res != TRUE)
+					{
+						return errf(m_allocator, "Failed to get overlapped result: ErrorCode({})"_sv, WSAGetLastError());
+					}
+					if (auto err = handleRead(std::move(readOp))) return err;
 					break;
+				}
 				default:
 					assert(false);
 					break;

@@ -79,6 +79,8 @@ namespace core
 			return m_ptr[i];
 		}
 
+		explicit operator StringView() const { return StringView{(const char*)m_ptr, m_count}; }
+
 		void push(std::byte b)
 		{
 			ensureSpaceExists(1);

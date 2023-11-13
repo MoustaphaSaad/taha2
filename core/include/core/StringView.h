@@ -137,6 +137,22 @@ namespace core
 		}
 
 		CORE_EXPORT Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const;
+
+		bool startsWith(StringView str) const
+		{
+			if (str.m_count > m_count)
+				return false;
+
+			return slice(0, str.m_count) == str;
+		}
+
+		bool endsWith(StringView str) const
+		{
+			if (str.m_count > m_count)
+				return false;
+
+			return slice(m_count - str.m_count, m_count) == str;
+		}
 	};
 }
 

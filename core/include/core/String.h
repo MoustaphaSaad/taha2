@@ -137,6 +137,9 @@ namespace core
 		char* end() { return m_ptr + m_count; }
 
 		Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const { return StringView{*this}.split(delim, skipEmpty, allocator); }
+
+		bool startsWith(StringView other) const { return StringView{*this}.startsWith(other); }
+		bool endsWith(StringView other) const { return StringView{*this}.endsWith(other); }
 	};
 
 	class StringBackInserter
