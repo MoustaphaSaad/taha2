@@ -287,10 +287,15 @@ namespace core
 
 				conn->m_handshakeBuffer.push((const std::byte*)op->recvBuf()->buf, op->bytesReceived());
 
-				if (StringView{conn->m_handshakeBuffer}.endsWith("\r\n\r\n"_sv))
+				auto handshakeString = StringView{conn->m_handshakeBuffer};
+				if (handshakeString.endsWith("\r\n\r\n"_sv))
 				{
-					// TODO: handle handshake here
-					m_log->debug("Handshake: {}"_sv, StringView{conn->m_handshakeBuffer});
+					auto handshakeResult = Handshake::parse(handshakeString, m_allocator);
+					if (handshakeResult.isError())
+					{
+						return errf(m_allocator, "Failed to parse handshake: {}"_sv, handshakeResult.error());
+					}
+					m_log->debug("Handshake key: {}"_sv, handshakeResult.value().key());
 				}
 				else
 				{

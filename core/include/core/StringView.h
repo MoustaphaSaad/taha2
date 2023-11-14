@@ -75,6 +75,7 @@ namespace core
 
 		static RabinKarpState hashRabinKarp(StringView v);
 		static RabinKarpState hashRabinKarpReverse(StringView v);
+		static RabinKarpState hashRabinKarpIgnoreCase(StringView v);
 		CORE_EXPORT static int cmp(StringView a, StringView b);
 	public:
 		StringView() = default;
@@ -111,6 +112,7 @@ namespace core
 		const char* end() const { return m_begin + m_count; }
 
 		CORE_EXPORT size_t find(StringView target, size_t start = 0) const;
+		CORE_EXPORT size_t findIgnoreCase(StringView target, size_t start = 0) const;
 		CORE_EXPORT size_t find(Rune target, size_t start = 0) const;
 		CORE_EXPORT size_t findLast(StringView target, size_t start) const;
 		CORE_EXPORT size_t findLast(StringView target) const { return findLast(target, m_count); }
@@ -171,6 +173,91 @@ namespace core
 
 			return slice(m_count - other.m_count, m_count).equalsIgnoreCase(other);
 		}
+
+		template<typename TFunc>
+		StringView trimLeftPredicate(TFunc&& predicate) const
+		{
+			auto self = *this;
+
+			if (self.m_count == 0)
+				return self;
+
+			auto it = begin();
+			for (; it != end(); it = Rune::next(it))
+			{
+				if (!predicate(Rune::decode(it)))
+					break;
+			}
+
+			size_t s = size_t(it - begin());
+
+			self.m_begin += s;
+			self.m_count -= s;
+			return self;
+		}
+
+		StringView trimLeft(StringView cutset) const
+		{
+			return trimLeftPredicate([&](Rune r) { return cutset.find(r) != SIZE_MAX; });
+		}
+
+		StringView trimLeft() const;
+
+		template<typename TFunc>
+		StringView trimRightPredicate(TFunc&& predicate) const
+		{
+			auto self = *this;
+
+			if (self.m_count == 0)
+				return self;
+
+			auto it = Rune::prev(self.end());
+			auto c = Rune::decode(it);
+			if (predicate(c) == false)
+				return self;
+
+			it = Rune::prev(it);
+			while (true)
+			{
+				c = Rune::decode(it);
+				if (predicate(c) == false)
+				{
+					// then ignore this rune
+					it = Rune::next(it);
+					break;
+				}
+
+				// don't step back outside the buffer
+				if (it == self.begin())
+					break;
+
+				it = Rune::prev(it);
+			}
+
+			auto s = size_t(it - self.begin());
+			self.m_count -= s;
+			return self;
+		}
+
+		StringView trimRight(StringView cutset) const
+		{
+			return trimRightPredicate([&](Rune r) { return cutset.find(r) != SIZE_MAX; });
+		}
+
+		StringView trimRight() const;
+
+		template<typename TFunc>
+		StringView trimPredicate(TFunc&& predicate) const
+		{
+			return trimLeftPredicate(predicate).trimRightPredicate(predicate);
+		}
+
+		StringView trim(StringView cutset) const
+		{
+			return trimPredicate([&](Rune r) { return cutset.find(r) != SIZE_MAX; });
+		}
+
+		StringView trim() const;
 	};
 }
 

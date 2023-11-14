@@ -147,6 +147,12 @@ namespace core
 		return self.find(str, start);
 	}
 
+	size_t String::findIgnoreCase(StringView str, size_t start) const
+	{
+		StringView self = *this;
+		return self.findIgnoreCase(str, start);
+	}
+
 	size_t String::find(Rune target, size_t start) const
 	{
 		StringView self = *this;

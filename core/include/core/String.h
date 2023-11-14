@@ -110,6 +110,7 @@ namespace core
 		CORE_EXPORT void pushByte(char v);
 
 		CORE_EXPORT size_t find(StringView str, size_t start = 0) const;
+		CORE_EXPORT size_t findIgnoreCase(StringView str, size_t start = 0) const;
 		CORE_EXPORT size_t find(Rune target, size_t start = 0) const;
 		CORE_EXPORT size_t findLast(StringView str, size_t start) const;
 		size_t findLast(StringView str) const { return findLast(str, m_count); }

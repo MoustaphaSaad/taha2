@@ -18,6 +18,22 @@ namespace core
 		return res;
 	}
 
+	StringView::RabinKarpState StringView::hashRabinKarpIgnoreCase(StringView str)
+	{
+		RabinKarpState res{0, 1};
+
+		for (size_t i = 0; i < str.count(); ++i)
+			res.hash = res.hash * PRIME_RABIN_KARP + uint32_t(Rune{str.m_begin[i]}.lower());
+		auto sq = PRIME_RABIN_KARP;
+		for (size_t i = str.m_count; i > 0; i >>= 1)
+		{
+			if ((i & 1) != 0)
+				res.pow *= sq;
+			sq *= sq;
+		}
+		return res;
+	}
+
 	StringView::RabinKarpState StringView::hashRabinKarpReverse(StringView str)
 	{
 		assert(str.m_count > 0);
@@ -106,6 +122,60 @@ namespace core
 			h -= pow * uint32_t(self.m_begin[i - target.m_count]);
 			i += 1;
 			if (h == hash && ::memcmp(self.m_begin + i - target.m_count, target.m_begin, target.m_count) == 0)
+			{
+				return i - target.m_count + start;
+			}
+		}
+		return SIZE_MAX;
+	}
+
+	size_t StringView::findIgnoreCase(StringView target, size_t start) const
+	{
+		if (start >= m_count || m_count - start < target.m_count)
+			return SIZE_MAX;
+
+		auto self = slice(start, m_count);
+
+		if (target.m_count == 0)
+		{
+			return start;
+		}
+		else if (target.m_count == 1)
+		{
+			for (size_t i = 0; i < self.count(); ++i)
+				if (Rune{self.m_begin[i]}.lower() == Rune{target.m_begin[0]}.lower())
+					return start + i;
+			return SIZE_MAX;
+		}
+		else if (target.m_count == m_count)
+		{
+			if (target.endsWithIgnoreCase(self))
+				return start;
+			return SIZE_MAX;
+		}
+		else if (target.m_count > m_count)
+		{
+			return SIZE_MAX;
+		}
+
+		auto [hash, pow] = hashRabinKarpIgnoreCase(target);
+
+		uint32_t h{};
+		for (size_t i = 0; i < target.m_count; ++i)
+		{
+			h = h * PRIME_RABIN_KARP + uint32_t(Rune{self.m_begin[i]}.lower());
+		}
+
+		if (h == hash && self.equalsIgnoreCase(target))
+			return start;
+
+		for (size_t i = target.m_count; i < self.m_count;)
+		{
+			h *= PRIME_RABIN_KARP;
+			h += uint32_t(Rune{self.m_begin[i]}.lower());
+			h -= pow * uint32_t(Rune{self.m_begin[i - target.m_count]}.lower());
+			i += 1;
+			if (h == hash && self.slice(i - target.count(), self.count()).equalsIgnoreCase(target))
 			{
 				return i - target.m_count + start;
 			}
@@ -235,5 +305,20 @@ namespace core
 				return false;
 		}
 		return true;
+	}
+
+	StringView StringView::trimLeft() const
+	{
+		return trimLeft(" \n\t\r\v"_sv);
+	}
+
+	StringView StringView::trimRight() const
+	{
+		return trimRight(" \n\t\r\v"_sv);
+	}
+
+	StringView StringView::trim() const
+	{
+		return trim(" \n\t\r\v"_sv);
 	}
 }
