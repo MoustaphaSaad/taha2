@@ -221,4 +221,19 @@ namespace core
 
 		return res;
 	}
+
+	bool StringView::equalsIgnoreCase(StringView other) const
+	{
+		if (m_count != other.m_count)
+			return false;
+
+		for (size_t i = 0; i < m_count; ++i)
+		{
+			auto a = m_begin + i;
+			auto b = other.m_begin + i;
+			if (Rune::decode(a).lower() != Rune::decode(b).lower())
+				return false;
+		}
+		return true;
+	}
 }

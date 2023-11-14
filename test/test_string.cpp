@@ -148,3 +148,8 @@ TEST_CASE("core::String::split")
 	REQUIRE(res.count() == 1);
 	REQUIRE(res[0] == "test"_sv);
 }
+
+TEST_CASE("core::String::endsWithIgnoreCase")
+{
+	REQUIRE("GET / HTTP/1.1"_sv.endsWithIgnoreCase("HTTP/1.1"_sv));
+}

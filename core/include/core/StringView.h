@@ -153,6 +153,24 @@ namespace core
 
 			return slice(m_count - str.m_count, m_count) == str;
 		}
+
+		CORE_EXPORT bool equalsIgnoreCase(StringView other) const;
+
+		bool startsWithIgnoreCase(StringView other) const
+		{
+			if (other.m_count > m_count)
+				return false;
+
+			return slice(0, other.m_count).equalsIgnoreCase(other);
+		}
+
+		bool endsWithIgnoreCase(StringView other)
+		{
+			if (other.m_count > m_count)
+				return false;
+
+			return slice(m_count - other.m_count, m_count).equalsIgnoreCase(other);
+		}
 	};
 }
 
