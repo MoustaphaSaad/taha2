@@ -169,6 +169,7 @@ namespace core
 		};
 
 		Allocator* m_allocator = nullptr;
+		Log* m_log = nullptr;
 		LPFN_ACCEPTEX m_acceptFn = nullptr;
 		HANDLE m_port = INVALID_HANDLE_VALUE;
 		SOCKET m_listenSocket = INVALID_SOCKET;
@@ -289,7 +290,7 @@ namespace core
 				if (StringView{conn->m_handshakeBuffer}.endsWith("\r\n\r\n"_sv))
 				{
 					// TODO: handle handshake here
-					int x = 234;
+					m_log->debug("Handshake: {}"_sv, StringView{conn->m_handshakeBuffer});
 				}
 				else
 				{
@@ -306,8 +307,9 @@ namespace core
 		}
 
 	public:
-		WinOSServer(HANDLE port, SOCKET listenSocket, LPFN_ACCEPTEX acceptEx, Allocator* allocator)
+		WinOSServer(HANDLE port, SOCKET listenSocket, LPFN_ACCEPTEX acceptEx, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
+			  m_log(log),
 			  m_acceptFn(acceptEx),
 			  m_port(port),
 			  m_listenSocket(listenSocket),
@@ -382,7 +384,7 @@ namespace core
 		}
 	};
 
-	Result<Unique<WebSocketServer>> WebSocketServer::open(StringView ip, StringView port, Allocator* allocator)
+	Result<Unique<WebSocketServer>> WebSocketServer::open(StringView ip, StringView port, Log* log, Allocator* allocator)
 	{
 		auto completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
 		if (completionPort == NULL) return errf(allocator, "failed to create completion port"_sv);
@@ -426,6 +428,6 @@ namespace core
 		auto newPort = CreateIoCompletionPort((HANDLE)listenSocket, completionPort, NULL, 0);
 		assert(newPort == completionPort);
 
-		return core::unique_from<WinOSServer>(allocator, completionPort, listenSocket, acceptEx, allocator);
+		return core::unique_from<WinOSServer>(allocator, completionPort, listenSocket, acceptEx, log, allocator);
 	}
 }
