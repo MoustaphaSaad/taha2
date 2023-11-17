@@ -12,11 +12,15 @@ namespace core
 	{
 		String m_key;
 	public:
+		Handshake(Allocator* allocator)
+			: m_key(allocator)
+		{}
+
 		Handshake(String key)
 			: m_key(key)
 		{}
 
-		String key() const { return m_key; }
+		StringView key() const { return m_key; }
 
 		static Result<Handshake> parse(StringView request, Allocator* allocator)
 		{

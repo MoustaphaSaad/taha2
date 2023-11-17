@@ -20,11 +20,14 @@ namespace core
 			{
 				STATE_NONE,
 				STATE_HANDSHAKE,
+				STATE_NORMAL,
 			};
 
 			Connection(SOCKET socket, Allocator* allocator)
 				: m_socket(socket),
-				  m_handshakeBuffer(allocator)
+				  m_handshakeBuffer(allocator),
+				  m_handshake(allocator),
+				  m_frameBuffer(allocator)
 			{
 				::memset(m_readBuffer, 0, sizeof(m_readBuffer));
 				m_handshakeBuffer.reserve(1 * 1024);
@@ -71,6 +74,8 @@ namespace core
 			SOCKET m_socket = INVALID_SOCKET;
 			CHAR m_readBuffer[1 * 1024];
 			Buffer m_handshakeBuffer;
+			Handshake m_handshake;
+			Buffer m_frameBuffer;
 		};
 
 		class Op: public OVERLAPPED
@@ -328,7 +333,12 @@ namespace core
 						(void)scheduleWrite(conn, R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv);
 						return errf(m_allocator, "Failed to parse handshake: {}"_sv, handshakeResult.error());
 					}
-					m_log->debug("Handshake key: {}"_sv, handshakeResult.value().key());
+					conn->m_handshake = std::move(handshakeResult.value());
+					conn->m_handshakeBuffer = Buffer{m_allocator};
+
+					// move to the normal state
+					conn->setState(Connection::STATE_NORMAL);
+					if (auto err = scheduleRead(conn)) return err;
 				}
 				else
 				{
@@ -337,7 +347,11 @@ namespace core
 				}
 
 				return {};
-			};
+			}
+			case Connection::STATE_NORMAL:
+			{
+				conn->m_frameBuffer.push((const std::byte*)op->recvBuf()->buf, op->bytesReceived());
+			}
 			default:
 				assert(false);
 				return errf(m_allocator, "Invalid connection state"_sv);
