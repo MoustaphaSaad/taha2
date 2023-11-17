@@ -163,7 +163,7 @@ namespace core
 				return &m_recvBuf;
 			}
 
-			Connection* connection() const
+			Connection* connection()
 			{
 				return m_connection;
 			}
@@ -191,6 +191,11 @@ namespace core
 			WSABUF* sendBuf()
 			{
 				return &m_wsaBuf;
+			}
+
+			Connection* connection()
+			{
+				return m_connection;
 			}
 		};
 
@@ -470,6 +475,18 @@ namespace core
 						return errf(m_allocator, "Failed to get overlapped result: ErrorCode({})"_sv, WSAGetLastError());
 					}
 					if (auto err = handleRead(std::move(readOp))) return err;
+					break;
+				}
+				case Op::KIND_WRITE:
+				{
+					auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+					DWORD dwFlags = 0;
+					auto res = WSAGetOverlappedResult(writeOp->connection()->socket(), overlapped, &writeOp->m_bytesSent, FALSE, &dwFlags);
+					if (res != TRUE)
+					{
+						return errf(m_allocator, "Failed to get overlapped result: ErrorCode({})"_sv, WSAGetLastError());
+					}
+					if (auto err = handleWrite(std::move(writeOp))) return err;
 					break;
 				}
 				default:
