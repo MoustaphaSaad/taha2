@@ -81,6 +81,7 @@ namespace core
 				KIND_NONE,
 				KIND_ACCEPT,
 				KIND_READ,
+				KIND_WRITE,
 			};
 
 			Op(KIND kind)
@@ -165,6 +166,31 @@ namespace core
 			Connection* connection() const
 			{
 				return m_connection;
+			}
+		};
+
+		class WriteOp: public Op
+		{
+			friend class WinOSServer;
+
+			Connection* m_connection = nullptr;
+			DWORD m_bytesSent = 0;
+			Buffer m_buffer;
+			WSABUF m_wsaBuf{};
+			DWORD m_flags = 0;
+		public:
+			WriteOp(Connection* connection, Buffer&& buffer)
+				: Op(KIND_WRITE),
+				  m_connection(connection),
+				  m_buffer(std::move(buffer))
+			{
+				m_wsaBuf.buf = (CHAR*)m_buffer.data();
+				m_wsaBuf.len = (ULONG)m_buffer.count();
+			}
+
+			WSABUF* sendBuf()
+			{
+				return &m_wsaBuf;
 			}
 		};
 
@@ -282,6 +308,7 @@ namespace core
 				auto totalHandshakeBuffer = conn->m_handshakeBuffer.count() + op->bytesReceived();
 				if (totalHandshakeBuffer > conn->m_handshakeBuffer.capacity())
 				{
+					(void)scheduleWrite(conn, R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv);
 					return errf(m_allocator, "Handshake buffer overflow, max handshake buffer size is {} bytes, but {} bytes is needed"_sv, totalHandshakeBuffer, conn->m_handshakeBuffer.capacity());
 				}
 
@@ -293,6 +320,7 @@ namespace core
 					auto handshakeResult = Handshake::parse(handshakeString, m_allocator);
 					if (handshakeResult.isError())
 					{
+						(void)scheduleWrite(conn, R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv);
 						return errf(m_allocator, "Failed to parse handshake: {}"_sv, handshakeResult.error());
 					}
 					m_log->debug("Handshake key: {}"_sv, handshakeResult.value().key());
@@ -308,6 +336,76 @@ namespace core
 			default:
 				assert(false);
 				return errf(m_allocator, "Invalid connection state"_sv);
+			}
+		}
+
+		HumanError scheduleWriteOp(Unique<WriteOp> op)
+		{
+			auto conn = op->m_connection;
+
+			auto res = WSASend(
+				conn->socket(),
+				op->sendBuf(),
+				1,
+				&op->m_bytesSent,
+				op->m_flags,
+				(OVERLAPPED*)op.get(),
+				NULL
+			);
+			if (res != SOCKET_ERROR)
+			{
+				return handleWrite(std::move(op));
+			}
+			else
+			{
+				auto err = WSAGetLastError();
+				if (err == ERROR_IO_PENDING)
+				{
+					pushPendingOp(std::move(op));
+				}
+				else
+				{
+					return errf(m_allocator, "Failed to schedule write operation: ErrorCode({})"_sv, err);
+				}
+			}
+
+			return {};
+		}
+
+		HumanError scheduleWrite(Connection* conn, Buffer&& buffer)
+		{
+			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
+			return scheduleWriteOp(std::move(op));
+		}
+
+		HumanError scheduleWrite(Connection* conn, StringView str)
+		{
+			Buffer buffer{m_allocator};
+			buffer.push(str);
+			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
+			return scheduleWriteOp(std::move(op));
+		}
+
+		HumanError handleWrite(Unique<WriteOp> op)
+		{
+			if (op->m_bytesSent == 0)
+			{
+				return errf(m_allocator, "Failed to send data"_sv);
+			}
+			else if (op->m_bytesSent == op->m_wsaBuf.len)
+			{
+				return {};
+			}
+			else if (op->m_bytesSent < op->m_wsaBuf.len)
+			{
+				op->m_wsaBuf.buf += op->m_bytesSent;
+				op->m_wsaBuf.len -= op->m_bytesSent;
+				return scheduleWriteOp(std::move(op));
+			}
+			else
+			{
+				assert(false);
+				return errf(m_allocator, "Invalid bytes sent!"_sv);
 			}
 		}
 
