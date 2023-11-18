@@ -82,6 +82,15 @@ namespace core
 		}
 	};
 
+	class WebSocketFrameParser
+	{
+		size_t m_neededBytes = 2;
+	public:
+		WebSocketFrameParser() = default;
+
+		size_t neededBytes() const { return m_neededBytes; }
+	};
+
 	class WebSocketServer
 	{
 	public:
