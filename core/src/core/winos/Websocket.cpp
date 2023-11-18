@@ -13,9 +13,8 @@ namespace core
 {
 	class WinOSServer: public WebSocketServer
 	{
-		class Connection
+		struct Connection
 		{
-		public:
 			enum STATE
 			{
 				STATE_NONE,
@@ -23,64 +22,35 @@ namespace core
 				STATE_NORMAL,
 			};
 
-			Connection(SOCKET socket, Allocator* allocator)
-				: m_socket(socket),
-				  m_handshakeBuffer(allocator),
-				  m_handshake(allocator),
-				  m_frameBuffer(allocator)
+			Connection(SOCKET socket_, Allocator* allocator)
+				: socket(socket_),
+				  handshakeBuffer(allocator),
+				  handshake(allocator),
+				  frameBuffer(allocator)
 			{
-				::memset(m_readBuffer, 0, sizeof(m_readBuffer));
-				m_handshakeBuffer.reserve(1 * 1024);
+				::memset(readBuffer, 0, sizeof(readBuffer));
+				handshakeBuffer.reserve(1 * 1024);
 			}
 
 			~Connection()
 			{
-				if (m_socket != INVALID_SOCKET)
+				if (socket != INVALID_SOCKET)
 				{
-					[[maybe_unused]] auto res = ::closesocket(m_socket);
+					[[maybe_unused]] auto res = ::closesocket(socket);
 					assert(res == 0);
 				}
 			}
 
-			SOCKET socket() const
-			{
-				return m_socket;
-			}
-
-			CHAR* readBuffer()
-			{
-				return m_readBuffer;
-			}
-
-			ULONG readBufferSize() const
-			{
-				return sizeof(m_readBuffer);
-			}
-
-			STATE state() const
-			{
-				return m_state;
-			}
-
-			void setState(STATE state)
-			{
-				m_state = state;
-			}
-
-		private:
-			friend class WinOSServer;
-
-			STATE m_state = STATE_NONE;
-			SOCKET m_socket = INVALID_SOCKET;
-			CHAR m_readBuffer[1 * 1024];
-			Buffer m_handshakeBuffer;
-			Handshake m_handshake;
-			Buffer m_frameBuffer;
+			STATE state = STATE_NONE;
+			SOCKET socket = INVALID_SOCKET;
+			CHAR readBuffer[1 * 1024];
+			Buffer handshakeBuffer;
+			Handshake handshake;
+			Buffer frameBuffer;
 		};
 
-		class Op: public OVERLAPPED
+		struct Op: OVERLAPPED
 		{
-		public:
 			enum KIND
 			{
 				KIND_NONE,
@@ -90,9 +60,9 @@ namespace core
 			};
 
 			Op(KIND kind)
-				: m_kind(kind)
+				: kind(kind)
 			{
-				memset(this, 0, sizeof(OVERLAPPED));
+				memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
 				hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 			}
 
@@ -101,106 +71,61 @@ namespace core
 				CloseHandle(hEvent);
 			}
 
-			KIND kind() const { return m_kind; }
-		private:
-			KIND m_kind = KIND_NONE;
+			KIND kind = KIND_NONE;
 		};
 
-		class AcceptOp: public Op
+		struct AcceptOp: public Op
 		{
-			friend class WinOSServer;
+			SOCKET acceptSocket = INVALID_SOCKET;
+			std::byte buffer[2 * (sizeof(SOCKADDR_IN) + 16)];
 
-			SOCKET m_acceptSocket = INVALID_SOCKET;
-			std::byte m_buffer[2 * (sizeof(SOCKADDR_IN) + 16)];
-		public:
 			AcceptOp()
 				: Op(KIND_ACCEPT)
 			{
-				m_acceptSocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+				acceptSocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}
 
 			~AcceptOp() override
 			{
-				if (m_acceptSocket != INVALID_SOCKET)
+				if (acceptSocket != INVALID_SOCKET)
 				{
-					[[maybe_unused]] auto res = ::closesocket(m_acceptSocket);
+					[[maybe_unused]] auto res = ::closesocket(acceptSocket);
 					assert(res == 0);
 				}
 			}
-
-			SOCKET releaseAcceptSocket()
-			{
-				auto res = m_acceptSocket;
-				m_acceptSocket = INVALID_SOCKET;
-				return res;
-			}
-
-			void* buffer()
-			{
-				return m_buffer;
-			}
 		};
 
-		class ReadOp: public Op
+		struct ReadOp: public Op
 		{
-			friend class WinOSServer;
+			Connection* connection = nullptr;
+			DWORD bytesReceived = 0;
+			DWORD flags = 0;
+			WSABUF recvBuf{};
 
-			Connection* m_connection = nullptr;
-			DWORD m_bytesReceived = 0;
-			DWORD m_flags = 0;
-			WSABUF m_recvBuf{};
-		public:
-			ReadOp(Connection* connection)
+			ReadOp(Connection* connection_)
 				: Op(KIND_READ),
-				  m_connection(connection)
+				  connection(connection_)
 			{
-				m_recvBuf.buf = connection->readBuffer();
-				m_recvBuf.len = connection->readBufferSize();
-			}
-
-			DWORD bytesReceived() const
-			{
-				return m_bytesReceived;
-			}
-
-			WSABUF* recvBuf()
-			{
-				return &m_recvBuf;
-			}
-
-			Connection* connection()
-			{
-				return m_connection;
+				recvBuf.buf = connection->readBuffer;
+				recvBuf.len = sizeof(connection->readBuffer);
 			}
 		};
 
-		class WriteOp: public Op
+		struct WriteOp: public Op
 		{
-			friend class WinOSServer;
+			Connection* connection = nullptr;
+			DWORD bytesSent = 0;
+			Buffer buffer;
+			WSABUF wsaBuf{};
+			DWORD flags = 0;
 
-			Connection* m_connection = nullptr;
-			DWORD m_bytesSent = 0;
-			Buffer m_buffer;
-			WSABUF m_wsaBuf{};
-			DWORD m_flags = 0;
-		public:
-			WriteOp(Connection* connection, Buffer&& buffer)
+			WriteOp(Connection* connection_, Buffer&& buffer_)
 				: Op(KIND_WRITE),
-				  m_connection(connection),
-				  m_buffer(std::move(buffer))
+				  connection(connection_),
+				  buffer(std::move(buffer_))
 			{
-				m_wsaBuf.buf = (CHAR*)m_buffer.data();
-				m_wsaBuf.len = (ULONG)m_buffer.count();
-			}
-
-			WSABUF* sendBuf()
-			{
-				return &m_wsaBuf;
-			}
-
-			Connection* connection()
-			{
-				return m_connection;
+				wsaBuf.buf = (CHAR*)buffer.data();
+				wsaBuf.len = (ULONG)buffer.count();
 			}
 		};
 
@@ -233,8 +158,8 @@ namespace core
 			DWORD bytesReceived = 0;
 			auto res = m_acceptFn(
 				m_listenSocket, // listen socket
-				op->m_acceptSocket, // accept socket
-				op->buffer(), // pointer to a buffer that receives the first block of data sent on new connection
+				op->acceptSocket, // accept socket
+				op->buffer, // pointer to a buffer that receives the first block of data sent on new connection
 				0, // number of bytes for receive data (it doesn't include server and client address)
 				sizeof(SOCKADDR_IN) + 16, // local address length
 				sizeof(SOCKADDR_IN) + 16, // remote address length
@@ -263,11 +188,14 @@ namespace core
 
 		HumanError handleAccept(Unique<AcceptOp> op)
 		{
-			auto res = CreateIoCompletionPort((HANDLE)op->m_acceptSocket, m_port, NULL, 0);
+			auto res = CreateIoCompletionPort((HANDLE)op->acceptSocket, m_port, NULL, 0);
 			assert(res == m_port);
 
-			auto connection = core::unique_from<Connection>(m_allocator, op->releaseAcceptSocket(), m_allocator);
-			connection->setState(Connection::STATE_HANDSHAKE);
+			auto acceptSocket = op->acceptSocket;
+			op->acceptSocket = INVALID_SOCKET;
+
+			auto connection = core::unique_from<Connection>(m_allocator, acceptSocket, m_allocator);
+			connection->state = Connection::STATE_HANDSHAKE;
 			if (auto err = scheduleRead(connection.get())) return err;
 			m_connections.insert(std::move(connection));
 			return {};
@@ -278,11 +206,11 @@ namespace core
 			auto op = unique_from<ReadOp>(m_allocator, conn);
 
 			auto res = WSARecv(
-				conn->socket(),
-				op->recvBuf(),
+				conn->socket,
+				&op->recvBuf,
 				1,
-				&op->m_bytesReceived,
-				&op->m_flags,
+				&op->bytesReceived,
+				&op->flags,
 				(OVERLAPPED*)op.get(),
 				NULL
 			);
@@ -308,23 +236,23 @@ namespace core
 
 		HumanError handleRead(Unique<ReadOp> op)
 		{
-			auto conn = op->connection();
+			auto conn = op->connection;
 
-			switch (conn->state())
+			switch (conn->state)
 			{
 			case Connection::STATE_NONE: return errf(m_allocator, "Connection in none state"_sv);
 			case Connection::STATE_HANDSHAKE:
 			{
-				auto totalHandshakeBuffer = conn->m_handshakeBuffer.count() + op->bytesReceived();
-				if (totalHandshakeBuffer > conn->m_handshakeBuffer.capacity())
+				auto totalHandshakeBuffer = conn->handshakeBuffer.count() + op->bytesReceived;
+				if (totalHandshakeBuffer > conn->handshakeBuffer.capacity())
 				{
 					(void)scheduleWrite(conn, R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv);
-					return errf(m_allocator, "Handshake buffer overflow, max handshake buffer size is {} bytes, but {} bytes is needed"_sv, totalHandshakeBuffer, conn->m_handshakeBuffer.capacity());
+					return errf(m_allocator, "Handshake buffer overflow, max handshake buffer size is {} bytes, but {} bytes is needed"_sv, totalHandshakeBuffer, conn->handshakeBuffer.capacity());
 				}
 
-				conn->m_handshakeBuffer.push((const std::byte*)op->recvBuf()->buf, op->bytesReceived());
+				conn->handshakeBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
 
-				auto handshakeString = StringView{conn->m_handshakeBuffer};
+				auto handshakeString = StringView{conn->handshakeBuffer};
 				if (handshakeString.endsWith("\r\n\r\n"_sv))
 				{
 					auto handshakeResult = Handshake::parse(handshakeString, m_allocator);
@@ -333,11 +261,13 @@ namespace core
 						(void)scheduleWrite(conn, R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv);
 						return errf(m_allocator, "Failed to parse handshake: {}"_sv, handshakeResult.error());
 					}
-					conn->m_handshake = std::move(handshakeResult.value());
-					conn->m_handshakeBuffer = Buffer{m_allocator};
+					conn->handshake = std::move(handshakeResult.value());
+					conn->handshakeBuffer = Buffer{m_allocator};
+
+					m_log->debug("handshake: {}"_sv, conn->handshake.key());
 
 					// move to the normal state
-					conn->setState(Connection::STATE_NORMAL);
+					conn->state = Connection::STATE_NORMAL;
 					if (auto err = scheduleRead(conn)) return err;
 				}
 				else
@@ -350,7 +280,7 @@ namespace core
 			}
 			case Connection::STATE_NORMAL:
 			{
-				conn->m_frameBuffer.push((const std::byte*)op->recvBuf()->buf, op->bytesReceived());
+				conn->frameBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
 			}
 			default:
 				assert(false);
@@ -360,14 +290,14 @@ namespace core
 
 		HumanError scheduleWriteOp(Unique<WriteOp> op)
 		{
-			auto conn = op->m_connection;
+			auto conn = op->connection;
 
 			auto res = WSASend(
-				conn->socket(),
-				op->sendBuf(),
+				conn->socket,
+				&op->wsaBuf,
 				1,
-				&op->m_bytesSent,
-				op->m_flags,
+				&op->bytesSent,
+				op->flags,
 				(OVERLAPPED*)op.get(),
 				NULL
 			);
@@ -407,18 +337,18 @@ namespace core
 
 		HumanError handleWrite(Unique<WriteOp> op)
 		{
-			if (op->m_bytesSent == 0)
+			if (op->bytesSent == 0)
 			{
 				return errf(m_allocator, "Failed to send data"_sv);
 			}
-			else if (op->m_bytesSent == op->m_wsaBuf.len)
+			else if (op->bytesSent == op->wsaBuf.len)
 			{
 				return {};
 			}
-			else if (op->m_bytesSent < op->m_wsaBuf.len)
+			else if (op->bytesSent < op->wsaBuf.len)
 			{
-				op->m_wsaBuf.buf += op->m_bytesSent;
-				op->m_wsaBuf.len -= op->m_bytesSent;
+				op->wsaBuf.buf += op->bytesSent;
+				op->wsaBuf.len -= op->bytesSent;
 				return scheduleWriteOp(std::move(op));
 			}
 			else
@@ -474,7 +404,7 @@ namespace core
 				auto op = popPendingOp((Op*)overlapped);
 				assert(op != nullptr);
 
-				switch (op->kind())
+				switch (op->kind)
 				{
 				case Op::KIND_ACCEPT:
 					if (auto err = handleAccept(unique_static_cast<AcceptOp>(std::move(op)))) return err;
@@ -483,7 +413,7 @@ namespace core
 				{
 					auto readOp = unique_static_cast<ReadOp>(std::move(op));
 					DWORD dwFlags = 0;
-					auto res = WSAGetOverlappedResult(readOp->connection()->socket(), overlapped, &readOp->m_bytesReceived, FALSE, &dwFlags);
+					auto res = WSAGetOverlappedResult(readOp->connection->socket, overlapped, &readOp->bytesReceived, FALSE, &dwFlags);
 					if (res != TRUE)
 					{
 						return errf(m_allocator, "Failed to get overlapped result: ErrorCode({})"_sv, WSAGetLastError());
@@ -495,7 +425,7 @@ namespace core
 				{
 					auto writeOp = unique_static_cast<WriteOp>(std::move(op));
 					DWORD dwFlags = 0;
-					auto res = WSAGetOverlappedResult(writeOp->connection()->socket(), overlapped, &writeOp->m_bytesSent, FALSE, &dwFlags);
+					auto res = WSAGetOverlappedResult(writeOp->connection->socket, overlapped, &writeOp->bytesSent, FALSE, &dwFlags);
 					if (res != TRUE)
 					{
 						return errf(m_allocator, "Failed to get overlapped result: ErrorCode({})"_sv, WSAGetLastError());
