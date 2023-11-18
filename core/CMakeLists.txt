@@ -32,6 +32,8 @@ target_sources(core PRIVATE
 	include/core/Url.h
 	include/core/Socket.h
 	include/core/Websocket.h
+	include/core/Span.h
+	include/core/Base64.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -44,6 +46,7 @@ target_sources(core PRIVATE
 	src/core/UUID.cpp
 	src/core/ThreadPool.cpp
 	src/core/Url.cpp
+	src/core/Base64.cpp
 )
 
 if (WIN32)
