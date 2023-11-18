@@ -19,7 +19,7 @@ namespace core
 			{
 				STATE_NONE,
 				STATE_HANDSHAKE,
-				STATE_NORMAL,
+				STATE_READ_MESSAGE,
 			};
 
 			Connection(SOCKET socket_, Allocator* allocator)
@@ -47,6 +47,7 @@ namespace core
 			Buffer handshakeBuffer;
 			Handshake handshake;
 			Buffer frameBuffer;
+			WebSocketFrameParser frameParser;
 		};
 
 		struct Op: OVERLAPPED
@@ -266,8 +267,10 @@ namespace core
 
 					m_log->debug("handshake: {}"_sv, conn->handshake.key());
 
-					// move to the normal state
-					conn->state = Connection::STATE_NORMAL;
+					// TODO: reply with success handshake
+
+					// move to the read message state
+					conn->state = Connection::STATE_READ_MESSAGE;
 					if (auto err = scheduleRead(conn)) return err;
 				}
 				else
@@ -278,9 +281,31 @@ namespace core
 
 				return {};
 			}
-			case Connection::STATE_NORMAL:
+			case Connection::STATE_READ_MESSAGE:
 			{
 				conn->frameBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
+				auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count(), m_allocator);
+				if (parserResult.isError()) return parserResult.releaseError();
+
+				// we have reached the end of a frame
+				if (parserResult.value())
+				{
+					m_log->debug("frame length: {}"_sv, conn->frameParser.neededBytes());
+					if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
+					{
+						::memcpy(conn->frameBuffer.data(), conn->frameBuffer.data() + conn->frameParser.neededBytes(), conn->frameBuffer.count() - conn->frameParser.neededBytes());
+						conn->frameBuffer.resize(conn->frameBuffer.count() - conn->frameParser.neededBytes());
+					}
+					else
+					{
+						conn->frameBuffer.clear();
+					}
+					// reset parser state
+					conn->frameParser = WebSocketFrameParser{};
+				}
+
+				if (auto err = scheduleRead(conn)) return err;
+				return {};
 			}
 			default:
 				assert(false);

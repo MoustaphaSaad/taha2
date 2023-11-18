@@ -46,11 +46,13 @@ func main() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
+	log.Println("start ticker")
 	for {
 		select {
 		case <-done:
 			return
 		case t := <-ticker.C:
+			log.Println("ticker:", t.String())
 			err := c.WriteMessage(websocket.TextMessage, []byte(t.String()))
 			if err != nil {
 				log.Println("write:", err)

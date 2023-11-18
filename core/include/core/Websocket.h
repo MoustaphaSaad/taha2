@@ -82,13 +82,166 @@ namespace core
 		}
 	};
 
+	struct WebSocketFrameHeader
+	{
+		enum OPCODE: uint8_t
+		{
+			OPCODE_CONTINUATION = 0,
+			OPCODE_TEXT = 1,
+			OPCODE_BINARY = 2,
+			OPCODE_CLOSE = 8,
+			OPCODE_PING = 9,
+			OPCODE_PONG = 10,
+		};
+
+		OPCODE opcode = OPCODE_CONTINUATION;
+		bool isMasked = false;
+		bool isFin = false;
+		uint64_t payloadLength = 0;
+	};
+
 	class WebSocketFrameParser
 	{
+		enum STATE
+		{
+			STATE_PRE,
+			STATE_HEADER,
+			STATE_PAYLOAD,
+		};
+
+		STATE m_state = STATE_PRE;
 		size_t m_neededBytes = 2;
+		size_t m_payloadLengthSize = 0;
+		size_t m_maskOffset = 0;
+		size_t m_payloadOffset = 0;
+		WebSocketFrameHeader m_header;
 	public:
 		WebSocketFrameParser() = default;
 
 		size_t neededBytes() const { return m_neededBytes; }
+
+		Result<bool> consume(std::byte* ptr, size_t size, Allocator* allocator)
+		{
+			// wait for more data to be received
+			if (size < m_neededBytes)
+				return false;
+
+			switch (m_state)
+			{
+			case STATE_PRE:
+			{
+				auto byte1 = (uint8_t)ptr[0];
+				auto byte2 = (uint8_t)ptr[1];
+
+				// check masked
+				m_header.isMasked = (byte2 & 128) == 128;
+
+				// get payload length size
+				if ((byte2 & 127) == 126)
+					m_payloadLengthSize = 2;
+				else if ((byte2 & 127) == 127)
+					m_payloadLengthSize = 8;
+				else
+					m_payloadLengthSize = 0;
+
+				m_state = STATE_HEADER;
+				m_neededBytes += m_payloadLengthSize;
+				m_maskOffset = m_neededBytes;
+				if (m_header.isMasked)
+					m_neededBytes += 4;
+				m_payloadOffset = m_neededBytes;
+
+				auto opcode = byte1 & 15;
+				if (opcode == WebSocketFrameHeader::OPCODE_CONTINUATION)
+				{
+					m_header.opcode = WebSocketFrameHeader::OPCODE_CONTINUATION;
+				}
+				else if (opcode == WebSocketFrameHeader::OPCODE_TEXT)
+				{
+					m_header.opcode = WebSocketFrameHeader::OPCODE_TEXT;
+				}
+				else if (opcode == WebSocketFrameHeader::OPCODE_BINARY)
+				{
+					m_header.opcode = WebSocketFrameHeader::OPCODE_BINARY;
+				}
+				else if (opcode == WebSocketFrameHeader::OPCODE_CLOSE)
+				{
+					m_header.opcode = WebSocketFrameHeader::OPCODE_CLOSE;
+				}
+				else if (opcode == WebSocketFrameHeader::OPCODE_PING)
+				{
+					m_header.opcode = WebSocketFrameHeader::OPCODE_PING;
+				}
+				else if (opcode == WebSocketFrameHeader::OPCODE_PONG)
+				{
+					m_header.opcode = WebSocketFrameHeader::OPCODE_PONG;
+				}
+				else
+				{
+					return errf(allocator, "unsupported opcode"_sv);
+				}
+
+				// check that reserved bits are not set
+				if ((byte1 & 12) != 0)
+					return errf(allocator, "reserved bits are set"_sv);
+
+				if (m_header.opcode != WebSocketFrameHeader::OPCODE_CONTINUATION &&
+					m_payloadLengthSize != 0 &&
+					(m_header.opcode == WebSocketFrameHeader::OPCODE_PING ||
+					 m_header.opcode == WebSocketFrameHeader::OPCODE_PONG ||
+					 m_header.opcode == WebSocketFrameHeader::OPCODE_CLOSE))
+				{
+					return errf(allocator, "control frame cannot have payload length"_sv);
+				}
+				return false;
+			}
+			case STATE_HEADER:
+			{
+				if (m_payloadLengthSize == 2)
+				{
+					m_header.payloadLength = (uint16_t)ptr[3] | ((uint16_t)ptr[2] << 8);
+				}
+				else if (m_payloadLengthSize == 8)
+				{
+					m_header.payloadLength = (uint64_t)ptr[9] |
+						((uint64_t)ptr[8] << 8) |
+						((uint64_t)ptr[7] << 16) |
+						((uint64_t)ptr[6] << 24) |
+						((uint64_t)ptr[5] << 32) |
+						((uint64_t)ptr[4] << 40) |
+						((uint64_t)ptr[3] << 48) |
+						((uint64_t)ptr[2] << 56);
+				}
+				else
+				{
+					m_header.payloadLength = (uint8_t)ptr[1] & 127;
+				}
+
+				m_neededBytes += m_header.payloadLength;
+				m_state = STATE_PAYLOAD;
+				return false;
+			}
+			case STATE_PAYLOAD:
+			{
+				m_header.isFin = ((uint8_t)ptr[0] & 128) == 128;
+				if (m_header.isMasked)
+				{
+					auto mask = (uint8_t*)ptr + m_maskOffset;
+					auto payload = (uint8_t*)ptr + m_payloadOffset;
+					for (size_t i = 0; i < m_header.payloadLength; ++i)
+						payload[i] ^= mask[i % 4];
+				}
+
+				// TODO: handle fragmented messages
+				return true;
+			}
+			default:
+			{
+				assert(false);
+				return errf(allocator, "invalid state"_sv);
+			}
+			}
+		}
 	};
 
 	class WebSocketServer
