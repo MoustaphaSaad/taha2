@@ -36,3 +36,14 @@ CPMDeclarePackage(spdlog
     "SPDLOG_FMT_EXTERNAL ON"
     "SPDLOG_NO_EXCEPTIONS ON"
 )
+
+CPMDeclarePackage(libressl
+  NAME libressl
+  URL https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-3.8.2.tar.gz
+  EXCLUDE_FROM_ALL TRUE
+  SYSTEM
+  OPTIONS
+    "LIBRESSL_SKIP_INSTALL ON"
+    "LIBRESSL_APPS OFF"
+    "LIBRESSL_TESTS OFF"
+)
