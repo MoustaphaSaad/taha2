@@ -34,6 +34,7 @@ target_sources(core PRIVATE
 	include/core/Websocket.h
 	include/core/Span.h
 	include/core/Base64.h
+	include/core/SHA1.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -47,6 +48,7 @@ target_sources(core PRIVATE
 	src/core/ThreadPool.cpp
 	src/core/Url.cpp
 	src/core/Base64.cpp
+	src/core/SHA1.cpp
 )
 
 if (WIN32)

@@ -3,6 +3,7 @@
 #include "core/Exports.h"
 #include "core/Rune.h"
 #include "core/Array.h"
+#include "core/Span.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
@@ -96,6 +97,11 @@ namespace core
 			, m_count(end - begin)
 		{
 			assert(begin <= end);
+		}
+
+		operator Span<std::byte>() const
+		{
+			return Span<std::byte>{(std::byte*)m_begin, m_count};
 		}
 
 		const char& operator[](size_t i) const

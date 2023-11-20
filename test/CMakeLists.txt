@@ -21,6 +21,7 @@ add_executable(unittests
 	test_log.cpp
 	test_url.cpp
 	test_vector.cpp
+	test_sha1.cpp
 )
 
 CPMGetPackage(doctest)
