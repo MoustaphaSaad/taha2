@@ -5,7 +5,7 @@
 
 namespace core
 {
-	String Base64::encode(Span<const std::byte> bytes, core::Allocator *allocator)
+	String Base64::encode(Span<std::byte> bytes, core::Allocator *allocator)
 	{
 		auto b64 = BIO_new(BIO_f_base64());
 		// ignore newlines
@@ -15,7 +15,7 @@ namespace core
 
 		b64 = BIO_push(b64, mem);
 		auto res = BIO_write(b64, bytes.data(), int(bytes.count()));
-		assert(res > bytes.count());
+		assert(res == bytes.count());
 		BIO_flush(b64);
 
 		char* encodedString = nullptr;

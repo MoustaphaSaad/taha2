@@ -1,5 +1,7 @@
 #include "core/Websocket.h"
 #include "core/Hash.h"
+#include "core/SHA1.h"
+#include "core/Base64.h"
 
 #include <Windows.h>
 
@@ -60,8 +62,8 @@ namespace core
 				KIND_WRITE,
 			};
 
-			Op(KIND kind)
-				: kind(kind)
+			Op(KIND kind_)
+				: kind(kind_)
 			{
 				memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
 				hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -86,7 +88,7 @@ namespace core
 				acceptSocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}
 
-			~AcceptOp() override
+			~AcceptOp()
 			{
 				if (acceptSocket != INVALID_SOCKET)
 				{
@@ -146,7 +148,8 @@ namespace core
 		Unique<Op> popPendingOp(Op* op)
 		{
 			auto it = m_scheduledOperations.lookup(op);
-			if (it == m_scheduledOperations.end()) return nullptr;
+			if (it == m_scheduledOperations.end())
+				return nullptr;
 			auto res = std::move(it->value);
 			m_scheduledOperations.remove(op);
 			return res;
@@ -167,21 +170,14 @@ namespace core
 				&bytesReceived, // bytes received in case of sync completion
 				(OVERLAPPED*)op.get() // overlapped structure
 			);
-			if (res == TRUE)
+			if (res == TRUE || WSAGetLastError() == ERROR_IO_PENDING)
 			{
-				return handleAccept(std::move(op));
+				pushPendingOp(std::move(op));
 			}
 			else
 			{
 				auto error = WSAGetLastError();
-				if (error == ERROR_IO_PENDING)
-				{
-					pushPendingOp(std::move(op));
-				}
-				else
-				{
-					return errf(m_allocator, "Failed to schedule accept operation: ErrorCode({})"_sv, error);
-				}
+				return errf(m_allocator, "Failed to schedule accept operation: ErrorCode({})"_sv, error);
 			}
 
 			return {};
@@ -215,21 +211,14 @@ namespace core
 				(OVERLAPPED*)op.get(),
 				NULL
 			);
-			if (res != SOCKET_ERROR)
+			if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
 			{
-				return handleRead(std::move(op));
+				pushPendingOp(std::move(op));
 			}
 			else
 			{
-				auto err = WSAGetLastError();
-				if (err == ERROR_IO_PENDING)
-				{
-					pushPendingOp(std::move(op));
-				}
-				else
-				{
-					return errf(m_allocator, "Failed to schedule read operation: ErrorCode({})"_sv, err);
-				}
+				auto error = WSAGetLastError();
+				return errf(m_allocator, "Failed to schedule read operation: ErrorCode({})"_sv, error);
 			}
 
 			return {};
@@ -238,6 +227,9 @@ namespace core
 		HumanError handleRead(Unique<ReadOp> op)
 		{
 			auto conn = op->connection;
+
+			auto str = StringView{(const char*)op->recvBuf.buf, op->bytesReceived};
+			m_log->debug("read: {}"_sv, str);
 
 			switch (conn->state)
 			{
@@ -267,7 +259,16 @@ namespace core
 
 					m_log->debug("handshake: {}"_sv, conn->handshake.key());
 
-					// TODO: reply with success handshake
+					constexpr static const char* REPLY = "HTTP/1.1 101 Switching Protocols\r\n"
+						"Upgrade: websocket\r\n"
+						"Connection: Upgrade\r\n"
+						"Sec-WebSocket-Accept: {}\r\n"
+						"\r\n";
+					auto concatKey = strf(m_allocator, "{}{}"_sv, conn->handshake.key(), "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"_sv);
+					auto sha1 = SHA1::hash(concatKey);
+					auto base64 = Base64::encode(sha1.asBytes(), m_allocator);
+					auto reply = strf(m_allocator, StringView{REPLY, strlen(REPLY)}, base64);
+					if (auto err = scheduleWrite(conn, reply)) return err;
 
 					// move to the read message state
 					conn->state = Connection::STATE_READ_MESSAGE;
@@ -326,21 +327,15 @@ namespace core
 				(OVERLAPPED*)op.get(),
 				NULL
 			);
-			if (res != SOCKET_ERROR)
+
+			if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
 			{
-				return handleWrite(std::move(op));
+				pushPendingOp(std::move(op));
 			}
 			else
 			{
-				auto err = WSAGetLastError();
-				if (err == ERROR_IO_PENDING)
-				{
-					pushPendingOp(std::move(op));
-				}
-				else
-				{
-					return errf(m_allocator, "Failed to schedule write operation: ErrorCode({})"_sv, err);
-				}
+				auto error = WSAGetLastError();
+				return errf(m_allocator, "Failed to schedule write operation: ErrorCode({})"_sv, error);
 			}
 
 			return {};

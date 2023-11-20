@@ -42,6 +42,7 @@ namespace core
 		}
 
 		T* data() { return m_ptr; }
+		const T* data() const { return m_ptr; }
 
 		size_t count() const { return m_count; }
 		size_t sizeInBytes() const { return m_count * sizeof(T); }
