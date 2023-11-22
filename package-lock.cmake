@@ -47,3 +47,14 @@ CPMDeclarePackage(libressl
     "LIBRESSL_APPS OFF"
     "LIBRESSL_TESTS OFF"
 )
+
+CPMDeclarePackage(tracy
+  NAME tracy
+  GIT_TAG v0.10
+  GIT_REPOSITORY git@github.com:wolfpld/tracy.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "TRACY_ENABLE ${TRACY_ENABLE}"
+    "TRACY_CALLSTACK ${TRACY_ENABLE}"
+)

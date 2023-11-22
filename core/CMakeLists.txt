@@ -103,7 +103,8 @@ CPMGetPackage(utf8proc)
 CPMGetPackage(fmt)
 CPMGetPackage(spdlog)
 CPMGetPackage(libressl)
-target_link_libraries(core PUBLIC utf8proc fmt spdlog ssl crypto tls)
+CPMGetPackage(tracy)
+target_link_libraries(core PUBLIC utf8proc fmt spdlog ssl crypto tls TracyClient)
 target_link_libraries(core
 	PRIVATE
 		"$<$<PLATFORM_ID:Windows>:bcrypt;ws2_32>"

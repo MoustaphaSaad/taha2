@@ -9,6 +9,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 option(BUILD_SHARED_LIBS "Build all libraries as shared" ON)
+option(TRACY_ENABLE "Build all tests" ON)
 
 include(CPM)
 CPMUsePackageLock(package-lock.cmake)

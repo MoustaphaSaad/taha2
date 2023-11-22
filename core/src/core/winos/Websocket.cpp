@@ -3,6 +3,8 @@
 #include "core/SHA1.h"
 #include "core/Base64.h"
 
+#include <tracy/Tracy.hpp>
+
 #include <Windows.h>
 
 #include <WinSock2.h>
@@ -143,11 +145,15 @@ namespace core
 
 		void pushPendingOp(Unique<Op> op)
 		{
+			ZoneScoped;
+
 			m_scheduledOperations.insert(op.get(), std::move(op));
 		}
 
 		Unique<Op> popPendingOp(Op* op)
 		{
+			ZoneScoped;
+
 			auto it = m_scheduledOperations.lookup(op);
 			if (it == m_scheduledOperations.end())
 				return nullptr;
@@ -158,6 +164,8 @@ namespace core
 
 		HumanError scheduleAccept()
 		{
+			ZoneScoped;
+
 			auto op = unique_from<AcceptOp>(m_allocator);
 			// TODO: we can receive on accept operation, it's a little bit more efficient so consider doing that in the future
 			DWORD bytesReceived = 0;
@@ -186,6 +194,8 @@ namespace core
 
 		HumanError handleAccept(Unique<AcceptOp> op)
 		{
+			ZoneScoped;
+
 			auto res = CreateIoCompletionPort((HANDLE)op->acceptSocket, m_port, NULL, 0);
 			assert(res == m_port);
 
@@ -201,6 +211,8 @@ namespace core
 
 		HumanError scheduleRead(Connection* conn)
 		{
+			ZoneScoped;
+
 			auto op = unique_from<ReadOp>(m_allocator, conn);
 
 			auto res = WSARecv(
@@ -227,6 +239,8 @@ namespace core
 
 		HumanError handleRead(Unique<ReadOp> op)
 		{
+			ZoneScoped;
+
 			auto conn = op->connection;
 
 			switch (conn->state)
@@ -234,6 +248,7 @@ namespace core
 			case Connection::STATE_NONE: return errf(m_allocator, "Connection in none state"_sv);
 			case Connection::STATE_HANDSHAKE:
 			{
+				ZoneScopedN("handshake");
 				auto totalHandshakeBuffer = conn->handshakeBuffer.count() + op->bytesReceived;
 				if (totalHandshakeBuffer > conn->handshakeBuffer.capacity())
 				{
@@ -282,6 +297,8 @@ namespace core
 			}
 			case Connection::STATE_READ_MESSAGE:
 			{
+				ZoneScopedN("read message");
+
 				conn->frameBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
 				auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count());
 				if (parserResult.isError()) return parserResult.releaseError();
@@ -317,6 +334,8 @@ namespace core
 
 		HumanError scheduleWriteOp(Unique<WriteOp> op)
 		{
+			ZoneScoped;
+
 			auto conn = op->connection;
 
 			auto res = WSASend(
@@ -344,12 +363,16 @@ namespace core
 
 		HumanError scheduleWrite(Connection* conn, Buffer&& buffer)
 		{
+			ZoneScoped;
+
 			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
 			return scheduleWriteOp(std::move(op));
 		}
 
 		HumanError scheduleWrite(Connection* conn, StringView str)
 		{
+			ZoneScoped;
+
 			Buffer buffer{m_allocator};
 			buffer.push(str);
 			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
@@ -358,6 +381,8 @@ namespace core
 
 		HumanError handleWrite(Unique<WriteOp> op)
 		{
+			ZoneScoped;
+
 			if (op->bytesSent == 0)
 			{
 				return errf(m_allocator, "Failed to send data"_sv);
@@ -407,6 +432,8 @@ namespace core
 
 		HumanError run() override
 		{
+			ZoneScoped;
+
 			// schedule an accept operation
 			if (auto err = scheduleAccept()) return err;
 
@@ -415,11 +442,15 @@ namespace core
 				DWORD bytesReceived = 0;
 				ULONG_PTR completionKey = 0;
 				OVERLAPPED* overlapped = nullptr;
-				auto res = GetQueuedCompletionStatus(m_port, &bytesReceived, &completionKey, &overlapped, INFINITE);
-				if (res == FALSE)
 				{
-					auto error = GetLastError();
-					return errf(m_allocator, "Failed to get queued completion status: ErrorCode({})"_sv, error);
+					ZoneScopedN("GetQueuedCompletionStatus");
+
+					auto res = GetQueuedCompletionStatus(m_port, &bytesReceived, &completionKey, &overlapped, INFINITE);
+					if (res == FALSE)
+					{
+						auto error = GetLastError();
+						return errf(m_allocator, "Failed to get queued completion status: ErrorCode({})"_sv, error);
+					}
 				}
 
 				auto op = popPendingOp((Op*)overlapped);
