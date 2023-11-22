@@ -28,7 +28,8 @@ namespace core
 				: socket(socket_),
 				  handshakeBuffer(allocator),
 				  handshake(allocator),
-				  frameBuffer(allocator)
+				  frameBuffer(allocator),
+				  frameParser(allocator)
 			{
 				::memset(readBuffer, 0, sizeof(readBuffer));
 				handshakeBuffer.reserve(1 * 1024);
@@ -228,9 +229,6 @@ namespace core
 		{
 			auto conn = op->connection;
 
-			auto str = StringView{(const char*)op->recvBuf.buf, op->bytesReceived};
-			m_log->debug("read: {}"_sv, str);
-
 			switch (conn->state)
 			{
 			case Connection::STATE_NONE: return errf(m_allocator, "Connection in none state"_sv);
@@ -285,13 +283,16 @@ namespace core
 			case Connection::STATE_READ_MESSAGE:
 			{
 				conn->frameBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
-				auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count(), m_allocator);
+				auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count());
 				if (parserResult.isError()) return parserResult.releaseError();
 
 				// we have reached the end of a frame
 				if (parserResult.value())
 				{
-					m_log->debug("frame length: {}"_sv, conn->frameParser.neededBytes());
+					auto frame = conn->frameParser.frame();
+					m_log->debug("frame opcode: {}, isFin: {}"_sv, (int)frame->header.opcode, frame->header.isFin);
+					m_log->debug("frame: {}"_sv, StringView{frame->payload});
+
 					if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
 					{
 						::memcpy(conn->frameBuffer.data(), conn->frameBuffer.data() + conn->frameParser.neededBytes(), conn->frameBuffer.count() - conn->frameParser.neededBytes());
@@ -302,7 +303,7 @@ namespace core
 						conn->frameBuffer.clear();
 					}
 					// reset parser state
-					conn->frameParser = WebSocketFrameParser{};
+					conn->frameParser = WebSocketFrameParser{m_allocator};
 				}
 
 				if (auto err = scheduleRead(conn)) return err;
@@ -428,6 +429,7 @@ namespace core
 				{
 				case Op::KIND_ACCEPT:
 					if (auto err = handleAccept(unique_static_cast<AcceptOp>(std::move(op)))) return err;
+					if (auto err = scheduleAccept()) return err;
 					break;
 				case Op::KIND_READ:
 				{

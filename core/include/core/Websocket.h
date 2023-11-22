@@ -100,6 +100,16 @@ namespace core
 		uint64_t payloadLength = 0;
 	};
 
+	struct WebSocketFrame
+	{
+		WebSocketFrameHeader header;
+		Buffer payload;
+
+		explicit WebSocketFrame(Allocator* allocator)
+			: payload(allocator)
+		{}
+	};
+
 	class WebSocketFrameParser
 	{
 		enum STATE
@@ -107,6 +117,7 @@ namespace core
 			STATE_PRE,
 			STATE_HEADER,
 			STATE_PAYLOAD,
+			STATE_END,
 		};
 
 		STATE m_state = STATE_PRE;
@@ -115,13 +126,22 @@ namespace core
 		size_t m_maskOffset = 0;
 		size_t m_payloadOffset = 0;
 		WebSocketFrameHeader m_header;
+		Buffer m_payload;
+		Allocator* m_allocator = nullptr;
 	public:
-		WebSocketFrameParser() = default;
+		explicit WebSocketFrameParser(Allocator* allocator)
+			: m_payload(allocator),
+			  m_allocator(allocator)
+		{}
 
 		size_t neededBytes() const { return m_neededBytes; }
 
-		Result<bool> consume(std::byte* ptr, size_t size, Allocator* allocator)
+		Result<bool> consume(const std::byte* ptr, size_t size)
 		{
+			// if we found the end of the frame, we are done
+			if (m_state == STATE_END)
+				return true;
+
 			// wait for more data to be received
 			if (size < m_neededBytes)
 				return false;
@@ -178,12 +198,12 @@ namespace core
 				}
 				else
 				{
-					return errf(allocator, "unsupported opcode"_sv);
+					return errf(m_allocator, "unsupported opcode"_sv);
 				}
 
 				// check that reserved bits are not set
 				if ((byte1 & 12) != 0)
-					return errf(allocator, "reserved bits are set"_sv);
+					return errf(m_allocator, "reserved bits are set"_sv);
 
 				if (m_header.opcode != WebSocketFrameHeader::OPCODE_CONTINUATION &&
 					m_payloadLengthSize != 0 &&
@@ -191,7 +211,7 @@ namespace core
 					 m_header.opcode == WebSocketFrameHeader::OPCODE_PONG ||
 					 m_header.opcode == WebSocketFrameHeader::OPCODE_CLOSE))
 				{
-					return errf(allocator, "control frame cannot have payload length"_sv);
+					return errf(m_allocator, "control frame cannot have payload length"_sv);
 				}
 				return false;
 			}
@@ -226,11 +246,14 @@ namespace core
 				m_header.isFin = ((uint8_t)ptr[0] & 128) == 128;
 				if (m_header.isMasked)
 				{
+					m_payload.resize(m_header.payloadLength);
 					auto mask = (uint8_t*)ptr + m_maskOffset;
-					auto payload = (uint8_t*)ptr + m_payloadOffset;
+					auto src = (const uint8_t*)ptr + m_payloadOffset;
 					for (size_t i = 0; i < m_header.payloadLength; ++i)
-						payload[i] ^= mask[i % 4];
+						m_payload[i] = std::byte(src[i] ^ mask[i % 4]);
 				}
+
+				m_state = STATE_END;
 
 				// TODO: handle fragmented messages
 				return true;
@@ -238,9 +261,20 @@ namespace core
 			default:
 			{
 				assert(false);
-				return errf(allocator, "invalid state"_sv);
+				return errf(m_allocator, "invalid state"_sv);
 			}
 			}
+		}
+
+		Unique<WebSocketFrame> frame()
+		{
+			if (m_state != STATE_END)
+				return nullptr;
+
+			auto result = unique_from<WebSocketFrame>(m_allocator, m_allocator);
+			result->header = m_header;
+			result->payload = std::move(m_payload);
+			return result;
 		}
 	};
 
