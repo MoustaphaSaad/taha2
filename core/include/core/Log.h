@@ -20,7 +20,7 @@ namespace core
 		{
 			auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
 			m_logger = shared_from<spdlog::logger>(allocator, "console", sink);
-			setPattern("[%H:%M:%S %z] [thread %t] [%^%l%$] [%n] %v"_sv);
+			setPattern("[%H:%M:%S.%e %z] [thread %t] [%^%l%$] [%n] %v"_sv);
 			setFlushLevel(level::err);
 
 			#if defined(DEBUG)

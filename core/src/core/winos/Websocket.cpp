@@ -300,27 +300,33 @@ namespace core
 				ZoneScopedN("read message");
 
 				conn->frameBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
-				auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count());
-				if (parserResult.isError()) return parserResult.releaseError();
 
-				// we have reached the end of a frame
-				if (parserResult.value())
+				while (conn->frameParser.neededBytes() <= conn->frameBuffer.count())
 				{
-					auto frame = conn->frameParser.frame();
-					m_log->debug("frame opcode: {}, isFin: {}"_sv, (int)frame->header.opcode, frame->header.isFin);
-					m_log->debug("frame: {}"_sv, StringView{frame->payload});
+					auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count());
+					if (parserResult.isError()) return parserResult.releaseError();
 
-					if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
+					// we have reached the end of a frame
+					if (parserResult.value())
 					{
-						::memcpy(conn->frameBuffer.data(), conn->frameBuffer.data() + conn->frameParser.neededBytes(), conn->frameBuffer.count() - conn->frameParser.neededBytes());
-						conn->frameBuffer.resize(conn->frameBuffer.count() - conn->frameParser.neededBytes());
+						ZoneScopedN("websocket frame complete");
+						auto frame = conn->frameParser.frame();
+						// m_log->info("frame opcode: {}, isFin: {}"_sv, (int) frame->header.opcode, frame->header.isFin);
+						m_log->debug("frame: {}"_sv, StringView{frame->payload});
+
+						if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
+						{
+							::memcpy(conn->frameBuffer.data(), conn->frameBuffer.data() + conn->frameParser.neededBytes(), conn->frameBuffer.count() - conn->frameParser.neededBytes());
+							conn->frameBuffer.resize(conn->frameBuffer.count() - conn->frameParser.neededBytes());
+						}
+						else
+						{
+							conn->frameBuffer.clear();
+						}
+
+						// reset parser state
+						conn->frameParser = WebSocketFrameParser{m_allocator};
 					}
-					else
-					{
-						conn->frameBuffer.clear();
-					}
-					// reset parser state
-					conn->frameParser = WebSocketFrameParser{m_allocator};
 				}
 
 				if (auto err = scheduleRead(conn)) return err;
@@ -439,13 +445,13 @@ namespace core
 
 			while (true)
 			{
-				DWORD bytesReceived = 0;
-				ULONG_PTR completionKey = 0;
-				OVERLAPPED* overlapped = nullptr;
+				constexpr int MAX_ENTRIES = 32;
+				OVERLAPPED_ENTRY entries[MAX_ENTRIES];
+				ULONG numEntries = 0;
 				{
 					ZoneScopedN("GetQueuedCompletionStatus");
 
-					auto res = GetQueuedCompletionStatus(m_port, &bytesReceived, &completionKey, &overlapped, INFINITE);
+					auto res = GetQueuedCompletionStatusEx(m_port, entries, MAX_ENTRIES, &numEntries, INFINITE, FALSE);
 					if (res == FALSE)
 					{
 						auto error = GetLastError();
@@ -453,42 +459,65 @@ namespace core
 					}
 				}
 
-				auto op = popPendingOp((Op*)overlapped);
-				assert(op != nullptr);
+				for (size_t i = 0; i < numEntries; ++i)
+				{
+					auto overlapped = entries[i].lpOverlapped;
 
-				switch (op->kind)
-				{
-				case Op::KIND_ACCEPT:
-					if (auto err = handleAccept(unique_static_cast<AcceptOp>(std::move(op)))) return err;
-					if (auto err = scheduleAccept()) return err;
-					break;
-				case Op::KIND_READ:
-				{
-					auto readOp = unique_static_cast<ReadOp>(std::move(op));
-					DWORD dwFlags = 0;
-					auto res = WSAGetOverlappedResult(readOp->connection->socket, overlapped, &readOp->bytesReceived, FALSE, &dwFlags);
-					if (res != TRUE)
+					auto op = popPendingOp((Op *) overlapped);
+					assert(op != nullptr);
+
+					switch (op->kind)
 					{
-						return errf(m_allocator, "Failed to get overlapped result: ErrorCode({})"_sv, WSAGetLastError());
-					}
-					if (auto err = handleRead(std::move(readOp))) return err;
-					break;
-				}
-				case Op::KIND_WRITE:
-				{
-					auto writeOp = unique_static_cast<WriteOp>(std::move(op));
-					DWORD dwFlags = 0;
-					auto res = WSAGetOverlappedResult(writeOp->connection->socket, overlapped, &writeOp->bytesSent, FALSE, &dwFlags);
-					if (res != TRUE)
+					case Op::KIND_ACCEPT:
+						if (auto err = handleAccept(unique_static_cast<AcceptOp>(std::move(op)))) return err;
+						if (auto err = scheduleAccept()) return err;
+						break;
+					case Op::KIND_READ:
 					{
-						return errf(m_allocator, "Failed to get overlapped result: ErrorCode({})"_sv, WSAGetLastError());
+						auto readOp = unique_static_cast<ReadOp>(std::move(op));
+						DWORD dwFlags = 0;
+						auto res = WSAGetOverlappedResult(
+							readOp->connection->socket,
+							overlapped,
+							&readOp->bytesReceived,
+							FALSE,
+							&dwFlags
+						);
+						if (res != TRUE)
+						{
+							return errf(
+								m_allocator,
+								"Failed to get overlapped result: ErrorCode({})"_sv,
+								WSAGetLastError());
+						}
+						if (auto err = handleRead(std::move(readOp))) return err;
+						break;
 					}
-					if (auto err = handleWrite(std::move(writeOp))) return err;
-					break;
-				}
-				default:
-					assert(false);
-					break;
+					case Op::KIND_WRITE:
+					{
+						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+						DWORD dwFlags = 0;
+						auto res = WSAGetOverlappedResult(
+							writeOp->connection->socket,
+							overlapped,
+							&writeOp->bytesSent,
+							FALSE,
+							&dwFlags
+						);
+						if (res != TRUE)
+						{
+							return errf(
+								m_allocator,
+								"Failed to get overlapped result: ErrorCode({})"_sv,
+								WSAGetLastError());
+						}
+						if (auto err = handleWrite(std::move(writeOp))) return err;
+						break;
+					}
+					default:
+						assert(false);
+						break;
+					}
 				}
 			}
 

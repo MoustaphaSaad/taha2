@@ -128,15 +128,8 @@ namespace core
 		WebSocketFrameHeader m_header;
 		Buffer m_payload;
 		Allocator* m_allocator = nullptr;
-	public:
-		explicit WebSocketFrameParser(Allocator* allocator)
-			: m_payload(allocator),
-			  m_allocator(allocator)
-		{}
 
-		size_t neededBytes() const { return m_neededBytes; }
-
-		Result<bool> consume(const std::byte* ptr, size_t size)
+		Result<bool> step(const std::byte* ptr, size_t size)
 		{
 			// if we found the end of the frame, we are done
 			if (m_state == STATE_END)
@@ -263,6 +256,27 @@ namespace core
 				assert(false);
 				return errf(m_allocator, "invalid state"_sv);
 			}
+			}
+		}
+
+	public:
+		explicit WebSocketFrameParser(Allocator* allocator)
+			: m_payload(allocator),
+			  m_allocator(allocator)
+		{}
+
+		size_t neededBytes() const { return m_neededBytes; }
+
+		Result<bool> consume(const std::byte* ptr, size_t size)
+		{
+			while (size >= m_neededBytes)
+			{
+				auto result = step(ptr, m_neededBytes);
+				if (result.isError())
+					return result;
+
+				if (result.value())
+					return true;
 			}
 		}
 
