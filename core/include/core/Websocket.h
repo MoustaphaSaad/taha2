@@ -124,11 +124,20 @@ namespace core::websocket
 		STATE m_state = STATE_PRE;
 		size_t m_neededBytes = 2;
 		size_t m_payloadLengthSize = 0;
-		size_t m_maskOffset = 0;
 		size_t m_payloadOffset = 0;
+		Span<const std::byte> m_mask;
 		FrameHeader m_header;
 		Buffer m_payload;
+		bool m_isFragmented = false;
 		Allocator* m_allocator = nullptr;
+
+		void pushPayload(Span<const std::byte> payload)
+		{
+			auto initCount = m_payload.count();
+			m_payload.resize(initCount + payload.count());
+			for (size_t i = 0; i < payload.count(); ++i)
+				m_payload[initCount + i] = payload[i] ^ m_mask[i % 4];
+		}
 
 		Result<bool> step(const std::byte* ptr, size_t size)
 		{
@@ -160,7 +169,7 @@ namespace core::websocket
 
 				m_state = STATE_HEADER;
 				m_neededBytes += m_payloadLengthSize;
-				m_maskOffset = m_neededBytes;
+				m_mask = Span<const std::byte>{ptr + m_neededBytes, 4};
 				if (m_header.isMasked)
 					m_neededBytes += 4;
 				m_payloadOffset = m_neededBytes;
@@ -238,19 +247,48 @@ namespace core::websocket
 			case STATE_PAYLOAD:
 			{
 				m_header.isFin = ((uint8_t)ptr[0] & 128) == 128;
-				if (m_header.isMasked)
+				Span<const std::byte> payload{ptr + m_payloadOffset, m_header.payloadLength};
+
+				if (m_header.isFin)
 				{
-					m_payload.resize(m_header.payloadLength);
-					auto mask = (uint8_t*)ptr + m_maskOffset;
-					auto src = (const uint8_t*)ptr + m_payloadOffset;
-					for (size_t i = 0; i < m_header.payloadLength; ++i)
-						m_payload[i] = std::byte(src[i] ^ mask[i % 4]);
+					if (m_header.opcode == FrameHeader::OPCODE_CONTINUATION)
+					{
+						if (m_isFragmented == false)
+							return errf(m_allocator, "continuation frame without previous frames"_sv);
+					}
+
+					if (m_isFragmented && (m_header.opcode == FrameHeader::OPCODE_TEXT || m_header.opcode == FrameHeader::OPCODE_BINARY))
+					{
+						return errf(m_allocator, "nested fragments"_sv);
+					}
+
+					pushPayload(payload);
+					m_state = STATE_END;
+					return true;
 				}
 
-				m_state = STATE_END;
+				if (m_header.opcode == FrameHeader::OPCODE_CONTINUATION)
+				{
+					if (m_isFragmented)
+					{
+						pushPayload(payload);
+						return false;
+					}
+					else
+					{
+						return errf(m_allocator, "continuation frame without previous frames"_sv);
+					}
+				}
+				else if (m_header.opcode != FrameHeader::OPCODE_TEXT && m_header.opcode != FrameHeader::OPCODE_BINARY)
+				{
+					return errf(m_allocator, "fragmented control messages"_sv);
+				}
 
-				// TODO: handle fragmented messages
-				return true;
+				if (m_isFragmented)
+					return errf(m_allocator, "nested fragmented messages"_sv);
+
+				m_isFragmented = true;
+				return false;
 			}
 			default:
 			{
