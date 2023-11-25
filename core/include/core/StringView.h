@@ -99,6 +99,16 @@ namespace core
 			assert(begin <= end);
 		}
 
+		StringView(const Span<const std::byte>& span)
+			: m_begin((const char*)span.data())
+			, m_count(span.count())
+		{}
+
+		StringView(const Span<std::byte>& span)
+			: m_begin((const char*)span.data())
+			, m_count(span.count())
+		{}
+
 		operator Span<std::byte>() const
 		{
 			return Span<std::byte>{(std::byte*)m_begin, m_count};

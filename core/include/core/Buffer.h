@@ -3,6 +3,7 @@
 #include "core/Exports.h"
 #include "core/Allocator.h"
 #include "core/StringView.h"
+#include "core/Span.h"
 
 #include <cstddef>
 #include <utility>
@@ -80,6 +81,8 @@ namespace core
 		}
 
 		explicit operator StringView() const { return StringView{(const char*)m_ptr, m_count}; }
+		explicit operator Span<const std::byte>() const { return Span<const std::byte>{m_ptr, m_count}; }
+		explicit operator Span<std::byte>() { return Span<std::byte>{m_ptr, m_count}; }
 
 		void push(std::byte b)
 		{

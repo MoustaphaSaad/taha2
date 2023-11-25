@@ -111,6 +111,21 @@ namespace core::websocket
 		{}
 	};
 
+	struct Msg
+	{
+		enum TYPE
+		{
+			TYPE_TEXT,
+			TYPE_BINARY,
+			TYPE_CLOSE,
+			TYPE_PING,
+			TYPE_PONG,
+		};
+
+		TYPE type;
+		Span<const std::byte> payload;
+	};
+
 	class FrameParser
 	{
 		enum STATE
@@ -320,22 +335,41 @@ namespace core::websocket
 			return false;
 		}
 
-		Unique<Frame> frame()
+		Msg msg() const
 		{
-			if (m_state != STATE_END)
-				return nullptr;
+			assert(m_state == STATE_END);
 
-			auto result = unique_from<Frame>(m_allocator, m_allocator);
-			result->header = m_header;
-			result->payload = std::move(m_payload);
+			Msg result{};
+			switch (m_header.opcode)
+			{
+			case FrameHeader::OPCODE_TEXT:
+				result.type = Msg::TYPE_TEXT;
+				break;
+			case FrameHeader::OPCODE_BINARY:
+				result.type = Msg::TYPE_BINARY;
+				break;
+			case FrameHeader::OPCODE_CLOSE:
+				result.type = Msg::TYPE_CLOSE;
+				break;
+			case FrameHeader::OPCODE_PING:
+				result.type = Msg::TYPE_PING;
+				break;
+			case FrameHeader::OPCODE_PONG:
+				result.type = Msg::TYPE_PONG;
+				break;
+			case FrameHeader::OPCODE_CONTINUATION:
+			default:
+				assert(false);
+				return result;
+			}
+			result.payload = Span<const std::byte>{m_payload};
 			return result;
 		}
 	};
 
 	struct Handler
 	{
-		// TODO: replace this with a onMessage (message may contain multiple frames) callback
-		Func<void(const Frame&)> onFrame;
+		Func<void(const Msg&)> onMsg;
 	};
 
 	class Server

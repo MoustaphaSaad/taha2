@@ -2,9 +2,9 @@
 #include <core/Log.h>
 #include <core/Websocket.h>
 
-void onFrame(const core::websocket::Frame& frame, core::Log* log)
+void onMsg(const core::websocket::Msg& msg, core::Log* log)
 {
-	log->info("frame: {}"_sv, core::StringView{frame.payload});
+	log->info("msg: {}"_sv, core::StringView{msg.payload});
 }
 
 int main()
@@ -23,7 +23,7 @@ int main()
 	auto server = serverResult.releaseValue();
 
 	core::websocket::Handler handler;
-	handler.onFrame = [&logger](const core::websocket::Frame& frame) { onFrame(frame, &logger); };
+	handler.onMsg = [&logger](const core::websocket::Msg& msg) { onMsg(msg, &logger); };
 	auto err = server->run(&handler);
 	if (err) logger.error("websocket run failed, {}"_sv, err);
 

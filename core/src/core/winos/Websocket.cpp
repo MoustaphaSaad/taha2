@@ -163,12 +163,12 @@ namespace core::websocket
 			return res;
 		}
 
-		void onFrame(const Frame& frame)
+		void onMsg(const Msg& msg)
 		{
-			if (m_handler->onFrame)
+			if (m_handler->onMsg)
 			{
 				ZoneScoped;
-				m_handler->onFrame(frame);
+				m_handler->onMsg(msg);
 			}
 		}
 
@@ -320,8 +320,8 @@ namespace core::websocket
 					if (parserResult.value())
 					{
 						ZoneScopedN("websocket frame complete");
-						auto frame = conn->frameParser.frame();
-						onFrame(*frame);
+						auto msg = conn->frameParser.msg();
+						onMsg(msg);
 
 						if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
 						{
