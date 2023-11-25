@@ -367,9 +367,18 @@ namespace core::websocket
 		}
 	};
 
+	class Connection
+	{
+	public:
+		virtual ~Connection() = default;
+		virtual HumanError write(Buffer&& bytes) = 0;
+		virtual HumanError write(StringView str) = 0;
+		virtual HumanError write(Span<const std::byte> bytes) = 0;
+	};
+
 	struct Handler
 	{
-		Func<void(const Msg&)> onMsg;
+		Func<void(const Msg&, Connection*)> onMsg;
 	};
 
 	class Server

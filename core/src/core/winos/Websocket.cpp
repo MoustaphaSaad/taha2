@@ -15,46 +15,54 @@
 
 namespace core::websocket
 {
-	class WinOSServer: public Server
+	class WinOSServer;
+
+	struct WinOSConnection: public Connection
 	{
-		struct Connection
+		enum STATE
 		{
-			enum STATE
-			{
-				STATE_NONE,
-				STATE_HANDSHAKE,
-				STATE_READ_MESSAGE,
-			};
-
-			Connection(SOCKET socket_, Allocator* allocator)
-				: socket(socket_),
-				  handshakeBuffer(allocator),
-				  handshake(allocator),
-				  frameBuffer(allocator),
-				  frameParser(allocator)
-			{
-				::memset(readBuffer, 0, sizeof(readBuffer));
-				handshakeBuffer.reserve(1 * 1024);
-			}
-
-			~Connection()
-			{
-				if (socket != INVALID_SOCKET)
-				{
-					[[maybe_unused]] auto res = ::closesocket(socket);
-					assert(res == 0);
-				}
-			}
-
-			STATE state = STATE_NONE;
-			SOCKET socket = INVALID_SOCKET;
-			CHAR readBuffer[1 * 1024];
-			Buffer handshakeBuffer;
-			Handshake handshake;
-			Buffer frameBuffer;
-			FrameParser frameParser;
+			STATE_NONE,
+			STATE_HANDSHAKE,
+			STATE_READ_MESSAGE,
 		};
 
+		WinOSConnection(WinOSServer* server, SOCKET socket_, Allocator* allocator)
+			: m_server(server),
+			  socket(socket_),
+			  handshakeBuffer(allocator),
+			  handshake(allocator),
+			  frameBuffer(allocator),
+			  frameParser(allocator)
+		{
+			::memset(readBuffer, 0, sizeof(readBuffer));
+			handshakeBuffer.reserve(1 * 1024);
+		}
+
+		~WinOSConnection()
+		{
+			if (socket != INVALID_SOCKET)
+			{
+				[[maybe_unused]] auto res = ::closesocket(socket);
+				assert(res == 0);
+			}
+		}
+
+		HumanError write(Buffer&& bytes) override;
+		HumanError write(StringView str) override;
+		HumanError write(Span<const std::byte> bytes) override;
+
+		WinOSServer* m_server = nullptr;
+		STATE state = STATE_NONE;
+		SOCKET socket = INVALID_SOCKET;
+		CHAR readBuffer[1 * 1024];
+		Buffer handshakeBuffer;
+		Handshake handshake;
+		Buffer frameBuffer;
+		FrameParser frameParser;
+	};
+
+	class WinOSServer: public Server
+	{
 		struct Op: OVERLAPPED
 		{
 			enum KIND
@@ -103,12 +111,12 @@ namespace core::websocket
 
 		struct ReadOp: public Op
 		{
-			Connection* connection = nullptr;
+			WinOSConnection* connection = nullptr;
 			DWORD bytesReceived = 0;
 			DWORD flags = 0;
 			WSABUF recvBuf{};
 
-			ReadOp(Connection* connection_)
+			ReadOp(WinOSConnection* connection_)
 				: Op(KIND_READ),
 				  connection(connection_)
 			{
@@ -119,13 +127,13 @@ namespace core::websocket
 
 		struct WriteOp: public Op
 		{
-			Connection* connection = nullptr;
+			WinOSConnection* connection = nullptr;
 			DWORD bytesSent = 0;
 			Buffer buffer;
 			WSABUF wsaBuf{};
 			DWORD flags = 0;
 
-			WriteOp(Connection* connection_, Buffer&& buffer_)
+			WriteOp(WinOSConnection* connection_, Buffer&& buffer_)
 				: Op(KIND_WRITE),
 				  connection(connection_),
 				  buffer(std::move(buffer_))
@@ -141,7 +149,7 @@ namespace core::websocket
 		HANDLE m_port = INVALID_HANDLE_VALUE;
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
-		Set<Unique<Connection>> m_connections;
+		Set<Unique<WinOSConnection>> m_connections;
 		Handler* m_handler = nullptr;
 
 		void pushPendingOp(Unique<Op> op)
@@ -163,12 +171,12 @@ namespace core::websocket
 			return res;
 		}
 
-		void onMsg(const Msg& msg)
+		void onMsg(const Msg& msg, WinOSConnection* conn)
 		{
 			if (m_handler->onMsg)
 			{
 				ZoneScoped;
-				m_handler->onMsg(msg);
+				m_handler->onMsg(msg, conn);
 			}
 		}
 
@@ -212,14 +220,14 @@ namespace core::websocket
 			auto acceptSocket = op->acceptSocket;
 			op->acceptSocket = INVALID_SOCKET;
 
-			auto connection = core::unique_from<Connection>(m_allocator, acceptSocket, m_allocator);
-			connection->state = Connection::STATE_HANDSHAKE;
+			auto connection = core::unique_from<WinOSConnection>(m_allocator, this, acceptSocket, m_allocator);
+			connection->state = WinOSConnection::STATE_HANDSHAKE;
 			if (auto err = scheduleRead(connection.get())) return err;
 			m_connections.insert(std::move(connection));
 			return {};
 		}
 
-		HumanError scheduleRead(Connection* conn)
+		HumanError scheduleRead(WinOSConnection* conn)
 		{
 			ZoneScoped;
 
@@ -255,8 +263,8 @@ namespace core::websocket
 
 			switch (conn->state)
 			{
-			case Connection::STATE_NONE: return errf(m_allocator, "Connection in none state"_sv);
-			case Connection::STATE_HANDSHAKE:
+			case WinOSConnection::STATE_NONE: return errf(m_allocator, "Connection in none state"_sv);
+			case WinOSConnection::STATE_HANDSHAKE:
 			{
 				ZoneScopedN("handshake");
 				auto totalHandshakeBuffer = conn->handshakeBuffer.count() + op->bytesReceived;
@@ -294,7 +302,7 @@ namespace core::websocket
 					if (auto err = scheduleWrite(conn, reply)) return err;
 
 					// move to the read message state
-					conn->state = Connection::STATE_READ_MESSAGE;
+					conn->state = WinOSConnection::STATE_READ_MESSAGE;
 					if (auto err = scheduleRead(conn)) return err;
 				}
 				else
@@ -305,7 +313,7 @@ namespace core::websocket
 
 				return {};
 			}
-			case Connection::STATE_READ_MESSAGE:
+			case WinOSConnection::STATE_READ_MESSAGE:
 			{
 				ZoneScopedN("read message");
 
@@ -321,7 +329,7 @@ namespace core::websocket
 					{
 						ZoneScopedN("websocket frame complete");
 						auto msg = conn->frameParser.msg();
-						onMsg(msg);
+						onMsg(msg, conn);
 
 						if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
 						{
@@ -376,24 +384,6 @@ namespace core::websocket
 			return {};
 		}
 
-		HumanError scheduleWrite(Connection* conn, Buffer&& buffer)
-		{
-			ZoneScoped;
-
-			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
-			return scheduleWriteOp(std::move(op));
-		}
-
-		HumanError scheduleWrite(Connection* conn, StringView str)
-		{
-			ZoneScoped;
-
-			Buffer buffer{m_allocator};
-			buffer.push(str);
-			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
-			return scheduleWriteOp(std::move(op));
-		}
-
 		HumanError handleWrite(Unique<WriteOp> op)
 		{
 			ZoneScoped;
@@ -443,6 +433,34 @@ namespace core::websocket
 				[[maybe_unused]] auto res = ::closesocket(m_listenSocket);
 				assert(res == 0);
 			}
+		}
+
+		HumanError scheduleWrite(WinOSConnection* conn, Buffer&& buffer)
+		{
+			ZoneScoped;
+
+			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
+			return scheduleWriteOp(std::move(op));
+		}
+
+		HumanError scheduleWrite(WinOSConnection* conn, StringView str)
+		{
+			ZoneScoped;
+
+			Buffer buffer{m_allocator};
+			buffer.push(str);
+			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
+			return scheduleWriteOp(std::move(op));
+		}
+
+		HumanError scheduleWrite(WinOSConnection* conn, Span<const std::byte> bytes)
+		{
+			ZoneScoped;
+
+			Buffer buffer{m_allocator};
+			buffer.push(bytes);
+			auto op = unique_from<WriteOp>(m_allocator, conn, std::move(buffer));
+			return scheduleWriteOp(std::move(op));
 		}
 
 		HumanError run(Handler* handler) override
@@ -540,6 +558,36 @@ namespace core::websocket
 			// TODO: Implement this function
 		}
 	};
+
+	HumanError WinOSConnection::write(Buffer&& bytes)
+	{
+		ZoneScoped;
+
+		if (bytes.count() == 0)
+			return {};
+
+		return m_server->scheduleWrite(this, std::move(bytes));
+	}
+
+	HumanError WinOSConnection::write(StringView str)
+	{
+		ZoneScoped;
+
+		if (str.count() == 0)
+			return {};
+
+		return m_server->scheduleWrite(this, str);
+	}
+
+	HumanError WinOSConnection::write(Span<const std::byte> bytes)
+	{
+		ZoneScoped;
+
+		if (bytes.count() == 0)
+			return {};
+
+		return m_server->scheduleWrite(this, bytes);
+	}
 
 	Result<Unique<Server>> Server::open(StringView ip, StringView port, Log* log, Allocator* allocator)
 	{
