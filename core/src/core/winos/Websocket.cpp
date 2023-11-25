@@ -142,6 +142,7 @@ namespace core::websocket
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
 		Set<Unique<Connection>> m_connections;
+		Handler* m_handler = nullptr;
 
 		void pushPendingOp(Unique<Op> op)
 		{
@@ -160,6 +161,15 @@ namespace core::websocket
 			auto res = std::move(it->value);
 			m_scheduledOperations.remove(op);
 			return res;
+		}
+
+		void onFrame(const Frame& frame)
+		{
+			if (m_handler->onFrame)
+			{
+				ZoneScoped;
+				m_handler->onFrame(frame);
+			}
 		}
 
 		HumanError scheduleAccept()
@@ -311,8 +321,7 @@ namespace core::websocket
 					{
 						ZoneScopedN("websocket frame complete");
 						auto frame = conn->frameParser.frame();
-						// m_log->info("frame opcode: {}, isFin: {}"_sv, (int) frame->header.opcode, frame->header.isFin);
-						m_log->debug("frame: {}"_sv, StringView{frame->payload});
+						onFrame(*frame);
 
 						if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
 						{
@@ -436,9 +445,11 @@ namespace core::websocket
 			}
 		}
 
-		HumanError run() override
+		HumanError run(Handler* handler) override
 		{
 			ZoneScoped;
+
+			m_handler = handler;
 
 			// schedule an accept operation
 			if (auto err = scheduleAccept()) return err;

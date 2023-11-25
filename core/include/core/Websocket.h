@@ -5,6 +5,7 @@
 #include "core/Result.h"
 #include "core/Log.h"
 #include "core/Hash.h"
+#include "core/Func.h"
 
 namespace core::websocket
 {
@@ -293,13 +294,19 @@ namespace core::websocket
 		}
 	};
 
+	struct Handler
+	{
+		// TODO: replace this with a onMessage (message may contain multiple frames) callback
+		Func<void(const Frame&)> onFrame;
+	};
+
 	class Server
 	{
 	public:
 		static CORE_EXPORT Result<Unique<Server>> open(StringView ip, StringView port, Log* log, Allocator* allocator);
 
 		virtual ~Server() = default;
-		virtual HumanError run() = 0;
+		virtual HumanError run(Handler* handler) = 0;
 		virtual void stop() = 0;
 	};
 }
