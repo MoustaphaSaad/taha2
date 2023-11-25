@@ -13,9 +13,9 @@
 
 #include <cassert>
 
-namespace core
+namespace core::websocket
 {
-	class WinOSServer: public WebSocketServer
+	class WinOSServer: public Server
 	{
 		struct Connection
 		{
@@ -52,7 +52,7 @@ namespace core
 			Buffer handshakeBuffer;
 			Handshake handshake;
 			Buffer frameBuffer;
-			WebSocketFrameParser frameParser;
+			FrameParser frameParser;
 		};
 
 		struct Op: OVERLAPPED
@@ -325,7 +325,7 @@ namespace core
 						}
 
 						// reset parser state
-						conn->frameParser = WebSocketFrameParser{m_allocator};
+						conn->frameParser = FrameParser{m_allocator};
 					}
 				}
 
@@ -530,7 +530,7 @@ namespace core
 		}
 	};
 
-	Result<Unique<WebSocketServer>> WebSocketServer::open(StringView ip, StringView port, Log* log, Allocator* allocator)
+	Result<Unique<Server>> Server::open(StringView ip, StringView port, Log* log, Allocator* allocator)
 	{
 		auto completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
 		if (completionPort == NULL) return errf(allocator, "failed to create completion port"_sv);

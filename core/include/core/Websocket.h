@@ -6,7 +6,7 @@
 #include "core/Log.h"
 #include "core/Hash.h"
 
-namespace core
+namespace core::websocket
 {
 	class Handshake
 	{
@@ -82,7 +82,7 @@ namespace core
 		}
 	};
 
-	struct WebSocketFrameHeader
+	struct FrameHeader
 	{
 		enum OPCODE: uint8_t
 		{
@@ -100,17 +100,17 @@ namespace core
 		uint64_t payloadLength = 0;
 	};
 
-	struct WebSocketFrame
+	struct Frame
 	{
-		WebSocketFrameHeader header;
+		FrameHeader header;
 		Buffer payload;
 
-		explicit WebSocketFrame(Allocator* allocator)
+		explicit Frame(Allocator* allocator)
 			: payload(allocator)
 		{}
 	};
 
-	class WebSocketFrameParser
+	class FrameParser
 	{
 		enum STATE
 		{
@@ -125,7 +125,7 @@ namespace core
 		size_t m_payloadLengthSize = 0;
 		size_t m_maskOffset = 0;
 		size_t m_payloadOffset = 0;
-		WebSocketFrameHeader m_header;
+		FrameHeader m_header;
 		Buffer m_payload;
 		Allocator* m_allocator = nullptr;
 
@@ -165,29 +165,29 @@ namespace core
 				m_payloadOffset = m_neededBytes;
 
 				auto opcode = byte1 & 15;
-				if (opcode == WebSocketFrameHeader::OPCODE_CONTINUATION)
+				if (opcode == FrameHeader::OPCODE_CONTINUATION)
 				{
-					m_header.opcode = WebSocketFrameHeader::OPCODE_CONTINUATION;
+					m_header.opcode = FrameHeader::OPCODE_CONTINUATION;
 				}
-				else if (opcode == WebSocketFrameHeader::OPCODE_TEXT)
+				else if (opcode == FrameHeader::OPCODE_TEXT)
 				{
-					m_header.opcode = WebSocketFrameHeader::OPCODE_TEXT;
+					m_header.opcode = FrameHeader::OPCODE_TEXT;
 				}
-				else if (opcode == WebSocketFrameHeader::OPCODE_BINARY)
+				else if (opcode == FrameHeader::OPCODE_BINARY)
 				{
-					m_header.opcode = WebSocketFrameHeader::OPCODE_BINARY;
+					m_header.opcode = FrameHeader::OPCODE_BINARY;
 				}
-				else if (opcode == WebSocketFrameHeader::OPCODE_CLOSE)
+				else if (opcode == FrameHeader::OPCODE_CLOSE)
 				{
-					m_header.opcode = WebSocketFrameHeader::OPCODE_CLOSE;
+					m_header.opcode = FrameHeader::OPCODE_CLOSE;
 				}
-				else if (opcode == WebSocketFrameHeader::OPCODE_PING)
+				else if (opcode == FrameHeader::OPCODE_PING)
 				{
-					m_header.opcode = WebSocketFrameHeader::OPCODE_PING;
+					m_header.opcode = FrameHeader::OPCODE_PING;
 				}
-				else if (opcode == WebSocketFrameHeader::OPCODE_PONG)
+				else if (opcode == FrameHeader::OPCODE_PONG)
 				{
-					m_header.opcode = WebSocketFrameHeader::OPCODE_PONG;
+					m_header.opcode = FrameHeader::OPCODE_PONG;
 				}
 				else
 				{
@@ -198,11 +198,11 @@ namespace core
 				if ((byte1 & 12) != 0)
 					return errf(m_allocator, "reserved bits are set"_sv);
 
-				if (m_header.opcode != WebSocketFrameHeader::OPCODE_CONTINUATION &&
+				if (m_header.opcode != FrameHeader::OPCODE_CONTINUATION &&
 					m_payloadLengthSize != 0 &&
-					(m_header.opcode == WebSocketFrameHeader::OPCODE_PING ||
-					 m_header.opcode == WebSocketFrameHeader::OPCODE_PONG ||
-					 m_header.opcode == WebSocketFrameHeader::OPCODE_CLOSE))
+					(m_header.opcode == FrameHeader::OPCODE_PING ||
+					 m_header.opcode == FrameHeader::OPCODE_PONG ||
+					 m_header.opcode == FrameHeader::OPCODE_CLOSE))
 				{
 					return errf(m_allocator, "control frame cannot have payload length"_sv);
 				}
@@ -260,7 +260,7 @@ namespace core
 		}
 
 	public:
-		explicit WebSocketFrameParser(Allocator* allocator)
+		explicit FrameParser(Allocator* allocator)
 			: m_payload(allocator),
 			  m_allocator(allocator)
 		{}
@@ -278,26 +278,27 @@ namespace core
 				if (result.value())
 					return true;
 			}
+			return false;
 		}
 
-		Unique<WebSocketFrame> frame()
+		Unique<Frame> frame()
 		{
 			if (m_state != STATE_END)
 				return nullptr;
 
-			auto result = unique_from<WebSocketFrame>(m_allocator, m_allocator);
+			auto result = unique_from<Frame>(m_allocator, m_allocator);
 			result->header = m_header;
 			result->payload = std::move(m_payload);
 			return result;
 		}
 	};
 
-	class WebSocketServer
+	class Server
 	{
 	public:
-		static CORE_EXPORT Result<Unique<WebSocketServer>> open(StringView ip, StringView port, Log* log, Allocator* allocator);
+		static CORE_EXPORT Result<Unique<Server>> open(StringView ip, StringView port, Log* log, Allocator* allocator);
 
-		virtual ~WebSocketServer() = default;
+		virtual ~Server() = default;
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 	};
