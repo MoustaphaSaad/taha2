@@ -1,6 +1,17 @@
 #include <core/Mallocator.h>
 #include <core/Log.h>
 #include <core/Websocket.h>
+#include <signal.h>
+
+core::Unique<core::websocket::Server> server;
+
+void signalHandler(int signal)
+{
+	if (signal == SIGINT)
+	{
+		server->stop();
+	}
+}
 
 core::HumanError onMsg(const core::websocket::Msg& msg, core::Log* log)
 {
@@ -10,6 +21,8 @@ core::HumanError onMsg(const core::websocket::Msg& msg, core::Log* log)
 
 int main()
 {
+	signal(SIGINT, signalHandler);
+
 	core::Mallocator mallocator;
 	core::Log logger{&mallocator};
 
@@ -21,7 +34,7 @@ int main()
 		logger.error("opening websocket server failed, {}"_sv, serverResult.error());
 		return EXIT_FAILURE;
 	}
-	auto server = serverResult.releaseValue();
+	server = serverResult.releaseValue();
 
 	core::websocket::Handler handler;
 	handler.onMsg = [&logger](const core::websocket::Msg& msg, core::websocket::Connection* conn) { return onMsg(msg, &logger); };

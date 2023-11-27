@@ -270,6 +270,7 @@ namespace core::websocket
 		Map<Op*, Unique<Op>> m_scheduledOperations;
 		Set<Unique<WinOSConnection>> m_connections;
 		Handler* m_handler = nullptr;
+		bool running = false;
 
 		void pushPendingOp(Unique<Op> op)
 		{
@@ -386,6 +387,9 @@ namespace core::websocket
 		{
 			ZoneScoped;
 
+			if (running == false)
+				return {};
+
 			auto op = unique_from<AcceptOp>(m_allocator);
 			// TODO: we can receive on accept operation, it's a little bit more efficient so consider doing that in the future
 			DWORD bytesReceived = 0;
@@ -432,6 +436,9 @@ namespace core::websocket
 		HumanError scheduleRead(WinOSConnection* conn)
 		{
 			ZoneScoped;
+
+			if (running == false)
+				return {};
 
 			auto op = unique_from<ReadOp>(m_allocator, conn);
 
@@ -561,6 +568,9 @@ namespace core::websocket
 		{
 			ZoneScoped;
 
+			if (running == false)
+				return {};
+
 			auto conn = op->connection;
 
 			auto res = WSASend(
@@ -689,11 +699,12 @@ namespace core::websocket
 			ZoneScoped;
 
 			m_handler = handler;
+			running = true;
 
 			// schedule an accept operation
 			if (auto err = scheduleAccept()) return err;
 
-			while (true)
+			while (running || m_scheduledOperations.count() > 1)
 			{
 				constexpr int MAX_ENTRIES = 32;
 				OVERLAPPED_ENTRY entries[MAX_ENTRIES];
@@ -771,12 +782,27 @@ namespace core::websocket
 				}
 			}
 
+			m_connections.clear();
+			for (auto& op: m_scheduledOperations)
+			{
+				if (op.value->kind == Op::KIND_ACCEPT)
+				{
+					auto acceptOp = unique_static_cast<AcceptOp>(std::move(op.value));
+					CancelIoEx((HANDLE)acceptOp->acceptSocket, (OVERLAPPED*)acceptOp.get());
+				}
+			}
+			m_scheduledOperations.clear();
+
 			return {};
 		}
 
 		void stop() override
 		{
-			// TODO: Implement this function
+			for (auto& conn : m_connections)
+			{
+				(void)conn->writeClose();
+			}
+			running = false;
 		}
 	};
 
