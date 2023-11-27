@@ -114,6 +114,11 @@ namespace core
 			return Span<std::byte>{(std::byte*)m_begin, m_count};
 		}
 
+		operator Span<const std::byte>() const
+		{
+			return Span<const std::byte>{(std::byte*)m_begin, m_count};
+		}
+
 		const char& operator[](size_t i) const
 		{
 			assert(i < m_count);

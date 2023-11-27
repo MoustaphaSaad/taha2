@@ -371,14 +371,25 @@ namespace core::websocket
 	{
 	public:
 		virtual ~Connection() = default;
-		virtual HumanError write(Buffer&& bytes) = 0;
-		virtual HumanError write(StringView str) = 0;
-		virtual HumanError write(Span<const std::byte> bytes) = 0;
+		virtual HumanError writeText(StringView str) = 0;
+		virtual HumanError writeText(Buffer&& str) = 0;
+		virtual HumanError writeBinary(Span<const std::byte> bytes) = 0;
+		virtual HumanError writeBinary(Buffer&& bytes) = 0;
+		virtual HumanError writePing(Span<const std::byte> bytes) = 0;
+		virtual HumanError writePing(Buffer&& bytes) = 0;
+		virtual HumanError writePong(Span<const std::byte> bytes) = 0;
+		virtual HumanError writePong(Buffer&& bytes) = 0;
+		virtual HumanError writeClose() = 0;
+		virtual HumanError writeClose(uint16_t code) = 0;
 	};
 
 	struct Handler
 	{
-		Func<void(const Msg&, Connection*)> onMsg;
+		bool handlePing = false;
+		bool handlePong = false;
+		bool handleClose = false;
+
+		Func<HumanError(const Msg&, Connection*)> onMsg;
 	};
 
 	class Server

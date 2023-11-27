@@ -2,9 +2,10 @@
 #include <core/Log.h>
 #include <core/Websocket.h>
 
-void onMsg(const core::websocket::Msg& msg, core::Log* log)
+core::HumanError onMsg(const core::websocket::Msg& msg, core::Log* log)
 {
 	log->info("msg: {}"_sv, core::StringView{msg.payload});
+	return {};
 }
 
 int main()
@@ -23,7 +24,7 @@ int main()
 	auto server = serverResult.releaseValue();
 
 	core::websocket::Handler handler;
-	handler.onMsg = [&logger](const core::websocket::Msg& msg, core::websocket::Connection* conn) { onMsg(msg, &logger); };
+	handler.onMsg = [&logger](const core::websocket::Msg& msg, core::websocket::Connection* conn) { return onMsg(msg, &logger); };
 	auto err = server->run(&handler);
 	if (err) logger.error("websocket run failed, {}"_sv, err);
 
