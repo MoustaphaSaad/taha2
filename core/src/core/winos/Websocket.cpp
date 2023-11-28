@@ -268,7 +268,7 @@ namespace core::websocket
 		HANDLE m_port = INVALID_HANDLE_VALUE;
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
-		Set<Unique<WinOSConnection>> m_connections;
+		Map<WinOSConnection*, Unique<WinOSConnection>> m_connections;
 		Handler* m_handler = nullptr;
 		bool running = false;
 
@@ -429,7 +429,8 @@ namespace core::websocket
 			auto connection = core::unique_from<WinOSConnection>(m_allocator, this, acceptSocket, m_allocator);
 			connection->state = WinOSConnection::STATE_HANDSHAKE;
 			if (auto err = scheduleRead(connection.get())) return err;
-			m_connections.insert(std::move(connection));
+			auto connectionHandle = connection.get();
+			m_connections.insert(connectionHandle, std::move(connection));
 			return {};
 		}
 
@@ -798,8 +799,9 @@ namespace core::websocket
 
 		void stop() override
 		{
-			for (auto& conn : m_connections)
+			for (auto& item : m_connections)
 			{
+				auto conn = item.key;
 				(void)conn->writeClose();
 			}
 			running = false;

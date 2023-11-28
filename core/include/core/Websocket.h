@@ -220,7 +220,7 @@ namespace core::websocket
 				}
 
 				// check that reserved bits are not set
-				if ((byte1 & 12) != 0)
+				if ((byte1 & 112) != 0)
 					return errf(m_allocator, "reserved bits are set"_sv);
 
 				if (m_header.opcode != FrameHeader::OPCODE_CONTINUATION &&
