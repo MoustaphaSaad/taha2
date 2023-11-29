@@ -16,6 +16,9 @@
 				"type": "equals",
 				"lhs": "${hostSystemName}",
 				"rhs": "Windows"
+			},
+			"cacheVariables": {
+				"TRACY_ENABLE": "OFF"
 			}
 		},
 		{
@@ -37,9 +40,38 @@
 			}
 		},
 		{
+			"name": "tracy-msvc-base",
+			"hidden": true,
+			"inherits": "msvc-base",
+			"cacheVariables": {
+				"TRACY_ENABLE": "ON"
+			}
+		},
+		{
+			"name": "tracy-msvc-debug",
+			"inherits": "tracy-msvc-base",
+			"displayName": "MSVC Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "tracy-msvc-release",
+			"inherits": "tracy-msvc-base",
+			"displayName": "MSVC Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
 			"name": "ninja-base",
 			"hidden": true,
-			"generator": "Ninja"
+			"generator": "Ninja",
+			"cacheVariables": {
+				"TRACY_ENABLE": "OFF"
+			}
 		},
 		{
 			"name": "ninja-debug",
@@ -53,6 +85,32 @@
 		{
 			"name": "ninja-release",
 			"inherits": "ninja-base",
+			"displayName": "Ninja Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "tracy-ninja-base",
+			"hidden": true,
+			"inherits": "ninja-base",
+			"cacheVariables": {
+				"TRACY_ENABLE": "ON"
+			}
+		},
+		{
+			"name": "tracy-ninja-debug",
+			"inherits": "tracy-ninja-base",
+			"displayName": "Ninja Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "tracy-ninja-release",
+			"inherits": "tracy-ninja-base",
 			"displayName": "Ninja Release",
 			"binaryDir": "${sourceDir}/build/${presetName}",
 			"cacheVariables": {
