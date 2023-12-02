@@ -471,6 +471,14 @@ namespace core::websocket
 
 			auto conn = op->connection;
 
+			// NOTE: handle recv = 0 (client has closed
+			if (op->bytesReceived == 0)
+			{
+				// TODO: maybe we should handle this in the outer level (this function caller)
+				::closesocket(conn->socket);
+				return {};
+			}
+
 			switch (conn->state)
 			{
 			case WinOSConnection::STATE_NONE: return errf(m_allocator, "Connection in none state"_sv);
@@ -529,6 +537,11 @@ namespace core::websocket
 
 				conn->frameBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
 
+				if (conn->frameBuffer.count() > m_handler->maxPayloadSize)
+				{
+					return errf(m_allocator, "Payload size is too large, max payload size is {} bytes, but {} bytes is needed"_sv, m_handler->maxPayloadSize, conn->frameBuffer.count());
+				}
+
 				while (conn->frameParser.neededBytes() <= conn->frameBuffer.count())
 				{
 					auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count());
@@ -539,6 +552,7 @@ namespace core::websocket
 					{
 						ZoneScopedN("websocket frame complete");
 						auto msg = conn->frameParser.msg();
+						m_log->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
 						if (auto err = onMsg(msg, conn)) return err;
 
 						if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
@@ -752,7 +766,14 @@ namespace core::websocket
 								"Failed to get overlapped result: ErrorCode({})"_sv,
 								WSAGetLastError());
 						}
-						if (auto err = handleRead(std::move(readOp))) return err;
+
+						auto conn = readOp->connection;
+						if (auto err = handleRead(std::move(readOp)))
+						{
+							(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+							// TODO: remove connection from the server
+							// return err;
+						}
 						break;
 					}
 					case Op::KIND_WRITE:
@@ -773,7 +794,13 @@ namespace core::websocket
 								"Failed to get overlapped result: ErrorCode({})"_sv,
 								WSAGetLastError());
 						}
-						if (auto err = handleWrite(std::move(writeOp))) return err;
+						auto conn = writeOp->connection;
+						if (auto err = handleWrite(std::move(writeOp)))
+						{
+							(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+							// TODO: remove connection from the server
+							// return err;
+						}
 						break;
 					}
 					default:

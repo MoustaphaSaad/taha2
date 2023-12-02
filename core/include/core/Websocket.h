@@ -388,6 +388,7 @@ namespace core::websocket
 		bool handlePing = false;
 		bool handlePong = false;
 		bool handleClose = false;
+		size_t maxPayloadSize = 16ULL * 1024ULL;
 
 		Func<HumanError(const Msg&, Connection*)> onMsg;
 	};
