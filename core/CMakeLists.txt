@@ -31,10 +31,12 @@ target_sources(core PRIVATE
 	include/core/Log.h
 	include/core/Url.h
 	include/core/Socket.h
-	include/core/Websocket.h
 	include/core/Span.h
 	include/core/Base64.h
 	include/core/SHA1.h
+	include/core/websocket/Handshake.h
+	include/core/websocket/Websocket.h
+	include/core/websocket/FrameParser.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -49,6 +51,7 @@ target_sources(core PRIVATE
 	src/core/Url.cpp
 	src/core/Base64.cpp
 	src/core/SHA1.cpp
+	src/core/websocket/Handshake.cpp
 )
 
 if (WIN32)
@@ -64,7 +67,7 @@ if (WIN32)
 			src/core/winos/ConditionVariable.cpp
 			src/core/winos/IMutex.h
 			src/core/winos/Socket.cpp
-			src/core/winos/Websocket.cpp
+			src/core/winos/websocket/Websocket.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)

@@ -1,4 +1,6 @@
-#include "core/Websocket.h"
+#include "core/websocket/Websocket.h"
+#include "core/websocket/Handshake.h"
+#include "core/websocket/FrameParser.h"
 #include "core/Hash.h"
 #include "core/SHA1.h"
 #include "core/Base64.h"
