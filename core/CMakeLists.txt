@@ -52,6 +52,7 @@ target_sources(core PRIVATE
 	src/core/Base64.cpp
 	src/core/SHA1.cpp
 	src/core/websocket/Handshake.cpp
+	src/core/websocket/FrameParser.cpp
 )
 
 if (WIN32)
