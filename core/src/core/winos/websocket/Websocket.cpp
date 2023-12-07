@@ -1,6 +1,6 @@
 #include "core/websocket/Websocket.h"
 #include "core/websocket/Handshake.h"
-#include "core/websocket/FrameParser.h"
+#include "core/websocket/MessageParser.h"
 #include "core/Hash.h"
 #include "core/SHA1.h"
 #include "core/Base64.h"
@@ -40,8 +40,8 @@ namespace core::websocket
 			  socket(socket_),
 			  handshakeBuffer(allocator),
 			  handshake(allocator),
-			  frameBuffer(allocator),
-			  frameParser(allocator),
+			  recvBuffer(allocator),
+			  messageParser(allocator),
 			  writeQueue(allocator)
 		{
 			::memset(readBuffer, 0, sizeof(readBuffer));
@@ -176,8 +176,8 @@ namespace core::websocket
 		CHAR readBuffer[1 * 1024];
 		Buffer handshakeBuffer;
 		Handshake handshake;
-		Buffer frameBuffer;
-		FrameParser frameParser;
+		Buffer recvBuffer;
+		MessageParser messageParser;
 		Queue<Buffer> writeQueue;
 		bool isWriting = false;
 	};
@@ -293,7 +293,7 @@ namespace core::websocket
 			return res;
 		}
 
-		HumanError onTextMsg(const Msg& msg, WinOSConnection* conn)
+		HumanError onTextMsg(const Message& msg, WinOSConnection* conn)
 		{
 			if (m_handler->onMsg)
 			{
@@ -303,7 +303,7 @@ namespace core::websocket
 			return {};
 		}
 
-		HumanError onBinaryMsg(const Msg& msg, WinOSConnection* conn)
+		HumanError onBinaryMsg(const Message& msg, WinOSConnection* conn)
 		{
 			if (m_handler->onMsg)
 			{
@@ -313,7 +313,7 @@ namespace core::websocket
 			return {};
 		}
 
-		HumanError onCloseMsg(const Msg& msg, WinOSConnection* conn)
+		HumanError onCloseMsg(const Message& msg, WinOSConnection* conn)
 		{
 			if (m_handler->handleClose)
 			{
@@ -342,7 +342,7 @@ namespace core::websocket
 			}
 		}
 
-		HumanError onPingMsg(const Msg& msg, WinOSConnection* conn)
+		HumanError onPingMsg(const Message& msg, WinOSConnection* conn)
 		{
 			if (m_handler->handlePing)
 			{
@@ -356,11 +356,11 @@ namespace core::websocket
 						Span<const std::byte>{(const std::byte *) EMPTY_PONG, sizeof(EMPTY_PONG)}
 					);
 				else
-					return conn->writePong(msg.payload);
+					return conn->writePong(Span<const std::byte>{msg.payload});
 			}
 		}
 
-		HumanError onPongMsg(const Msg& msg, WinOSConnection* conn)
+		HumanError onPongMsg(const Message& msg, WinOSConnection* conn)
 		{
 			if (m_handler->handlePong)
 			{
@@ -370,15 +370,15 @@ namespace core::websocket
 			return {};
 		}
 
-		HumanError onMsg(const Msg& msg, WinOSConnection* conn)
+		HumanError onMsg(const Message& msg, WinOSConnection* conn)
 		{
 			switch (msg.type)
 			{
-			case Msg::TYPE_TEXT: return onTextMsg(msg, conn);
-			case Msg::TYPE_BINARY: return onBinaryMsg(msg, conn);
-			case Msg::TYPE_CLOSE: return onCloseMsg(msg, conn);
-			case Msg::TYPE_PING: return onPingMsg(msg, conn);
-			case Msg::TYPE_PONG: return onPongMsg(msg, conn);
+			case Message::TYPE_TEXT: return onTextMsg(msg, conn);
+			case Message::TYPE_BINARY: return onBinaryMsg(msg, conn);
+			case Message::TYPE_CLOSE: return onCloseMsg(msg, conn);
+			case Message::TYPE_PING: return onPingMsg(msg, conn);
+			case Message::TYPE_PONG: return onPongMsg(msg, conn);
 			default:
 				assert(false);
 				return errf(m_allocator, "Invalid message type"_sv);
@@ -537,39 +537,41 @@ namespace core::websocket
 			{
 				ZoneScopedN("read message");
 
-				conn->frameBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
+				conn->recvBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
 
-				if (conn->frameBuffer.count() > m_handler->maxPayloadSize)
+				if (conn->recvBuffer.count() > m_handler->maxPayloadSize)
 				{
-					return errf(m_allocator, "Payload size is too large, max payload size is {} bytes, but {} bytes is needed"_sv, m_handler->maxPayloadSize, conn->frameBuffer.count());
+					return errf(m_allocator, "Payload size is too large, max payload size is {} bytes, but {} bytes is needed"_sv, m_handler->maxPayloadSize, conn->recvBuffer.count());
 				}
 
-				while (conn->frameParser.neededBytes() <= conn->frameBuffer.count())
+				auto bytes = Span<const std::byte>{conn->recvBuffer};
+				while (conn->messageParser.neededBytes() <= bytes.count())
 				{
-					auto parserResult = conn->frameParser.consume(conn->frameBuffer.data(), conn->frameBuffer.count());
+					auto parserResult = conn->messageParser.consume(bytes);
 					if (parserResult.isError()) return parserResult.releaseError();
+					bytes = bytes.slice(conn->messageParser.consumedBytes(), bytes.count() - conn->messageParser.consumedBytes());
 
 					// we have reached the end of a frame
 					if (parserResult.value())
 					{
 						ZoneScopedN("websocket frame complete");
-						auto msg = conn->frameParser.msg();
+						auto msg = conn->messageParser.message();
 						m_log->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
 						if (auto err = onMsg(msg, conn)) return err;
 
-						if (conn->frameBuffer.count() > conn->frameParser.neededBytes())
-						{
-							::memcpy(conn->frameBuffer.data(), conn->frameBuffer.data() + conn->frameParser.neededBytes(), conn->frameBuffer.count() - conn->frameParser.neededBytes());
-							conn->frameBuffer.resize(conn->frameBuffer.count() - conn->frameParser.neededBytes());
-						}
-						else
-						{
-							conn->frameBuffer.clear();
-						}
-
 						// reset parser state
-						conn->frameParser = FrameParser{m_allocator};
+						conn->messageParser = MessageParser{m_allocator};
 					}
+				}
+
+				if (bytes.count() == 0)
+				{
+					conn->recvBuffer.clear();
+				}
+				else
+				{
+					::memcpy(conn->recvBuffer.data(), bytes.data(), bytes.count());
+					conn->recvBuffer.resize(bytes.count());
 				}
 
 				if (auto err = scheduleRead(conn)) return err;

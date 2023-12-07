@@ -53,6 +53,26 @@ namespace core::websocket
 		Span<const std::byte> payload;
 	};
 
+	struct Message
+	{
+		enum TYPE
+		{
+			TYPE_NONE,
+			TYPE_TEXT,
+			TYPE_BINARY,
+			TYPE_CLOSE,
+			TYPE_PING,
+			TYPE_PONG,
+		};
+
+		TYPE type = TYPE_NONE;
+		Buffer payload;
+
+		explicit Message(Allocator* allocator)
+			: payload(allocator)
+		{}
+	};
+
 	class Connection
 	{
 	public:
@@ -76,7 +96,7 @@ namespace core::websocket
 		bool handleClose = false;
 		size_t maxPayloadSize = 16ULL * 1024ULL;
 
-		Func<HumanError(const Msg&, Connection*)> onMsg;
+		Func<HumanError(const Message&, Connection*)> onMsg;
 	};
 
 	class Server

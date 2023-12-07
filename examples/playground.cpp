@@ -13,16 +13,16 @@ void signalHandler(int signal)
 	}
 }
 
-core::HumanError onMsg(const core::websocket::Msg& msg, core::websocket::Connection* conn, core::Log* log)
+core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Connection* conn, core::Log* log)
 {
 	switch (msg.type)
 	{
-	case core::websocket::Msg::TYPE_TEXT:
+	case core::websocket::Message::TYPE_TEXT:
 //		log->debug("msg: {}"_sv, core::StringView{msg.payload});
-		if (auto err = conn->writeText(msg.payload)) return err;
+		if (auto err = conn->writeText(core::StringView{msg.payload})) return err;
 		break;
-	case core::websocket::Msg::TYPE_BINARY:
-		if (auto err = conn->writeBinary(msg.payload)) return err;
+	case core::websocket::Message::TYPE_BINARY:
+		if (auto err = conn->writeBinary(core::Span<const std::byte>{msg.payload})) return err;
 		break;
 	default:
 		assert(false);
@@ -49,7 +49,7 @@ int main()
 	server = serverResult.releaseValue();
 
 	core::websocket::Handler handler;
-	handler.onMsg = [&logger](const core::websocket::Msg& msg, core::websocket::Connection* conn){ return onMsg(msg, conn, &logger); };
+	handler.onMsg = [&logger](const core::websocket::Message& msg, core::websocket::Connection* conn){ return onMsg(msg, conn, &logger); };
 	auto err = server->run(&handler);
 	if (err) logger.error("websocket run failed, {}"_sv, err);
 

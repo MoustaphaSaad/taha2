@@ -95,6 +95,16 @@ namespace core
 			push((const std::byte*)v.data(), v.count());
 		}
 
+		void push(Span<const std::byte> v)
+		{
+			push(v.data(), v.count());
+		}
+
+		void push(const Buffer& other)
+		{
+			push(other.data(), other.count());
+		}
+
 		CORE_EXPORT void push(const std::byte* ptr, size_t size);
 
 		CORE_EXPORT void resize(size_t new_count);
