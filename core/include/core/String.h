@@ -169,7 +169,7 @@ namespace core
 	{
 		String out{allocator};
 		StringBackInserter it{&out};
-		fmt::format_to(it, std::string_view{format.begin(), format.count()}, std::forward<Args>(args)...);
+		fmt::format_to(it, fmt::runtime(std::string_view{format.begin(), format.count()}), std::forward<Args>(args)...);
 		return out;
 	}
 }
@@ -201,7 +201,7 @@ namespace fmt
 		template<typename FormatContext>
 		auto format(const core::String& str, FormatContext& ctx)
 		{
-			return format_to(ctx.out(), "{}", core::StringView{str});
+			return format_to(ctx.out(), fmt::runtime("{}"), core::StringView{str});
 		}
 	};
 }

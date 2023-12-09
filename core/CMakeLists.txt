@@ -36,7 +36,7 @@ target_sources(core PRIVATE
 	include/core/SHA1.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/Websocket.h
-		include/core/websocket/MessageParser.h
+	include/core/websocket/MessageParser.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -52,7 +52,7 @@ target_sources(core PRIVATE
 	src/core/Base64.cpp
 	src/core/SHA1.cpp
 	src/core/websocket/Handshake.cpp
-		src/core/websocket/MessageParser.cpp
+	src/core/websocket/MessageParser.cpp
 )
 
 if (WIN32)
@@ -120,7 +120,7 @@ target_compile_definitions(core
 		"$<$<CONFIG:DEBUG>:DEBUG>"
 )
 
-target_compile_features(core PUBLIC cxx_std_17)
+target_compile_features(core PUBLIC cxx_std_20)
 set_target_properties(core PROPERTIES
 	CXX_EXTENSIONS OFF
 	DEBUG_POSTFIX d

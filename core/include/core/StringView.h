@@ -301,7 +301,7 @@ namespace fmt
 		template<typename FormatContext>
 		auto format(const core::StringView& str, FormatContext& ctx)
 		{
-			return format_to(ctx.out(), "{}", fmt::string_view{str.data(), str.count()});
+			return format_to(ctx.out(), fmt::runtime("{}"), fmt::string_view{str.data(), str.count()});
 		}
 	};
 }

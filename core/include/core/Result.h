@@ -120,7 +120,7 @@ namespace fmt
 		template<typename FormatContext>
 		auto format(const core::HumanError& err, FormatContext& ctx)
 		{
-			return format_to(ctx.out(), "{}", err.message());
+			return format_to(ctx.out(), fmt::runtime("{}"), err.message());
 		}
 	};
 }

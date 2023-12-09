@@ -33,7 +33,7 @@ namespace core
 	inline void strf(Stream* stream, StringView format, Args&& ... args)
 	{
 		auto out = fmt::memory_buffer();
-		fmt::format_to(std::back_inserter(out), std::string_view{format.begin(), format.count()}, std::forward<Args>(args)...);
+		fmt::format_to(std::back_inserter(out), fmt::runtime(std::string_view{format.begin(), format.count()}), std::forward<Args>(args)...);
 		stream->write(out.data(), out.size());
 	}
 }
