@@ -25,6 +25,7 @@ compile_commands.json
 **/Exports.h
 examples/example-hot-reload-lib-exports.h
 _deps
+test/autobahn-testsuite/reports
 
 # User-specific files
 *.suo
