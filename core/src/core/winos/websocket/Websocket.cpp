@@ -5,6 +5,7 @@
 #include "core/SHA1.h"
 #include "core/Base64.h"
 #include "core/Queue.h"
+#include "core/MemoryStream.h"
 
 #include <tracy/Tracy.hpp>
 
@@ -352,11 +353,15 @@ namespace core::websocket
 			else
 			{
 				if (msg.payload.count() == 0)
+				{
 					return conn->writePong(
-						Span<const std::byte>{(const std::byte *) EMPTY_PONG, sizeof(EMPTY_PONG)}
+							Span<const std::byte>{(const std::byte *) EMPTY_PONG, sizeof(EMPTY_PONG)}
 					);
+				}
 				else
+				{
 					return conn->writePong(Span<const std::byte>{msg.payload});
+				}
 			}
 		}
 
@@ -558,9 +563,6 @@ namespace core::websocket
 						auto msg = conn->messageParser.message();
 						m_log->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
 						if (auto err = onMsg(msg, conn)) return err;
-
-						// reset parser state
-						conn->messageParser = MessageParser{m_allocator};
 					}
 				}
 
@@ -774,6 +776,7 @@ namespace core::websocket
 						auto conn = readOp->connection;
 						if (auto err = handleRead(std::move(readOp)))
 						{
+							m_log->debug("Failed to handle read: {}"_sv, err);
 							(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
 							// TODO: remove connection from the server
 							// return err;
@@ -801,6 +804,7 @@ namespace core::websocket
 						auto conn = writeOp->connection;
 						if (auto err = handleWrite(std::move(writeOp)))
 						{
+							m_log->debug("Failed to handle write: {}"_sv, err);
 							(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
 							// TODO: remove connection from the server
 							// return err;
