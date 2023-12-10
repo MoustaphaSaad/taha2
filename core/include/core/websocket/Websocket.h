@@ -32,10 +32,6 @@ namespace core::websocket
 	{
 		FrameHeader header;
 		Buffer payload;
-
-		explicit Frame(Allocator* allocator)
-			: payload(allocator)
-		{}
 	};
 
 	struct Msg
@@ -94,7 +90,7 @@ namespace core::websocket
 		bool handlePing = false;
 		bool handlePong = false;
 		bool handleClose = false;
-		size_t maxPayloadSize = 16ULL * 1024ULL;
+		size_t maxPayloadSize = 16ULL * 1024ULL * 1024ULL;
 
 		Func<HumanError(const Message&, Connection*)> onMsg;
 	};

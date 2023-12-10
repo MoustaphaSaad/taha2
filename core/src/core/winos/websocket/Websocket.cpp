@@ -36,13 +36,13 @@ namespace core::websocket
 			STATE_READ_MESSAGE,
 		};
 
-		WinOSConnection(WinOSServer* server, SOCKET socket_, Allocator* allocator)
+		WinOSConnection(WinOSServer* server, SOCKET socket_, size_t maxPayloadSize, Allocator* allocator)
 			: m_server(server),
 			  socket(socket_),
 			  handshakeBuffer(allocator),
 			  handshake(allocator),
 			  recvBuffer(allocator),
-			  messageParser(allocator),
+			  messageParser(allocator, maxPayloadSize),
 			  writeQueue(allocator)
 		{
 			::memset(readBuffer, 0, sizeof(readBuffer));
@@ -275,6 +275,12 @@ namespace core::websocket
 		Handler* m_handler = nullptr;
 		bool running = false;
 
+		size_t maxPayloadSize()
+		{
+			if (m_handler) return m_handler->maxPayloadSize;
+			return 16ULL * 1024ULL * 1024ULL;
+		}
+
 		void pushPendingOp(Unique<Op> op)
 		{
 			ZoneScoped;
@@ -433,7 +439,7 @@ namespace core::websocket
 			auto acceptSocket = op->acceptSocket;
 			op->acceptSocket = INVALID_SOCKET;
 
-			auto connection = core::unique_from<WinOSConnection>(m_allocator, this, acceptSocket, m_allocator);
+			auto connection = core::unique_from<WinOSConnection>(m_allocator, this, acceptSocket, maxPayloadSize(), m_allocator);
 			connection->state = WinOSConnection::STATE_HANDSHAKE;
 			if (auto err = scheduleRead(connection.get())) return err;
 			auto connectionHandle = connection.get();
@@ -541,28 +547,36 @@ namespace core::websocket
 			case WinOSConnection::STATE_READ_MESSAGE:
 			{
 				ZoneScopedN("read message");
-
 				conn->recvBuffer.push((const std::byte*)op->recvBuf.buf, op->bytesReceived);
 
-				if (conn->recvBuffer.count() > m_handler->maxPayloadSize)
-				{
-					return errf(m_allocator, "Payload size is too large, max payload size is {} bytes, but {} bytes is needed"_sv, m_handler->maxPayloadSize, conn->recvBuffer.count());
-				}
-
 				auto bytes = Span<const std::byte>{conn->recvBuffer};
-				while (conn->messageParser.neededBytes() <= bytes.count())
+				HumanError error;
+				while (bytes.count() > 0)
 				{
 					auto parserResult = conn->messageParser.consume(bytes);
-					if (parserResult.isError()) return parserResult.releaseError();
-					bytes = bytes.slice(conn->messageParser.consumedBytes(), bytes.count() - conn->messageParser.consumedBytes());
+					if (parserResult.isError())
+					{
+						error = parserResult.releaseError();
+						break;
+					}
+					auto consumedBytes = parserResult.value();
 
-					// we have reached the end of a frame
-					if (parserResult.value())
+					// if we didn't consume any bytes we just wait for more bytes
+					if (consumedBytes == 0)
+						break;
+
+					bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
+
+					if (conn->messageParser.hasMessage())
 					{
 						ZoneScopedN("websocket frame complete");
 						auto msg = conn->messageParser.message();
 						m_log->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
-						if (auto err = onMsg(msg, conn)) return err;
+						if (auto err = onMsg(msg, conn))
+						{
+							error = err;
+							break;
+						}
 					}
 				}
 
@@ -575,6 +589,8 @@ namespace core::websocket
 					::memcpy(conn->recvBuffer.data(), bytes.data(), bytes.count());
 					conn->recvBuffer.resize(bytes.count());
 				}
+
+				if (error) return error;
 
 				if (auto err = scheduleRead(conn)) return err;
 				return {};

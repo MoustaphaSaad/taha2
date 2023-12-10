@@ -1,13 +1,14 @@
 #include "core/websocket/MessageParser.h"
+#include "core/intrinsics.h"
 
 namespace core::websocket
 {
-	bool FrameParser3::isControlOpcode(FrameHeader::OPCODE opcode)
+	bool FrameParser::isControlOpcode(FrameHeader::OPCODE opcode)
 	{
 		return (opcode & 0b1000);
 	}
 
-	Result<size_t> FrameParser3::consume(Span<const std::byte> src)
+	Result<size_t> FrameParser::consume(Span<const std::byte> src)
 	{
 		size_t offset = 0;
 		while (m_state != STATE_END)
@@ -78,18 +79,34 @@ namespace core::websocket
 
 				if (m_payloadLengthSize == 2)
 				{
-					m_header.payloadLength = (uint16_t)data[3] | ((uint16_t)data[2] << 8);
+					uint16_t payloadSize = (uint16_t)data[1] | ((uint16_t)data[0] << 8);
+					if (core::systemEndianness() == core::Endianness::Little)
+						m_header.payloadLength = payloadSize;
+					else
+						m_header.payloadLength = core::byteswap_uint16(payloadSize);
 				}
 				else if (m_payloadLengthSize == 8)
 				{
-					m_header.payloadLength = (uint64_t)data[9] |
-											 ((uint64_t)data[8] << 8) |
-											 ((uint64_t)data[7] << 16) |
-											 ((uint64_t)data[6] << 24) |
-											 ((uint64_t)data[5] << 32) |
-											 ((uint64_t)data[4] << 40) |
-											 ((uint64_t)data[3] << 48) |
-											 ((uint64_t)data[2] << 56);
+					uint64_t payloadSize = (uint64_t)data[7] |
+										   ((uint64_t)data[6] << 8) |
+										   ((uint64_t)data[5] << 16) |
+										   ((uint64_t)data[4] << 24) |
+										   ((uint64_t)data[3] << 32) |
+										   ((uint64_t)data[2] << 40) |
+										   ((uint64_t)data[1] << 48) |
+										   ((uint64_t)data[0] << 56);
+
+					if (core::systemEndianness() == core::Endianness::Little)
+						m_header.payloadLength = payloadSize;
+					else
+						m_header.payloadLength = core::byteswap_uint64(payloadSize);
+				}
+
+				if (m_header.payloadLength > m_maxPayloadSize)
+				{
+					return errf(m_allocator,
+								"Payload size is too large, max payload size is {} bytes, but {} bytes is needed"_sv,
+								m_maxPayloadSize, m_header.payloadLength);
 				}
 
 				// preserve the mask
@@ -122,165 +139,19 @@ namespace core::websocket
 		return offset;
 	}
 
-	Result<bool> FrameParser2::step(Span<const std::byte> data)
+	Result<size_t> MessageParser::consume(Span<const std::byte> data)
 	{
-		// if we found the end of the frame, we are done
-		if (m_state == STATE_END)
-			return true;
+		// reset the message before working with it
+		m_readyMessage = Message{m_allocator};
 
-		// wait for more data to be received
-		if (data.sizeInBytes() < m_neededBytes)
-			return false;
-
-		switch (m_state)
-		{
-		case STATE_PRE:
-		{
-			auto byte1 = (uint8_t)data[0];
-			auto byte2 = (uint8_t)data[1];
-
-			// check masked
-			m_header.isMasked = (byte2 & 128) == 128;
-
-			// get payload length size
-			if ((byte2 & 127) == 126)
-				m_payloadLengthSize = 2;
-			else if ((byte2 & 127) == 127)
-				m_payloadLengthSize = 8;
-			else
-				m_payloadLengthSize = 0;
-
-			m_state = STATE_HEADER;
-			m_neededBytes += m_payloadLengthSize;
-			m_maskOffset = m_neededBytes;
-			if (m_header.isMasked)
-				m_neededBytes += 4;
-			m_payloadOffset = m_neededBytes;
-
-			auto opcode = byte1 & 15;
-			if (opcode == FrameHeader::OPCODE_CONTINUATION)
-			{
-				m_header.opcode = FrameHeader::OPCODE_CONTINUATION;
-			}
-			else if (opcode == FrameHeader::OPCODE_TEXT)
-			{
-				m_header.opcode = FrameHeader::OPCODE_TEXT;
-			}
-			else if (opcode == FrameHeader::OPCODE_BINARY)
-			{
-				m_header.opcode = FrameHeader::OPCODE_BINARY;
-			}
-			else if (opcode == FrameHeader::OPCODE_CLOSE)
-			{
-				m_header.opcode = FrameHeader::OPCODE_CLOSE;
-			}
-			else if (opcode == FrameHeader::OPCODE_PING)
-			{
-				m_header.opcode = FrameHeader::OPCODE_PING;
-			}
-			else if (opcode == FrameHeader::OPCODE_PONG)
-			{
-				m_header.opcode = FrameHeader::OPCODE_PONG;
-			}
-			else
-			{
-				return errf(m_allocator, "unsupported opcode"_sv);
-			}
-
-			// check that reserved bits are not set
-			if ((byte1 & 112) != 0)
-				return errf(m_allocator, "reserved bits are set"_sv);
-
-			if (m_header.opcode != FrameHeader::OPCODE_CONTINUATION &&
-				m_payloadLengthSize != 0 &&
-				(m_header.opcode == FrameHeader::OPCODE_PING ||
-				 m_header.opcode == FrameHeader::OPCODE_PONG ||
-				 m_header.opcode == FrameHeader::OPCODE_CLOSE))
-			{
-				return errf(m_allocator, "control frame cannot have payload length"_sv);
-			}
-			return false;
-		}
-		case STATE_HEADER:
-		{
-			if (m_payloadLengthSize == 2)
-			{
-				m_header.payloadLength = (uint16_t)data[3] | ((uint16_t)data[2] << 8);
-			}
-			else if (m_payloadLengthSize == 8)
-			{
-				m_header.payloadLength = (uint64_t)data[9] |
-										 ((uint64_t)data[8] << 8) |
-										 ((uint64_t)data[7] << 16) |
-										 ((uint64_t)data[6] << 24) |
-										 ((uint64_t)data[5] << 32) |
-										 ((uint64_t)data[4] << 40) |
-										 ((uint64_t)data[3] << 48) |
-										 ((uint64_t)data[2] << 56);
-			}
-			else
-			{
-				m_header.payloadLength = (uint8_t)data[1] & 127;
-			}
-
-			m_neededBytes += m_header.payloadLength;
-			m_state = STATE_PAYLOAD;
-			return false;
-		}
-		case STATE_PAYLOAD:
-		{
-			m_header.isFin = ((uint8_t)data[0] & 128) == 128;
-			auto mask = data.slice(m_maskOffset, 4);
-			auto payload = data.slice(m_payloadOffset, m_header.payloadLength);
-
-			auto initCount = m_payload.count();
-			m_payload.resize(initCount + payload.count());
-			for (size_t i = 0; i < payload.count(); ++i)
-				m_payload[initCount + i] = payload[i] ^ mask[i % 4];
-
-			m_state = STATE_END;
-			return true;
-		}
-		default:
-		{
-			assert(false);
-			return errf(m_allocator, "invalid state"_sv);
-		}
-		}
-	}
-
-	Result<bool> FrameParser2::consume(Span<const std::byte> data)
-	{
-		while (data.sizeInBytes() >= m_neededBytes)
-		{
-			auto result = step(data);
-			if (result.isError())
-				return result;
-
-			if (result.value())
-				return true;
-		}
-		return false;
-	}
-
-	Frame FrameParser2::frame() const
-	{
-		assert(m_state == STATE_END);
-
-		Frame result{m_allocator};
-		result.header = m_header;
-		result.payload = std::move(m_payload);
-		return result;
-	}
-
-	Result<bool> MessageParser::consume(Span<const std::byte> data)
-	{
 		auto frameResult = m_frameParser.consume(data);
 		if (frameResult.isError())
 			return frameResult;
 
-		if (frameResult.value() == false)
-			return false;
+		auto consumedBytes = frameResult.value();
+
+		if (m_frameParser.hasFrame() == false)
+			return consumedBytes;
 
 		auto frame = m_frameParser.frame();
 
@@ -311,9 +182,7 @@ namespace core::websocket
 			}
 			result.payload = std::move(frame.payload);
 			m_readyMessage = std::move(result);
-			m_consumedBytes = m_frameParser.neededBytes();
-			m_frameParser = FrameParser2{m_allocator};
-			return true;
+			m_frameParser = FrameParser{m_allocator, m_maxPayloadSize};
 		}
 		else
 		{
@@ -344,20 +213,15 @@ namespace core::websocket
 			}
 
 			m_fragmentedMessage.payload.push(frame.payload);
-			m_consumedBytes = m_frameParser.neededBytes();
 
 			if (frame.header.isFin)
 			{
 				m_readyMessage = std::move(m_fragmentedMessage);
 				m_fragmentedMessage = Message{m_allocator};
-				m_frameParser = FrameParser2{m_allocator};
-				return true;
 			}
-			else
-			{
-				m_frameParser = FrameParser2{m_allocator};
-				return false;
-			}
+			m_frameParser = FrameParser{m_allocator, m_maxPayloadSize};
 		}
+
+		return consumedBytes;
 	}
 }
