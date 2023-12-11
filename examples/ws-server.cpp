@@ -10,7 +10,7 @@
 #include <core/Url.h>
 #include <signal.h>
 
-core::Unique<core::websocket::Server> server;
+core::websocket::Server* server = nullptr;
 
 void signalHandler(int signal)
 {
@@ -64,7 +64,8 @@ int main(int argc, char** argv)
 		logger.error("opening websocket server failed, {}"_sv, serverResult.error());
 		return EXIT_FAILURE;
 	}
-	server = serverResult.releaseValue();
+	auto wsServer = serverResult.releaseValue();
+	server = wsServer.get();
 
 	logger.info("websocket server listening on {}:{}"_sv, parsedUrl.host(), parsedUrl.port());
 

@@ -281,6 +281,13 @@ namespace core::websocket
 			return 16ULL * 1024ULL * 1024ULL;
 		}
 
+		void closeConnection(WinOSConnection* conn)
+		{
+			ZoneScoped;
+
+			m_connections.remove(conn);
+		}
+
 		void pushPendingOp(Unique<Op> op)
 		{
 			ZoneScoped;
@@ -484,11 +491,11 @@ namespace core::websocket
 
 			auto conn = op->connection;
 
-			// NOTE: handle recv = 0 (client has closed
+			// NOTE: handle recv = 0 (client has closed)
 			if (op->bytesReceived == 0)
 			{
-				// TODO: maybe we should handle this in the outer level (this function caller)
-				::closesocket(conn->socket);
+				m_log->debug("closing: {}"_sv, conn->socket);
+				closeConnection(conn);
 				return {};
 			}
 
@@ -781,22 +788,29 @@ namespace core::websocket
 							FALSE,
 							&dwFlags
 						);
-						if (res != TRUE)
+						if (res == TRUE)
 						{
-							return errf(
-								m_allocator,
-								"Failed to get overlapped result: ErrorCode({})"_sv,
-								WSAGetLastError());
+							auto conn = readOp->connection;
+							if (auto err = handleRead(std::move(readOp)))
+							{
+								m_log->debug("Failed to handle read: {}"_sv, err);
+								(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+								// TODO: remove connection from the server
+								// return err;
+							}
+						}
+						else
+						{
+							auto err = WSAGetLastError();
+							if (err != WSAECONNRESET)
+							{
+								return errf(
+										m_allocator,
+										"Failed to get overlapped result: ErrorCode({})"_sv,
+										WSAGetLastError());
+							}
 						}
 
-						auto conn = readOp->connection;
-						if (auto err = handleRead(std::move(readOp)))
-						{
-							m_log->debug("Failed to handle read: {}"_sv, err);
-							(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
-							// TODO: remove connection from the server
-							// return err;
-						}
 						break;
 					}
 					case Op::KIND_WRITE:
@@ -810,21 +824,29 @@ namespace core::websocket
 							FALSE,
 							&dwFlags
 						);
-						if (res != TRUE)
+						if (res == TRUE)
 						{
-							return errf(
-								m_allocator,
-								"Failed to get overlapped result: ErrorCode({})"_sv,
-								WSAGetLastError());
+							auto conn = writeOp->connection;
+							if (auto err = handleWrite(std::move(writeOp)))
+							{
+								m_log->debug("Failed to handle write: {}"_sv, err);
+								(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+								// TODO: remove connection from the server
+								// return err;
+							}
 						}
-						auto conn = writeOp->connection;
-						if (auto err = handleWrite(std::move(writeOp)))
+						else
 						{
-							m_log->debug("Failed to handle write: {}"_sv, err);
-							(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
-							// TODO: remove connection from the server
-							// return err;
+							auto err = WSAGetLastError();
+							if (err != WSAECONNRESET)
+							{
+								return errf(
+										m_allocator,
+										"Failed to get overlapped result: ErrorCode({})"_sv,
+										WSAGetLastError());
+							}
 						}
+
 						break;
 					}
 					default:
