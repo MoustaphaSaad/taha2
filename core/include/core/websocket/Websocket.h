@@ -26,6 +26,8 @@ namespace core::websocket
 		bool isMasked = false;
 		bool isFin = false;
 		uint64_t payloadLength = 0;
+
+		bool isControlOpcode() const { return (opcode & 0b1000); }
 	};
 
 	struct Frame

@@ -22,8 +22,6 @@ namespace core::websocket
 		size_t m_maxPayloadSize = 0;
 		Allocator* m_allocator;
 
-		bool isControlOpcode(FrameHeader::OPCODE opcode);
-
 	public:
 		explicit FrameParser(Allocator* allocator, size_t maxPayloadSize)
 			: m_allocator(allocator),

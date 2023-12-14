@@ -4,6 +4,8 @@
 
 namespace core
 {
+	const Rune Rune::SELF{0x80};
+
 	Rune Rune::lower() const
 	{
 		return Rune{utf8proc_tolower(m_value)};

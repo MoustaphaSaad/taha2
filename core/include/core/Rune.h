@@ -10,6 +10,8 @@ namespace core
 	{
 		int m_value = 0;
 	public:
+		static const Rune SELF;
+
 		Rune() = default;
 		explicit Rune(int value)
 			: m_value(value)

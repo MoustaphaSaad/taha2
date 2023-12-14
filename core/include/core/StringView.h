@@ -279,6 +279,8 @@ namespace core
 		}
 
 		StringView trim() const;
+
+		bool isValidUtf8() const;
 	};
 }
 

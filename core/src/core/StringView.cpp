@@ -321,4 +321,93 @@ namespace core
 	{
 		return trim(" \n\t\r\v"_sv);
 	}
+
+	bool StringView::isValidUtf8() const
+	{
+		struct AcceptRange
+		{
+			uint8_t lo, hi;
+		};
+
+		static constexpr AcceptRange acceptRanges[5] = {
+			AcceptRange{0x80, 0xbf},
+			AcceptRange{0xa0, 0xbf},
+			AcceptRange{0x80, 0x9f},
+			AcceptRange{0x90, 0xbf},
+			AcceptRange{0x80, 0x8f},
+		};
+
+		static constexpr uint8_t xx = 0xf1;
+		static constexpr uint8_t as = 0xf0;
+		static constexpr uint8_t s1 = 0x02;
+		static constexpr uint8_t s2 = 0x13;
+		static constexpr uint8_t s3 = 0x03;
+		static constexpr uint8_t s4 = 0x23;
+		static constexpr uint8_t s5 = 0x34;
+		static constexpr uint8_t s6 = 0x04;
+		static constexpr uint8_t s7 = 0x44;
+
+		static constexpr uint8_t acceptSizes[256] = {
+			//   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x00-0x0F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x10-0x1F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x20-0x2F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x30-0x3F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x40-0x4F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x50-0x5F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x60-0x6F
+			as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, // 0x70-0x7F
+			//   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+			xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, // 0x80-0x8F
+			xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, // 0x90-0x9F
+			xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, // 0xA0-0xAF
+			xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, // 0xB0-0xBF
+			xx, xx, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, // 0xC0-0xCF
+			s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, // 0xD0-0xDF
+			s2, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s4, s3, s3, // 0xE0-0xEF
+			s5, s6, s6, s6, s7, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, // 0xF0-0xFF
+		};
+
+		auto bytes = (uint8_t*)m_begin;
+
+		for (size_t i = 0; i < m_count;)
+		{
+			auto byte = bytes[i];
+			if (Rune{byte} < Rune::SELF) {
+				++i;
+				continue;
+			}
+
+			auto x = acceptSizes[byte];
+			if (x == xx) return false;
+
+			auto size = (int)(x & 7);
+			if (i + size > m_count)
+				return false;
+
+			auto ar = acceptRanges[x >> 4];
+			if (auto b = bytes[i + 1]; b < ar.lo || ar.hi < b)
+			{
+				return false;
+			}
+			else if (size == 2)
+			{
+				// okay
+			}
+			else if (auto c = bytes[i + 2]; c < 0x80 || 0xbf < c)
+			{
+				return false;
+			}
+			else if (size == 3)
+			{
+				// okay
+			}
+			else if (auto d = bytes[i + 3]; d < 0x80 || 0xbf < d)
+			{
+				return false;
+			}
+			i += size;
+		}
+		return true;
+	}
 }

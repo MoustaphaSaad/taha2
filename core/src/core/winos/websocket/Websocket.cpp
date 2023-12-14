@@ -246,12 +246,12 @@ namespace core::websocket
 
 		struct ReadOp: public Op
 		{
-			Shared<WinOSConnection> connection = nullptr;
+			WinOSConnection* connection = nullptr;
 			DWORD bytesReceived = 0;
 			DWORD flags = 0;
 			WSABUF recvBuf{};
 
-			ReadOp(Shared<WinOSConnection> connection_)
+			ReadOp(WinOSConnection* connection_)
 				: Op(KIND_READ),
 				  connection(connection_)
 			{
@@ -262,13 +262,13 @@ namespace core::websocket
 
 		struct WriteOp: public Op
 		{
-			Shared<WinOSConnection> connection = nullptr;
+			WinOSConnection* connection = nullptr;
 			DWORD bytesSent = 0;
 			Span<const std::byte> buffer;
 			WSABUF wsaBuf{};
 			DWORD flags = 0;
 
-			WriteOp(Shared<WinOSConnection> connection_, Span<const std::byte> buffer_)
+			WriteOp(WinOSConnection* connection_, Span<const std::byte> buffer_)
 				: Op(KIND_WRITE),
 				  connection(connection_),
 				  buffer(buffer_)
@@ -284,7 +284,7 @@ namespace core::websocket
 		HANDLE m_port = INVALID_HANDLE_VALUE;
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
-		Map<WinOSConnection*, Shared<WinOSConnection>> m_connections;
+		Map<WinOSConnection*, Unique<WinOSConnection>> m_connections;
 		Handler* m_handler = nullptr;
 		bool running = false;
 
@@ -294,12 +294,12 @@ namespace core::websocket
 			return 16ULL * 1024ULL * 1024ULL;
 		}
 
-		void closeConnection(Shared<WinOSConnection> conn)
+		void closeConnection(WinOSConnection* conn)
 		{
 			ZoneScoped;
 
 			conn->closeSocket();
-			m_connections.remove(conn.get());
+			m_connections.remove(conn);
 		}
 
 		void pushPendingOp(Unique<Op> op)
@@ -323,6 +323,10 @@ namespace core::websocket
 
 		HumanError onTextMsg(const Message& msg, WinOSConnection* conn)
 		{
+			auto text = StringView{msg.payload};
+			if (text.isValidUtf8() == false)
+				return errf(m_allocator, "invalid utf8 string"_sv);
+
 			if (m_handler->onMsg)
 			{
 				ZoneScoped;
@@ -366,6 +370,13 @@ namespace core::websocket
 				if (msg.payload.count() == 2)
 					return conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)}, true);
 
+				// close payload should be utf8
+				auto payload = StringView{msg.payload}.slice(2, msg.payload.count());
+				if (payload.isValidUtf8() == false)
+				{
+					return conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)}, true);
+				}
+
 				return conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)}, true);
 			}
 		}
@@ -381,8 +392,8 @@ namespace core::websocket
 			{
 				if (msg.payload.count() == 0)
 				{
-					return conn->writePong(
-							Span<const std::byte>{(const std::byte *) EMPTY_PONG, sizeof(EMPTY_PONG)}
+					return conn->writeRaw(
+							Span<const std::byte>{(const std::byte *) EMPTY_PONG, sizeof(EMPTY_PONG)}, false
 					);
 				}
 				else
@@ -402,15 +413,15 @@ namespace core::websocket
 			return {};
 		}
 
-		HumanError onMsg(const Message& msg, Shared<WinOSConnection> conn)
+		HumanError onMsg(const Message& msg, WinOSConnection* conn)
 		{
 			switch (msg.type)
 			{
-			case Message::TYPE_TEXT: return onTextMsg(msg, conn.get());
-			case Message::TYPE_BINARY: return onBinaryMsg(msg, conn.get());
-			case Message::TYPE_CLOSE: return onCloseMsg(msg, conn.get());
-			case Message::TYPE_PING: return onPingMsg(msg, conn.get());
-			case Message::TYPE_PONG: return onPongMsg(msg, conn.get());
+			case Message::TYPE_TEXT: return onTextMsg(msg, conn);
+			case Message::TYPE_BINARY: return onBinaryMsg(msg, conn);
+			case Message::TYPE_CLOSE: return onCloseMsg(msg, conn);
+			case Message::TYPE_PING: return onPingMsg(msg, conn);
+			case Message::TYPE_PONG: return onPongMsg(msg, conn);
 			default:
 				assert(false);
 				return errf(m_allocator, "Invalid message type"_sv);
@@ -460,14 +471,15 @@ namespace core::websocket
 			auto acceptSocket = op->acceptSocket;
 			op->acceptSocket = INVALID_SOCKET;
 
-			auto connection = core::shared_from<WinOSConnection>(m_allocator, this, acceptSocket, maxPayloadSize(), m_allocator);
+			auto connection = core::unique_from<WinOSConnection>(m_allocator, this, acceptSocket, maxPayloadSize(), m_allocator);
 			connection->state = WinOSConnection::STATE_HANDSHAKE;
-			if (auto err = scheduleRead(connection)) return err;
-			m_connections.insert(connection.get(), connection);
+			auto connectionHandle = connection.get();
+			if (auto err = scheduleRead(connectionHandle)) return err;
+			m_connections.insert(connectionHandle, std::move(connection));
 			return {};
 		}
 
-		HumanError scheduleRead(Shared<WinOSConnection> conn)
+		HumanError scheduleRead(WinOSConnection* conn)
 		{
 			ZoneScoped;
 
@@ -521,7 +533,7 @@ namespace core::websocket
 				auto totalHandshakeBuffer = conn->handshakeBuffer.count() + op->bytesReceived;
 				if (totalHandshakeBuffer > conn->handshakeBuffer.capacity())
 				{
-					(void)scheduleWrite(conn.get(), R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv, true);
+					(void)scheduleWrite(conn, R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv, true);
 					return errf(m_allocator, "Handshake buffer overflow, max handshake buffer size is {} bytes, but {} bytes is needed"_sv, totalHandshakeBuffer, conn->handshakeBuffer.capacity());
 				}
 
@@ -533,7 +545,7 @@ namespace core::websocket
 					auto handshakeResult = Handshake::parse(handshakeString, m_allocator);
 					if (handshakeResult.isError())
 					{
-						(void)scheduleWrite(conn.get(), R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv, true);
+						(void)scheduleWrite(conn, R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv, true);
 						return errf(m_allocator, "Failed to parse handshake: {}"_sv, handshakeResult.error());
 					}
 					conn->handshake = std::move(handshakeResult.value());
@@ -550,7 +562,7 @@ namespace core::websocket
 					auto sha1 = SHA1::hash(concatKey);
 					auto base64 = Base64::encode(sha1.asBytes(), m_allocator);
 					auto reply = strf(m_allocator, StringView{REPLY, strlen(REPLY)}, base64);
-					if (auto err = scheduleWrite(conn.get(), reply, false)) return err;
+					if (auto err = scheduleWrite(conn, reply, false)) return err;
 
 					// move to the read message state
 					conn->state = WinOSConnection::STATE_READ_MESSAGE;
@@ -666,9 +678,7 @@ namespace core::websocket
 				return {};
 
 			outboundMessage.isScheduled = true;
-			auto sharedConn = m_connections.lookup(conn);
-			assert(sharedConn != nullptr);
-			auto op = unique_from<WriteOp>(m_allocator, sharedConn->value, Span<const std::byte>(outboundMessage.data));
+			auto op = unique_from<WriteOp>(m_allocator, conn, Span<const std::byte>(outboundMessage.data));
 			return scheduleWriteOp(std::move(op));
 		}
 
@@ -692,7 +702,7 @@ namespace core::websocket
 				}
 				conn->outboundQueue.pop_front();
 				// advance the write queue
-				return processWriteQueue(op->connection.get());
+				return processWriteQueue(op->connection);
 			}
 			else if (op->bytesSent < op->wsaBuf.len)
 			{
@@ -803,39 +813,39 @@ namespace core::websocket
 					case Op::KIND_READ:
 					{
 						auto readOp = unique_static_cast<ReadOp>(std::move(op));
-						if (readOp->connection->socket != INVALID_SOCKET)
+
+						// check if the connection is not closed
+						if (auto it = m_connections.lookup(readOp->connection); it == m_connections.end())
+							break;
+
+						DWORD dwFlags = 0;
+						auto res = WSAGetOverlappedResult(
+							readOp->connection->socket,
+							overlapped,
+							&readOp->bytesReceived,
+							FALSE,
+							&dwFlags
+						);
+						if (res == TRUE)
 						{
-							DWORD dwFlags = 0;
-							auto res = WSAGetOverlappedResult(
-									readOp->connection->socket,
-									overlapped,
-									&readOp->bytesReceived,
-									FALSE,
-									&dwFlags
-							);
-							if (res == TRUE)
+							auto conn = readOp->connection;
+							if (auto err = handleRead(std::move(readOp)))
 							{
-								auto conn = readOp->connection;
-								if (auto err = handleRead(std::move(readOp)))
-								{
-									m_log->debug("Failed to handle read: {}"_sv, err);
-									(void) conn->writeRaw(
-											Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR,
-																  sizeof(CLOSE_PROTOCOL_ERROR)}, true);
-									// TODO: remove connection from the server
-									// return err;
-								}
+								m_log->debug("Failed to handle read: {}"_sv, err);
+								(void) conn->writeRaw(
+										Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR,
+															  sizeof(CLOSE_PROTOCOL_ERROR)}, true);
 							}
-							else
+						}
+						else
+						{
+							auto err = WSAGetLastError();
+							if (err != WSAECONNRESET)
 							{
-								auto err = WSAGetLastError();
-								if (err != WSAECONNRESET)
-								{
-									return errf(
-											m_allocator,
-											"Failed to get overlapped result: ErrorCode({})"_sv,
-											WSAGetLastError());
-								}
+								return errf(
+										m_allocator,
+										"Failed to get overlapped result: ErrorCode({})"_sv,
+										WSAGetLastError());
 							}
 						}
 
@@ -844,6 +854,11 @@ namespace core::websocket
 					case Op::KIND_WRITE:
 					{
 						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+
+						// check if the connection is not closed
+						if (auto it = m_connections.lookup(writeOp->connection); it == m_connections.end())
+							break;
+
 						DWORD dwFlags = 0;
 						auto res = WSAGetOverlappedResult(
 							writeOp->connection->socket,
@@ -859,8 +874,6 @@ namespace core::websocket
 							{
 								m_log->debug("Failed to handle write: {}"_sv, err);
 								(void)conn->writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)}, true);
-								// TODO: remove connection from the server
-								// return err;
 							}
 						}
 						else

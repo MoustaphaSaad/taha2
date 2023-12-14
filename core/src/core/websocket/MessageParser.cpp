@@ -3,11 +3,6 @@
 
 namespace core::websocket
 {
-	bool FrameParser::isControlOpcode(FrameHeader::OPCODE opcode)
-	{
-		return (opcode & 0b1000);
-	}
-
 	Result<size_t> FrameParser::consume(Span<const std::byte> src)
 	{
 		size_t offset = 0;
@@ -59,7 +54,7 @@ namespace core::websocket
 					break;
 				}
 
-				if (isControlOpcode(m_header.opcode) && m_payloadLengthSize != 0)
+				if (m_header.isControlOpcode() && m_payloadLengthSize != 0)
 				{
 					return errf(m_allocator,
 								"All control frames MUST have a payload length of 125 bytes or less and MUST NOT be fragmented."_sv);
@@ -155,6 +150,13 @@ namespace core::websocket
 
 		auto frame = m_frameParser.frame();
 
+		if (m_fragmentedMessage.type != Message::TYPE_NONE &&
+			frame.header.opcode != FrameHeader::OPCODE_CONTINUATION &&
+			frame.header.isControlOpcode() == false)
+		{
+			return errf(m_allocator, "all data frames after the initial data frame must be continuation"_sv);
+		}
+
 		// single frame message, most common type of messages
 		if (frame.header.isFin && frame.header.opcode != FrameHeader::OPCODE_CONTINUATION)
 		{
@@ -187,8 +189,13 @@ namespace core::websocket
 		else
 		{
 			// first fragment
-			if (m_fragmentedMessage.type == Message::TYPE_NONE && frame.header.opcode != FrameHeader::OPCODE_CONTINUATION)
+			if (m_fragmentedMessage.type == Message::TYPE_NONE)
 			{
+				if (frame.header.isControlOpcode())
+					return errf(m_allocator, "control opcode can't be fragmented"_sv);
+				else if (frame.header.opcode == FrameHeader::OPCODE_CONTINUATION)
+					return errf(m_allocator, "invalid continuation frame because there is no message to continue"_sv);
+
 				switch (frame.header.opcode)
 				{
 				case FrameHeader::OPCODE_TEXT:
@@ -196,15 +203,6 @@ namespace core::websocket
 					break;
 				case FrameHeader::OPCODE_BINARY:
 					m_fragmentedMessage.type = Message::TYPE_BINARY;
-					break;
-				case FrameHeader::OPCODE_CLOSE:
-					m_fragmentedMessage.type = Message::TYPE_CLOSE;
-					break;
-				case FrameHeader::OPCODE_PING:
-					m_fragmentedMessage.type = Message::TYPE_PING;
-					break;
-				case FrameHeader::OPCODE_PONG:
-					m_fragmentedMessage.type = Message::TYPE_PONG;
 					break;
 				default:
 					assert(false);
