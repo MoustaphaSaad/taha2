@@ -71,21 +71,8 @@ namespace core::websocket
 		{}
 	};
 
-	class Connection
-	{
-	public:
-		virtual ~Connection() = default;
-		virtual HumanError writeText(StringView str) = 0;
-		virtual HumanError writeText(Buffer&& str) = 0;
-		virtual HumanError writeBinary(Span<const std::byte> bytes) = 0;
-		virtual HumanError writeBinary(Buffer&& bytes) = 0;
-		virtual HumanError writePing(Span<const std::byte> bytes) = 0;
-		virtual HumanError writePing(Buffer&& bytes) = 0;
-		virtual HumanError writePong(Span<const std::byte> bytes) = 0;
-		virtual HumanError writePong(Buffer&& bytes) = 0;
-		virtual HumanError writeClose() = 0;
-		virtual HumanError writeClose(uint16_t code) = 0;
-	};
+	struct Connection;
+	class Server;
 
 	struct Handler
 	{
@@ -94,7 +81,7 @@ namespace core::websocket
 		bool handleClose = false;
 		size_t maxPayloadSize = 16ULL * 1024ULL * 1024ULL;
 
-		Func<HumanError(const Message&, Connection*)> onMsg;
+		Func<HumanError(const Message&, Server*, Connection*)> onMsg;
 	};
 
 	class Server
@@ -105,5 +92,15 @@ namespace core::websocket
 		virtual ~Server() = default;
 		virtual HumanError run(Handler* handler) = 0;
 		virtual void stop() = 0;
+		virtual HumanError writeText(Connection* conn, StringView str) = 0;
+		virtual HumanError writeText(Connection* conn, Buffer&& str) = 0;
+		virtual HumanError writeBinary(Connection* conn, Span<const std::byte> bytes) = 0;
+		virtual HumanError writeBinary(Connection* conn, Buffer&& bytes) = 0;
+		virtual HumanError writePing(Connection* conn, Span<const std::byte> bytes) = 0;
+		virtual HumanError writePing(Connection* conn, Buffer&& bytes) = 0;
+		virtual HumanError writePong(Connection* conn, Span<const std::byte> bytes) = 0;
+		virtual HumanError writePong(Connection* conn, Buffer&& bytes) = 0;
+		virtual HumanError writeClose(Connection* conn) = 0;
+		virtual HumanError writeClose(Connection* conn, uint16_t code) = 0;
 	};
 }

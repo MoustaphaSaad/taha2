@@ -111,7 +111,7 @@ namespace core
 
 		~Func() { m_concept->dtor(&m_model); }
 
-		TReturn operator()(TArgs&& ... args)
+		TReturn operator()(TArgs ... args)
 		{
 			return m_concept->invoke(&m_model, std::forward<TArgs>(args)...);
 		}
