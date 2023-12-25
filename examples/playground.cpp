@@ -1,6 +1,6 @@
 #include <core/Mallocator.h>
 #include <core/Log.h>
-#include <core/websocket/Websocket.h>
+#include "core/websocket/Server.h"
 #include <signal.h>
 
 core::Unique<core::websocket::Server> server;

@@ -1,4 +1,5 @@
 #include "core/UUID.h"
+#include "core/Rand.h"
 
 namespace core
 {
@@ -23,6 +24,18 @@ namespace core
 	inline uint8_t hex_to_uint8(char c1, char c2)
 	{
 		return (hex_to_uint8(c1) << 4) | hex_to_uint8(c2);
+	}
+
+	UUID UUID::generate()
+	{
+		UUID uuid;
+		auto ok = Rand::cryptoRand(Span<std::byte>{(std::byte*)&uuid.data, sizeof(uuid.data)});
+		assert(ok);
+		// version 4
+		uuid.data.bytes[6] = (uuid.data.bytes[6] & 0x0f) | 0x40;
+		// variant is 10
+		uuid.data.bytes[8] = (uuid.data.bytes[8] & 0x3f) | 0x80;
+		return uuid;
 	}
 
 	Result<UUID> UUID::parse(StringView str, Allocator* allocator)

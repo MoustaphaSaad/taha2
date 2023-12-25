@@ -34,9 +34,11 @@ target_sources(core PRIVATE
 	include/core/Span.h
 	include/core/Base64.h
 	include/core/SHA1.h
+	include/core/Rand.h
 	include/core/websocket/Handshake.h
-	include/core/websocket/Websocket.h
+	include/core/websocket/Server.h
 	include/core/websocket/MessageParser.h
+	include/core/websocket/Client.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -53,6 +55,7 @@ target_sources(core PRIVATE
 	src/core/SHA1.cpp
 	src/core/websocket/Handshake.cpp
 	src/core/websocket/MessageParser.cpp
+	src/core/websocket/Client.cpp
 )
 
 if (WIN32)
@@ -62,13 +65,13 @@ if (WIN32)
 			src/core/winos/File.cpp
 			src/core/winos/OSString.cpp
 			src/core/winos/Intrinsics.cpp
-			src/core/winos/UUID.cpp
 			src/core/winos/Mutex.cpp
 			src/core/winos/Thread.cpp
 			src/core/winos/ConditionVariable.cpp
 			src/core/winos/IMutex.h
 			src/core/winos/Socket.cpp
-			src/core/winos/websocket/Websocket.cpp
+			src/core/winos/websocket/Server.cpp
+			src/core/winos/Rand.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
@@ -78,12 +81,12 @@ elseif (APPLE)
 			src/core/macos/File.cpp
 			src/core/macos/OSString.cpp
 			src/core/macos/Intrinsics.cpp
-			src/core/macos/UUID.cpp
 			src/core/macos/Mutex.cpp
 			src/core/macos/Thread.cpp
 			src/core/macos/ConditionVariable.cpp
 			src/core/macos/IMutex.h
 			src/core/macos/Socket.cpp
+			src/core/macos/Rand.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
@@ -93,12 +96,12 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/File.cpp
 			src/core/linux/OSString.cpp
 			src/core/linux/Intrinsics.cpp
-			src/core/linux/UUID.cpp
 			src/core/linux/Mutex.cpp
 			src/core/linux/Thread.cpp
 			src/core/linux/ConditionVariable.cpp
 			src/core/linux/IMutex.h
 			src/core/linux/Socket.cpp
+			src/core/linux/Rand.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()

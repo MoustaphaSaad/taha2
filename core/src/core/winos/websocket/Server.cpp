@@ -1,4 +1,4 @@
-#include "core/websocket/Websocket.h"
+#include "core/websocket/Server.h"
 #include "core/websocket/Handshake.h"
 #include "core/websocket/MessageParser.h"
 #include "core/Hash.h"

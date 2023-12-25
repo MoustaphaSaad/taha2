@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/websocket/Websocket.h"
+#include "core/websocket/Server.h"
 
 namespace core::websocket
 {

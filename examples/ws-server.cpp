@@ -6,7 +6,7 @@
 
 #include <core/Mallocator.h>
 #include <core/Log.h>
-#include <core/websocket/Websocket.h>
+#include <core/websocket/Server.h>
 #include <core/Url.h>
 #include <signal.h>
 
