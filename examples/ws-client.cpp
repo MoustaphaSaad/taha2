@@ -6,7 +6,7 @@ int main()
 {
 	core::Mallocator mallocator;
 	core::Log logger{&mallocator};
-	auto clientResult = core::websocket::Client::connect("127.0.0.1"_sv, "9010"_sv, &logger, &mallocator);
+	auto clientResult = core::websocket::Client::connect("127.0.0.1"_sv, "8080"_sv, &logger, &mallocator);
 	if (clientResult.isError())
 	{
 		logger.error("failed to connect to websocket server, {}"_sv, clientResult.error());

@@ -53,9 +53,14 @@ namespace core
 			return Span<T>(m_ptr + offset, count);
 		}
 
-		Span<std::byte> asBytes() const
+		Span<const std::byte> asBytes() const
 		{
-			return {reinterpret_cast<std::byte*>(m_ptr), m_count * sizeof(T)};
+			return {(const std::byte*)(m_ptr), m_count * sizeof(T)};
+		}
+
+		Span<std::byte> asBytes()
+		{
+			return {(std::byte*)(m_ptr), m_count * sizeof(T)};
 		}
 	};
 }

@@ -6,13 +6,28 @@
 
 #include <fmt/core.h>
 
+#include <openssl/sha.h>
+
 namespace core
 {
+	class SHA1Hasher;
+
 	class SHA1
 	{
+		friend class SHA1Hasher;
 		std::byte m_digest[20];
 	public:
-		CORE_EXPORT static SHA1 hash(Span<std::byte> bytes);
+		static SHA1 hash(Span<std::byte> bytes)
+		{
+			SHA_CTX ctx;
+			SHA1_Init(&ctx);
+			SHA1_Update(&ctx, bytes.data(), bytes.count());
+
+			SHA1 sha{};
+			SHA1_Final((unsigned char*)sha.m_digest, &ctx);
+
+			return sha;
+		}
 
 		template<typename T>
 		static SHA1 hash(Span<T> s)
@@ -33,6 +48,39 @@ namespace core
 		Span<const std::byte> asBytes() const
 		{
 			return {m_digest, 20};
+		}
+	};
+
+	class SHA1Hasher
+	{
+		SHA_CTX m_ctx;
+	public:
+		SHA1Hasher()
+		{
+			SHA1_Init(&m_ctx);
+		}
+
+		void hash(Span<std::byte> bytes)
+		{
+			SHA1_Update(&m_ctx, bytes.data(), bytes.count());
+		}
+
+		template<typename T>
+		void hash(Span<T> s)
+		{
+			hash(s.asBytes());
+		}
+
+		void hash(StringView str)
+		{
+			hash(Span<std::byte>{str});
+		}
+
+		SHA1 final()
+		{
+			SHA1 res{};
+			SHA1_Final((unsigned char*)res.m_digest, &m_ctx);
+			return res;
 		}
 	};
 }

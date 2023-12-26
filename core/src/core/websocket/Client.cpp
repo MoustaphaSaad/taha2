@@ -2,6 +2,7 @@
 #include "core/Rand.h"
 #include "core/MemoryStream.h"
 #include "core/Base64.h"
+#include "core/SHA1.h"
 
 namespace core::websocket
 {
@@ -28,6 +29,7 @@ namespace core::websocket
 
 		// read the response till the end
 		String response{m_allocator};
+		bool receivedResponse = false;
 		char line[1024] = {};
 		while (true)
 		{
@@ -41,9 +43,59 @@ namespace core::websocket
 			{
 				//TODO: now we have th entire response, parse it
 				m_logger->debug("{}"_sv, response);
+				receivedResponse = true;
 				break;
 			}
 		}
+
+		auto lines = response.split("\r\n"_sv, true, m_allocator);
+		if (lines.count() == 0)
+			return errf(m_allocator, "failed to parse empty handshake response"_sv);
+
+		auto statusLine = lines[0];
+		if (statusLine.startsWithIgnoreCase("HTTP/1.1 101 "_sv) == false)
+			return errf(m_allocator, "unexpected handshake http upgrade response, {}"_sv, statusLine);
+
+		int validResponse = 0;
+		for (size_t i = 1; i < lines.count(); ++i)
+		{
+			auto line = lines[i];
+
+			auto colonIndex = line.find(Rune{':'}, 0);
+			if (colonIndex == SIZE_MAX)
+				continue;
+
+			auto key = line.slice(0, colonIndex).trim();
+			auto value = line.slice(colonIndex + 1, line.count()).trim();
+			if (key.equalsIgnoreCase("upgrade"_sv))
+			{
+				if (value.equalsIgnoreCase("websocket"_sv) == false)
+					return errf(m_allocator, "invalid upgrade header, {}"_sv, value);
+				++validResponse;
+			}
+			else if (key.equalsIgnoreCase("connection"_sv))
+			{
+				if (value.equalsIgnoreCase("upgrade"_sv) == false)
+					return errf(m_allocator, "invalid connection header, {}"_sv, value);
+				++validResponse;
+			}
+			else if (key.equalsIgnoreCase("sec-websocket-accept"_sv))
+			{
+				core::SHA1Hasher hasher;
+				hasher.hash(Base64::encode(Span<std::byte>{m_key, sizeof(m_key)}, m_allocator));
+				hasher.hash("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"_sv);
+				auto secHash = hasher.final();
+				auto base64SecHash = Base64::encode(secHash.asBytes(), m_allocator);
+				if (base64SecHash != value)
+					return errf(m_allocator, "invalid websocket accept header"_sv);
+				++validResponse;
+			}
+		}
+
+		if (validResponse != 3)
+			return errf(m_allocator, "missing headers in handshake response"_sv);
+
+		m_logger->debug("parsed handshake response successfully"_sv);
 		return {};
 	}
 
