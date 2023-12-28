@@ -24,5 +24,7 @@ namespace core::websocket
 			  m_logger(logger),
 			  m_socket(std::move(socket))
 		{}
+
+		HumanError run();
 	};
 }

@@ -1,4 +1,5 @@
 #include "core/websocket/Client.h"
+#include "core/websocket/MessageParser.h"
 #include "core/Rand.h"
 #include "core/MemoryStream.h"
 #include "core/Base64.h"
@@ -118,5 +119,56 @@ namespace core::websocket
 		if (auto err = client->handshake("/"_sv)) return err;
 
 		return client;
+	}
+
+	HumanError Client::run()
+	{
+		bool running = true;
+		size_t maxMessageSize = 64ULL * 1024ULL * 1024ULL;
+		std::byte recvLine[1024];
+		Buffer recvBuffer{m_allocator};
+		MessageParser messageParser{m_allocator, maxMessageSize};
+		while (running)
+		{
+			// consume the bytes and encoded messages within it
+			auto recvBytesCount = m_socket->read(recvLine, sizeof(recvLine));
+			recvBuffer.push(Span<const std::byte>{recvLine, recvBytesCount});
+			auto recvBytes = Span<const std::byte>{recvBuffer};
+			while (recvBytes.count() > 0)
+			{
+				auto parserResult = messageParser.consume(recvBytes);
+				if (parserResult.isError())
+				{
+					// TODO: close the connection here
+					return parserResult.releaseError();
+				}
+				auto consumedBytes = parserResult.value();
+
+				// if we didn't consume any bytes we just wait for more bytes
+				if (consumedBytes == 0)
+					break;
+
+				recvBytes = recvBytes.slice(consumedBytes, recvBytes.count() - consumedBytes);
+
+				if (messageParser.hasMessage())
+				{
+					auto msg = messageParser.message();
+					m_logger->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
+					// TODO: handle the message
+				}
+			}
+
+			if (recvBytes.count() == 0)
+			{
+				recvBuffer.clear();
+			}
+			else
+			{
+				::memcpy(recvBuffer.data(), recvBytes.data(), recvBytes.count());
+				recvBuffer.resize(recvBytes.count());
+			}
+		}
+
+		return {};
 	}
 }
