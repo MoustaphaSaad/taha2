@@ -4,6 +4,32 @@
 
 namespace core::websocket
 {
+	struct FrameHeader
+	{
+		enum OPCODE: uint8_t
+		{
+			OPCODE_CONTINUATION = 0,
+			OPCODE_TEXT = 1,
+			OPCODE_BINARY = 2,
+			OPCODE_CLOSE = 8,
+			OPCODE_PING = 9,
+			OPCODE_PONG = 10,
+		};
+
+		OPCODE opcode = OPCODE_CONTINUATION;
+		bool isMasked = false;
+		bool isFin = false;
+		uint64_t payloadLength = 0;
+
+		bool isControlOpcode() const { return (opcode & 0b1000); }
+	};
+
+	struct Frame
+	{
+		FrameHeader header;
+		Buffer payload;
+	};
+
 	class FrameParser
 	{
 		enum STATE

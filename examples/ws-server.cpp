@@ -69,7 +69,7 @@ int main(int argc, char** argv)
 
 	logger.info("websocket server listening on {}:{}"_sv, parsedUrl.host(), parsedUrl.port());
 
-	core::websocket::Handler handler;
+	core::websocket::ServerHandler handler;
 	handler.onMsg = [&logger](const core::websocket::Message& msg, core::websocket::Server* server, core::websocket::Connection* conn){ return onMsg(msg, server, conn, &logger); };
 	auto err = server->run(&handler);
 	if (err) logger.error("websocket run failed, {}"_sv, err);

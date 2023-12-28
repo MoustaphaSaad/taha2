@@ -100,6 +100,48 @@ namespace core::websocket
 		return {};
 	}
 
+	HumanError Client::readAndHandleMessage()
+	{
+		// consume the bytes and encoded messages within it
+		auto recvBytesCount = m_socket->read(m_recvLine, sizeof(m_recvLine));
+		m_recvBuffer.push(Span<const std::byte>{m_recvLine, recvBytesCount});
+		auto recvBytes = Span<const std::byte>{m_recvBuffer};
+		while (recvBytes.count() > 0)
+		{
+			auto parserResult = m_messageParser.consume(recvBytes);
+			if (parserResult.isError())
+			{
+				// TODO: close the connection here
+				return parserResult.releaseError();
+			}
+			auto consumedBytes = parserResult.value();
+
+			// if we didn't consume any bytes we just wait for more bytes
+			if (consumedBytes == 0)
+				break;
+
+			recvBytes = recvBytes.slice(consumedBytes, recvBytes.count() - consumedBytes);
+
+			if (m_messageParser.hasMessage())
+			{
+				auto msg = m_messageParser.message();
+				m_logger->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
+				// TODO: handle the message
+			}
+		}
+
+		if (recvBytes.count() == 0)
+		{
+			m_recvBuffer.clear();
+		}
+		else
+		{
+			::memcpy(m_recvBuffer.data(), recvBytes.data(), recvBytes.count());
+			m_recvBuffer.resize(recvBytes.count());
+		}
+		return {};
+	}
+
 	Result<Unique<Client>> Client::connect(StringView ip, StringView port, Log *log, Allocator *allocator)
 	{
 		auto socket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
@@ -124,48 +166,12 @@ namespace core::websocket
 	HumanError Client::run()
 	{
 		bool running = true;
-		size_t maxMessageSize = 64ULL * 1024ULL * 1024ULL;
-		std::byte recvLine[1024];
-		Buffer recvBuffer{m_allocator};
-		MessageParser messageParser{m_allocator, maxMessageSize};
 		while (running)
 		{
-			// consume the bytes and encoded messages within it
-			auto recvBytesCount = m_socket->read(recvLine, sizeof(recvLine));
-			recvBuffer.push(Span<const std::byte>{recvLine, recvBytesCount});
-			auto recvBytes = Span<const std::byte>{recvBuffer};
-			while (recvBytes.count() > 0)
+			if (auto err = readAndHandleMessage())
 			{
-				auto parserResult = messageParser.consume(recvBytes);
-				if (parserResult.isError())
-				{
-					// TODO: close the connection here
-					return parserResult.releaseError();
-				}
-				auto consumedBytes = parserResult.value();
-
-				// if we didn't consume any bytes we just wait for more bytes
-				if (consumedBytes == 0)
-					break;
-
-				recvBytes = recvBytes.slice(consumedBytes, recvBytes.count() - consumedBytes);
-
-				if (messageParser.hasMessage())
-				{
-					auto msg = messageParser.message();
-					m_logger->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
-					// TODO: handle the message
-				}
-			}
-
-			if (recvBytes.count() == 0)
-			{
-				recvBuffer.clear();
-			}
-			else
-			{
-				::memcpy(recvBuffer.data(), recvBytes.data(), recvBytes.count());
-				recvBuffer.resize(recvBytes.count());
+				// TODO: close the connection here
+				return err;
 			}
 		}
 

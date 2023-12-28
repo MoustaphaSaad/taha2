@@ -48,7 +48,7 @@ int main()
 	}
 	server = serverResult.releaseValue();
 
-	core::websocket::Handler handler;
+	core::websocket::ServerHandler handler;
 	handler.onMsg = [&logger](const core::websocket::Message& msg, core::websocket::Server* server, core::websocket::Connection* conn){ return onMsg(msg, server, conn, &logger); };
 	auto err = server->run(&handler);
 	if (err) logger.error("websocket run failed, {}"_sv, err);

@@ -173,7 +173,7 @@ namespace core::websocket
 		SOCKET m_listenSocket = INVALID_SOCKET;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
 		Map<Connection*, Unique<Connection>> m_connections;
-		Handler* m_handler = nullptr;
+		ServerHandler* m_handler = nullptr;
 		bool running = false;
 
 		size_t maxPayloadSize()
@@ -744,7 +744,7 @@ namespace core::websocket
 			return processWriteQueue(conn);
 		}
 
-		HumanError run(Handler* handler) override
+		HumanError run(ServerHandler* handler) override
 		{
 			ZoneScoped;
 
