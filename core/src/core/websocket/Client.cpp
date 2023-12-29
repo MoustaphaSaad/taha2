@@ -217,6 +217,58 @@ namespace core::websocket
 		}
 	}
 
+	HumanError Client::writeRaw(Span<const std::byte> bytes)
+	{
+		auto remainingBytes = bytes;
+		while (remainingBytes.count() > 0)
+		{
+			auto writtenCount = m_socket->write(remainingBytes.data(), remainingBytes.count());
+			remainingBytes = remainingBytes.slice(writtenCount, remainingBytes.count() - writtenCount);
+		}
+		return {};
+	}
+
+	HumanError Client::writeFrameHeader(FrameHeader::OPCODE opcode, size_t payloadLength)
+	{
+		std::byte buf[10];
+		buf[0] = std::byte(128 | opcode);
+
+		if (payloadLength <= 125)
+		{
+			buf[1] = std::byte(payloadLength);
+			if (auto err = writeRaw(Span<const std::byte>{buf, 2})) return err;
+		}
+		else if (payloadLength <= UINT16_MAX)
+		{
+			buf[1] = std::byte(126);
+			buf[2] = std::byte((payloadLength >> 8) & 0xFF);
+			buf[3] = std::byte(payloadLength & 0xFF);
+			if (auto err = writeRaw(Span<const std::byte>{buf, 4})) return err;
+		}
+		else
+		{
+			buf[1] = std::byte(127);
+			buf[2] = std::byte((payloadLength >> 56) & 0xFF);
+			buf[3] = std::byte((payloadLength >> 48) & 0xFF);
+			buf[4] = std::byte((payloadLength >> 40) & 0xFF);
+			buf[5] = std::byte((payloadLength >> 32) & 0xFF);
+			buf[6] = std::byte((payloadLength >> 24) & 0xFF);
+			buf[7] = std::byte((payloadLength >> 16) & 0xFF);
+			buf[8] = std::byte((payloadLength >> 8) & 0xFF);
+			buf[9] = std::byte(payloadLength & 0xFF);
+			if (auto err = writeRaw(Span<const std::byte>{buf, 10})) return err;
+		}
+
+		return {};
+	}
+
+	HumanError Client::writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> payload)
+	{
+		if (auto err = writeFrameHeader(opcode, payload.count())) return err;
+		if (auto err = writeRaw(payload)) return err;
+		return {};
+	}
+
 	Result<Unique<Client>> Client::connect(ClientConfig&& config, Log *log, Allocator *allocator)
 	{
 		auto socket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
@@ -251,5 +303,38 @@ namespace core::websocket
 		}
 
 		return {};
+	}
+
+	HumanError Client::writeText(StringView str)
+	{
+		return writeFrame(FrameHeader::OPCODE_TEXT, Span<const std::byte>{str});
+	}
+
+	HumanError Client::writeBinary(Span<const std::byte> bytes)
+	{
+		return writeFrame(FrameHeader::OPCODE_BINARY, bytes);
+	}
+
+	HumanError Client::writePing(Span<const std::byte> bytes)
+	{
+		return writeFrame(FrameHeader::OPCODE_PING, bytes);
+	}
+
+	HumanError Client::writePong(Span<const std::byte> bytes)
+	{
+		return writeFrame(FrameHeader::OPCODE_PONG, bytes);
+	}
+
+	HumanError Client::writeClose()
+	{
+		return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+	}
+
+	HumanError Client::writeClose(uint16_t code)
+	{
+		uint8_t buf[2];
+		buf[0] = (code >> 8) & 0xFF;
+		buf[1] = code & 0xFF;
+		return writeFrame(FrameHeader::OPCODE_CLOSE, Span<const std::byte>{(const std::byte*)buf, 2});
 	}
 }

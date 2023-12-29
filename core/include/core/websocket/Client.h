@@ -38,6 +38,9 @@ namespace core::websocket
 		HumanError handshake(StringView path);
 		HumanError readAndHandleMessage();
 		HumanError onMsg(const Message& msg);
+		HumanError writeRaw(Span<const std::byte> bytes);
+		HumanError writeFrameHeader(FrameHeader::OPCODE opcode, size_t payloadLength);
+		HumanError writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> payload);
 
 	public:
 		static CORE_EXPORT Result<Unique<Client>> connect(ClientConfig&& config, Log* log, Allocator* allocator);
@@ -51,6 +54,13 @@ namespace core::websocket
 			  m_config(std::move(config))
 		{}
 
-		HumanError run();
+		CORE_EXPORT HumanError run();
+
+		CORE_EXPORT HumanError writeText(StringView str);
+		CORE_EXPORT HumanError writeBinary(Span<const std::byte> bytes);
+		CORE_EXPORT HumanError writePing(Span<const std::byte> bytes);
+		CORE_EXPORT HumanError writePong(Span<const std::byte> bytes);
+		CORE_EXPORT HumanError writeClose();
+		CORE_EXPORT HumanError writeClose(uint16_t code);
 	};
 }
