@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../CPMCache/doctest/57555da117a763e80250f7ce844073267b7086cb" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../CPMCache/fmt/0f60137d28548cc99c93279116a61c535c9d5ca2" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../CPMCache/spdlog/2eaeba860f244dae9478e35c9897321489e3971d" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../CPMCache/tracy/773f4e60973040dd8c46830d0a969aa8fe4e0ea7" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../CPMCache/utf8proc/71fecd11d969b5f7f29605885c44a57e16396024" vcs="Git" />
+  </component>
+</project>

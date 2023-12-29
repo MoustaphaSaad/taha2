@@ -24,6 +24,12 @@ namespace core::websocket
 		bool isControlOpcode() const { return (opcode & 0b1000); }
 	};
 
+	constexpr static uint8_t EMPTY_PONG[] = {128 | FrameHeader::OPCODE_PONG, 0x00};
+	// code: 1000
+	constexpr static uint8_t CLOSE_NORMAL[] = {128 | FrameHeader::OPCODE_CLOSE, 0x02, 0x03, 0xE8};
+	// code: 1002
+	constexpr static uint8_t CLOSE_PROTOCOL_ERROR[] = {128 | FrameHeader::OPCODE_CLOSE, 0x02, 0x03, 0xEA};
+
 	struct Frame
 	{
 		FrameHeader header;

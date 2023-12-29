@@ -5,6 +5,8 @@
 #include "core/Base64.h"
 #include "core/SHA1.h"
 
+#include <tracy/Tracy.hpp>
+
 namespace core::websocket
 {
 	HumanError Client::handshake(core::StringView path)
@@ -126,7 +128,7 @@ namespace core::websocket
 			{
 				auto msg = m_messageParser.message();
 				m_logger->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
-				// TODO: handle the message
+				if (auto err = onMsg(msg)) return err;
 			}
 		}
 
@@ -142,17 +144,90 @@ namespace core::websocket
 		return {};
 	}
 
-	Result<Unique<Client>> Client::connect(StringView ip, StringView port, Log *log, Allocator *allocator)
+	HumanError Client::onMsg(const Message& msg)
+	{
+		switch (msg.type)
+		{
+		case Message::TYPE_TEXT:
+		{
+			auto text = StringView{msg.payload};
+			if (text.isValidUtf8() == false)
+				return errf(m_allocator, "invalid utf8 string"_sv);
+
+			if (m_config.onMsg)
+			{
+				ZoneScoped;
+				return m_config.onMsg(msg, this);
+			}
+			return {};
+		}
+		case Message::TYPE_BINARY:
+		{
+			if (m_config.onMsg)
+			{
+				ZoneScoped;
+				return m_config.onMsg(msg, this);
+			}
+			return {};
+		}
+		case Message::TYPE_CLOSE:
+		{
+			if (m_config.handleClose)
+			{
+				ZoneScoped;
+				return m_config.onMsg(msg, this);
+			}
+			else
+			{
+				// TODO: handle message
+				return errf(m_allocator, "unimplemented"_sv);
+			}
+		}
+		case Message::TYPE_PING:
+		{
+			if (m_config.handlePing)
+			{
+				ZoneScoped;
+				return m_config.onMsg(msg, this);
+			}
+			else
+			{
+				// TODO: handle message
+				return errf(m_allocator, "unimplemented"_sv);
+			}
+		}
+		case Message::TYPE_PONG:
+		{
+			if (m_config.handlePong)
+			{
+				ZoneScoped;
+				return m_config.onMsg(msg, this);
+			}
+			else
+			{
+				// TODO: handle message
+				return errf(m_allocator, "unimplemented"_sv);
+			}
+		}
+		default:
+		{
+			assert(false);
+			return errf(m_allocator, "Invalid message type"_sv);
+		}
+		}
+	}
+
+	Result<Unique<Client>> Client::connect(ClientConfig&& config, Log *log, Allocator *allocator)
 	{
 		auto socket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 		if (socket == nullptr)
 			return errf(allocator, "failed to open socket"_sv);
 
-		auto connected = socket->connect(ip, port);
+		auto connected = socket->connect(config.ip, config.port);
 		if (connected == false)
-			return errf(allocator, "failed to connect to {}:{}"_sv, ip, port);
+			return errf(allocator, "failed to connect to {}:{}"_sv, config.ip, config.port);
 
-		auto client = unique_from<Client>(allocator, std::move(socket), log, allocator);
+		auto client = unique_from<Client>(allocator, std::move(config), std::move(socket), log, allocator);
 
 		auto generatedKey = Rand::cryptoRand(Span<std::byte>{client->m_key, sizeof(client->m_key)});
 		if (generatedKey == false)
