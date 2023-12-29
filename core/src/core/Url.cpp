@@ -939,4 +939,38 @@ namespace core
 
 		return stream.releaseString();
 	}
+
+	Result<String> Url::pathWithQueryAndFragment(Allocator* allocator) const
+	{
+		MemoryStream stream{allocator};
+
+		if (m_path.count() > 0)
+		{
+			if (m_path[0] != '/' && m_host.count() > 0)
+				return errf(allocator, "Path must start with '/' if host is empty"_sv);
+			strf(&stream, "{}"_sv, encodeString(m_path, 0x0F, allocator));
+		}
+
+		if (m_query.count() > 0)
+		{
+			strf(&stream, "?"_sv);
+			for (size_t i = 0; i < m_query.count(); ++i)
+			{
+				if (m_query[i].key.count() == 0)
+					return errf(allocator, "Empty key in query"_sv);
+
+				if (i != 0)
+					strf(&stream, "&"_sv);
+
+				strf(&stream, "{}"_sv, encodeQueryElement(m_query[i].key, allocator));
+				if (m_query[i].value.count() > 0)
+					strf(&stream, "={}"_sv, encodeQueryElement(m_query[i].value, allocator));
+			}
+		}
+
+		if (m_fragment.count() > 0)
+			strf(&stream, "#{}"_sv, encodeString(m_fragment, 0x1F, allocator));
+
+		return stream.releaseString();
+	}
 }

@@ -4,16 +4,21 @@
 #include "core/MemoryStream.h"
 #include "core/Base64.h"
 #include "core/SHA1.h"
+#include "core/Url.h"
 
 #include <tracy/Tracy.hpp>
 
 namespace core::websocket
 {
-	HumanError Client::handshake(core::StringView path)
+	HumanError Client::handshake()
 	{
 		MemoryStream request{m_allocator};
 
 		auto base64Key = Base64::encode(Span<std::byte>{m_key, sizeof(m_key)}, m_allocator);
+
+		auto pathResult = m_url.pathWithQueryAndFragment(m_allocator);
+		if (pathResult.isError()) return pathResult.releaseError();
+		auto path = pathResult.releaseValue();
 
 		// build the request text
 		strf(&request, "GET {} HTTP/1.1\r\n"_sv, path);
@@ -22,6 +27,7 @@ namespace core::websocket
 		strf(&request, "sec-websocket-version: 13\r\n"_sv);
 		strf(&request, "connection: upgrade\r\n"_sv);
 		strf(&request, "sec-websocket-key: {}\r\n"_sv, base64Key);
+		strf(&request, "Host: {}:{}\r\n"_sv, m_url.host(), m_url.port());
 		strf(&request, "\r\n"_sv);
 
 		// send the built request
@@ -295,21 +301,26 @@ namespace core::websocket
 
 	Result<Unique<Client>> Client::connect(ClientConfig&& config, Log *log, Allocator *allocator)
 	{
+		auto parsedUrlResult = core::Url::parse(config.url, allocator);
+		if (parsedUrlResult.isError())
+			return parsedUrlResult.releaseError();
+		auto url = parsedUrlResult.releaseValue();
+
 		auto socket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 		if (socket == nullptr)
 			return errf(allocator, "failed to open socket"_sv);
 
-		auto connected = socket->connect(config.ip, config.port);
+		auto connected = socket->connect(url.host(), url.port());
 		if (connected == false)
-			return errf(allocator, "failed to connect to {}:{}"_sv, config.ip, config.port);
+			return errf(allocator, "failed to connect to {}:{}"_sv, url.host(), url.port());
 
-		auto client = unique_from<Client>(allocator, std::move(config), std::move(socket), log, allocator);
+		auto client = unique_from<Client>(allocator, std::move(config), std::move(socket), std::move(url), log, allocator);
 
 		auto generatedKey = Rand::cryptoRand(Span<std::byte>{client->m_key, sizeof(client->m_key)});
 		if (generatedKey == false)
 			return errf(allocator, "failed to generate client key"_sv);
 
-		if (auto err = client->handshake("/"_sv)) return err;
+		if (auto err = client->handshake()) return err;
 
 		return client;
 	}
@@ -328,6 +339,11 @@ namespace core::websocket
 		}
 
 		return {};
+	}
+
+	void Client::stop()
+	{
+		// actually make the client stop
 	}
 
 	HumanError Client::writeText(StringView str)

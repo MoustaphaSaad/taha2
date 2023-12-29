@@ -75,6 +75,7 @@ namespace core
 		int ipVersion() const { return m_ipVersion; }
 
 		CORE_EXPORT Result<String> toString(Allocator* allocator) const;
+		CORE_EXPORT Result<String> pathWithQueryAndFragment(Allocator* allocator) const;
 
 		bool isDefaultPort() const
 		{

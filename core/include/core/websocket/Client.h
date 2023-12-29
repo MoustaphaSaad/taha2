@@ -6,6 +6,7 @@
 #include "core/Log.h"
 #include "core/Socket.h"
 #include "core/Func.h"
+#include "core/Url.h"
 #include "core/websocket/Message.h"
 #include "core/websocket/MessageParser.h"
 
@@ -15,8 +16,7 @@ namespace core::websocket
 
 	struct ClientConfig
 	{
-		StringView ip = "127.0.0.1"_sv;
-		StringView port = "8080"_sv;
+		StringView url = "ws://127.0.0.1:8080"_sv;
 		bool handlePing = false;
 		bool handlePong = false;
 		bool handleClose = false;
@@ -34,8 +34,9 @@ namespace core::websocket
 		Buffer m_recvBuffer;
 		MessageParser m_messageParser;
 		ClientConfig m_config;
+		Url m_url;
 
-		HumanError handshake(StringView path);
+		HumanError handshake();
 		HumanError readAndHandleMessage();
 		HumanError onMsg(const Message& msg);
 		HumanError writeRaw(Span<const std::byte> bytes);
@@ -45,16 +46,19 @@ namespace core::websocket
 	public:
 		static CORE_EXPORT Result<Unique<Client>> connect(ClientConfig&& config, Log* log, Allocator* allocator);
 
-		Client(ClientConfig&& config, Unique<Socket> socket, Log* logger, Allocator* allocator)
+		Client(ClientConfig&& config, Unique<Socket> socket, Url&& url, Log* logger, Allocator* allocator)
 			: m_allocator(allocator),
 			  m_logger(logger),
 			  m_socket(std::move(socket)),
 			  m_recvBuffer(allocator),
 			  m_messageParser(allocator, 16ULL * 1024ULL * 1024ULL),
-			  m_config(std::move(config))
-		{}
+			  m_config(std::move(config)),
+			  m_url(std::move(url))
+		{
+		}
 
 		CORE_EXPORT HumanError run();
+		CORE_EXPORT void stop();
 
 		CORE_EXPORT HumanError writeText(StringView str);
 		CORE_EXPORT HumanError writeBinary(Span<const std::byte> bytes);
