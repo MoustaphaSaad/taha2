@@ -179,8 +179,30 @@ namespace core::websocket
 			}
 			else
 			{
-				// TODO: handle message
-				return errf(m_allocator, "unimplemented"_sv);
+				if (msg.payload.count() == 0)
+					return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+
+				// error protocol close payload should have at least 2 byte
+				if (msg.payload.count() == 1)
+					return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+
+				auto errorCode = uint16_t(msg.payload[1]) | (uint16_t(msg.payload[0]) << 8);
+				if (errorCode < 1000 || errorCode == 1004 || errorCode == 1005 || errorCode == 1006 || (errorCode > 1013  && errorCode < 3000))
+				{
+					return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+				}
+
+				if (msg.payload.count() == 2)
+					return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+
+				// close payload should be utf8
+				auto payload = StringView{msg.payload}.slice(2, msg.payload.count());
+				if (payload.isValidUtf8() == false)
+				{
+					return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+				}
+
+				return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
 			}
 		}
 		case Message::TYPE_PING:
@@ -192,8 +214,14 @@ namespace core::websocket
 			}
 			else
 			{
-				// TODO: handle message
-				return errf(m_allocator, "unimplemented"_sv);
+				if (msg.payload.count() == 0)
+				{
+					return writeRaw(Span<const std::byte>{(const std::byte *) EMPTY_PONG, sizeof(EMPTY_PONG)});
+				}
+				else
+				{
+					return writePong(Span<const std::byte>{msg.payload});
+				}
 			}
 		}
 		case Message::TYPE_PONG:
@@ -203,11 +231,7 @@ namespace core::websocket
 				ZoneScoped;
 				return m_config.onMsg(msg, this);
 			}
-			else
-			{
-				// TODO: handle message
-				return errf(m_allocator, "unimplemented"_sv);
-			}
+			return {};
 		}
 		default:
 		{
