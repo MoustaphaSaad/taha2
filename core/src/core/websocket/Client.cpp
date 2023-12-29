@@ -321,7 +321,8 @@ namespace core::websocket
 		{
 			if (auto err = readAndHandleMessage())
 			{
-				// TODO: close the connection here
+				m_logger->debug("Failed to read and handle message: {}"_sv, err);
+				(void) writeRaw(Span<const std::byte>{(const std::byte*) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
 				return err;
 			}
 		}
