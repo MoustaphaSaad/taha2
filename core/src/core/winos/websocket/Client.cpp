@@ -25,6 +25,31 @@ namespace core::websocket
 		{
 
 		}
+
+		~WinOSClient() override
+		{
+			if (m_completionPort != INVALID_HANDLE_VALUE)
+			{
+				[[maybe_unused]] auto res = CloseHandle(m_completionPort);
+				assert(SUCCEEDED(res));
+			}
+
+			if (m_socket != INVALID_SOCKET)
+			{
+				[[maybe_unused]] auto res = ::closesocket(m_socket);
+				assert(res == 0);
+			}
+		}
+
+		HumanError run() override
+		{
+			bool running = true;
+			while (running)
+			{
+				// TODO: implement the client main loop here
+			}
+			return {};
+		}
 	};
 
 	Result<Unique<Client2>> Client2::connect(ClientConfig &&config, Log *log, Allocator *allocator)

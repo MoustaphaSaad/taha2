@@ -72,5 +72,9 @@ namespace core::websocket
 	{
 	public:
 		static CORE_EXPORT Result<Unique<Client2>> connect(ClientConfig&& config, Log* log, Allocator* allocator);
+
+		virtual ~Client2() = default;
+
+		virtual HumanError run() = 0;
 	};
 }
