@@ -1,4 +1,5 @@
 #include "core/websocket/Client.h"
+#include "core/Queue.h"
 
 #include <Windows.h>
 #include <WinSock2.h>
@@ -6,14 +7,114 @@
 
 namespace core::websocket
 {
+
 	class WinOSClient: public Client2
 	{
+		struct OutboundBytes
+		{
+			Buffer data;
+			bool isScheduled = false;
+		};
+
+		struct Op: OVERLAPPED
+		{
+			enum KIND
+			{
+				KIND_NONE,
+				KIND_WRITE,
+			};
+
+			explicit Op(KIND kind_)
+				: kind(kind_)
+			{
+				::memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
+				hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+			}
+
+			virtual ~Op()
+			{
+				[[maybe_unused]] auto res = CloseHandle(hEvent);
+				assert(res != 0);
+			}
+
+			KIND kind = KIND_NONE;
+		};
+
+		struct WriteOp: public Op
+		{
+			DWORD bytesSent = 0;
+			Span<const std::byte> buffer;
+			WSABUF wsaBuf{};
+			DWORD flags = 0;
+
+			explicit WriteOp(Span<const std::byte> buffer_)
+				: Op(KIND_WRITE),
+				  buffer(buffer_)
+			{
+				wsaBuf.buf = (CHAR*)buffer.data();
+				wsaBuf.len = (ULONG)buffer.count();
+			}
+		};
+
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		SOCKET m_socket = INVALID_SOCKET;
 		ClientConfig m_config;
 		Url m_url;
+		Map<Op*, Unique<Op>> m_scheduledOperations;
+		Queue<OutboundBytes> m_outboundQueue;
+
+		void pushPendingOp(Unique<Op> op)
+		{
+			m_scheduledOperations.insert(op.get(), std::move(op));
+		}
+
+		HumanError scheduleWriteOp(Unique<WriteOp> op)
+		{
+			auto res = WSASend(
+				m_socket,
+				&op->wsaBuf,
+				1,
+				&op->bytesSent,
+				op->flags,
+				(OVERLAPPED*)op.get(),
+				NULL
+			);
+
+			if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
+			{
+				pushPendingOp(std::move(op));
+			}
+			else
+			{
+				auto error = WSAGetLastError();
+				return errf(m_allocator, "Failed to schedule write operation: ErrorCode({})"_sv, error);
+			}
+
+			return {};
+		}
+
+		HumanError processWriteQueue()
+		{
+			if (m_outboundQueue.count() == 0)
+				return {};
+
+			auto& outboundBytes = m_outboundQueue.front();
+
+			if (outboundBytes.isScheduled)
+				return {};
+
+			outboundBytes.isScheduled = true;
+			auto op = unique_from<WriteOp>(m_allocator, Span<const std::byte>{outboundBytes.data});
+			return scheduleWriteOp(std::move(op));
+		}
+
+		HumanError scheduleWrite(Buffer&& buffer)
+		{
+			m_outboundQueue.push_back(OutboundBytes{.data = std::move(buffer)});
+			return processWriteQueue();
+		}
 	public:
 		WinOSClient(HANDLE completionPort, SOCKET socket, ClientConfig&& config, Url&& url, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
@@ -21,7 +122,9 @@ namespace core::websocket
 			  m_completionPort(completionPort),
 			  m_socket(socket),
 			  m_config(std::move(config)),
-			  m_url(std::move(url))
+			  m_url(std::move(url)),
+			  m_scheduledOperations(allocator),
+			  m_outboundQueue(allocator)
 		{
 
 		}

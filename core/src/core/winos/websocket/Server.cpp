@@ -560,7 +560,7 @@ namespace core::websocket
 				return {};
 
 			outboundMessage.isScheduled = true;
-			auto op = unique_from<WriteOp>(m_allocator, conn, Span<const std::byte>(outboundMessage.data));
+			auto op = unique_from<WriteOp>(m_allocator, conn, Span<const std::byte>{outboundMessage.data});
 			return scheduleWriteOp(std::move(op));
 		}
 
