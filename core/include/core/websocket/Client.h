@@ -67,4 +67,10 @@ namespace core::websocket
 		CORE_EXPORT HumanError writeClose();
 		CORE_EXPORT HumanError writeClose(uint16_t code);
 	};
+
+	class Client2
+	{
+	public:
+		static CORE_EXPORT Result<Unique<Client2>> connect(ClientConfig&& config, Log* log, Allocator* allocator);
+	};
 }
