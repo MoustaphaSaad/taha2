@@ -54,11 +54,13 @@ namespace core
 		}
 
 		Allocator* m_allocator = nullptr;
+		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
 	public:
-		WinOSEventLoop(HANDLE completionPort, Allocator* allocator)
+		WinOSEventLoop(HANDLE completionPort, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
+			  m_log(log),
 			  m_completionPort(completionPort),
 			  m_scheduledOperations(allocator)
 		{}
@@ -74,6 +76,8 @@ namespace core
 
 		HumanError run() override
 		{
+			m_log->debug("started event loop"_sv);
+
 			while (true)
 			{
 				constexpr int MAX_ENTRIES = 32;
@@ -98,6 +102,7 @@ namespace core
 					switch (op->kind)
 					{
 					case Op::KIND_CLOSE:
+						m_log->debug("closed event loop"_sv);
 						m_scheduledOperations.clear();
 						return {};
 					default:
@@ -116,12 +121,12 @@ namespace core
 		}
 	};
 
-	Result<Unique<EventLoop>> EventLoop::create(Allocator* allocator)
+	Result<Unique<EventLoop>> EventLoop::create(Log* log, Allocator* allocator)
 	{
 		auto completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 		if (completionPort == NULL)
 			return errf(allocator, "failed to create completion port"_sv);
 
-		return unique_from<WinOSEventLoop>(allocator, completionPort, allocator);
+		return unique_from<WinOSEventLoop>(allocator, completionPort, log, allocator);
 	}
 }

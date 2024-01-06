@@ -1,57 +1,41 @@
 #include <core/Mallocator.h>
 #include <core/Log.h>
-#include "core/websocket/Server.h"
+#include <core/EventLoop.h>
+
 #include <signal.h>
 
-core::Unique<core::websocket::Server> server;
+core::EventLoop* EVENT_LOOP = nullptr;
 
 void signalHandler(int signal)
 {
 	if (signal == SIGINT)
 	{
-		server->stop();
+		EVENT_LOOP->stop();
 	}
-}
-
-core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Server* server, core::websocket::Connection* conn, core::Log* log)
-{
-	switch (msg.type)
-	{
-	case core::websocket::Message::TYPE_TEXT:
-//		log->debug("msg: {}"_sv, core::StringView{msg.payload});
-		if (auto err = server->writeText(conn, core::StringView{msg.payload})) return err;
-		break;
-	case core::websocket::Message::TYPE_BINARY:
-		if (auto err = server->writeBinary(conn, core::Span<const std::byte>{msg.payload})) return err;
-		break;
-	default:
-		assert(false);
-		break;
-	}
-	return {};
 }
 
 int main()
 {
 	signal(SIGINT, signalHandler);
 
-	core::Mallocator mallocator;
-	core::Log logger{&mallocator};
+	core::Mallocator mallocator{};
+	core::Log log{&mallocator};
 
-	logger.info("Hello, World!\n"_sv);
-
-	auto serverResult = core::websocket::Server::open("172.25.48.1"_sv, "9010"_sv, &logger, &mallocator);
-	if (serverResult.isError())
+	auto eventLoopResult = core::EventLoop::create(&log, &mallocator);
+	if (eventLoopResult.isError())
 	{
-		logger.error("opening websocket server failed, {}"_sv, serverResult.error());
+		log.critical("failed to create event loop, {}"_sv, eventLoopResult.error());
 		return EXIT_FAILURE;
 	}
-	server = serverResult.releaseValue();
+	auto eventLoop = eventLoopResult.releaseValue();
+	EVENT_LOOP = eventLoop.get();
 
-	core::websocket::ServerHandler handler;
-	handler.onMsg = [&logger](const core::websocket::Message& msg, core::websocket::Server* server, core::websocket::Connection* conn){ return onMsg(msg, server, conn, &logger); };
-	auto err = server->run(&handler);
-	if (err) logger.error("websocket run failed, {}"_sv, err);
+	auto err = eventLoop->run();
+	if (err)
+	{
+		log.critical("event loop error, {}"_sv, err);
+		return EXIT_FAILURE;
+	}
 
 	return 0;
 }
