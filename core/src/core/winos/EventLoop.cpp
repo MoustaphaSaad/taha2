@@ -8,14 +8,6 @@ namespace core
 {
 	class WinOSEventLoop;
 
-	class EventSource
-	{
-	public:
-		virtual ~EventSource() = default;
-
-		virtual HumanError read(WinOSEventLoop* loop) = 0;
-	};
-
 	class WinOSEventLoop: public EventLoop
 	{
 		struct Op: OVERLAPPED
@@ -52,12 +44,15 @@ namespace core
 
 		struct ReadOp: Op
 		{
-			DWORD bytesReceived = 0;
+			HANDLE handle;
 			DWORD flags = 0;
 			WSABUF wsaBuf{};
+			Reactor* reactor = nullptr;
 
-			explicit ReadOp(Span<std::byte> buffer)
-				: Op(KIND_READ)
+			ReadOp(HANDLE handle_, Span<std::byte> buffer, Reactor* reactor_)
+				: Op(KIND_READ),
+				  handle(handle_),
+				  reactor(reactor_)
 			{
 				wsaBuf.buf = (CHAR*)buffer.data();
 				wsaBuf.len = (ULONG)buffer.count();
@@ -75,15 +70,15 @@ namespace core
 				::memset(recvLine, 0, sizeof(recvLine));
 			}
 
-			HumanError read(WinOSEventLoop* loop) override
+			HumanError read(WinOSEventLoop* loop, Reactor* reactor) override
 			{
-				auto op = unique_from<ReadOp>(loop->m_allocator, Span<std::byte>{recvLine, sizeof(recvLine)});
+				auto op = unique_from<ReadOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<std::byte>{recvLine, sizeof(recvLine)}, reactor);
 
 				auto res = WSARecv(
 					(SOCKET)m_socket->fd(),
 					&op->wsaBuf,
 					1,
-					&op->bytesReceived,
+					NULL,
 					&op->flags,
 					(OVERLAPPED*)op.get(),
 					NULL
@@ -167,12 +162,25 @@ namespace core
 					switch (op->kind)
 					{
 					case Op::KIND_CLOSE:
+					{
 						m_log->debug("closed event loop"_sv);
 						m_scheduledOperations.clear();
 						return {};
+					}
 					case Op::KIND_READ:
+					{
+						auto readOp = unique_static_cast<ReadOp>(std::move(op));
+						if (readOp->reactor)
+						{
+							DWORD bytesReceived = 0;
+							auto res = GetOverlappedResult(readOp->handle, readOp.get(), &bytesReceived, FALSE);
+							assert(SUCCEEDED(res));
+							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesReceived}};
+							readOp->reactor->handle(&readEvent);
+						}
 						m_log->debug("read event loop"_sv);
 						break;
+					}
 					default:
 						return errf(m_allocator, "unknown operation kind, {}"_sv, (int)op->kind);
 					}
@@ -193,15 +201,17 @@ namespace core
 			if (socket == nullptr)
 				return nullptr;
 
+			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
+			assert(newPort == m_completionPort);
 			return unique_from<WinOSSocketEventSource>(m_allocator, std::move(socket));
 		}
 
-		HumanError read(EventSource* source) override
+		HumanError read(EventSource* source, Reactor* reactor) override
 		{
 			if (source == nullptr)
 				return {};
 
-			return source->read(this);
+			return source->read(this, reactor);
 		}
 	};
 

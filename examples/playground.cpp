@@ -1,6 +1,7 @@
 #include <core/Mallocator.h>
 #include <core/Log.h>
 #include <core/EventLoop.h>
+#include <core/Socket.h>
 
 #include <signal.h>
 
@@ -13,6 +14,21 @@ void signalHandler(int signal)
 		EVENT_LOOP->stop();
 	}
 }
+
+class Printer: public core::Reactor
+{
+	core::Log* m_log = nullptr;
+public:
+
+	explicit Printer(core::Log* log)
+		: m_log(log)
+	{}
+
+	void onRead(const core::ReadEvent* event) override
+	{
+		m_log->debug("read: \"{}\""_sv, core::StringView{event->buffer()});
+	}
+};
 
 int main()
 {
@@ -30,7 +46,21 @@ int main()
 	auto eventLoop = eventLoopResult.releaseValue();
 	EVENT_LOOP = eventLoop.get();
 
-	auto err = eventLoop->run();
+	Printer printer{&log};
+
+	auto acceptSocket = core::Socket::open(&mallocator, core::Socket::FAMILY_IPV4, core::Socket::TYPE_TCP);
+	acceptSocket->bind("8080"_sv);
+	acceptSocket->listen();
+	auto socket = acceptSocket->accept();
+
+	auto eventSocket = eventLoop->createEventSource(std::move(socket));
+	auto err = eventLoop->read(eventSocket.get(), &printer);
+	if (err)
+	{
+		log.critical("socket read error, {}"_sv, err);
+	}
+
+	err = eventLoop->run();
 	if (err)
 	{
 		log.critical("event loop error, {}"_sv, err);
