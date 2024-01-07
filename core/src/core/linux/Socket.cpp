@@ -114,6 +114,28 @@ namespace core
 			return unique_from<LinuxSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
 		}
 
+		bool shutdown(SHUT how) override
+		{
+			int osHow = 0;
+			switch (how)
+			{
+			case SHUT_RD:
+				osHow = ::SHUT_RD;
+				break;
+			case SHUT_WR:
+				osHow = ::SHUT_WR;
+				break;
+			case SHUT_RDWR:
+				osHow = ::SHUT_RDWR;
+				break;
+			default:
+				return false;
+			}
+
+			auto res = ::shutdown(m_handle, osHow);
+			return res == 0;
+		}
+
 		int64_t fd() override
 		{
 			return (int64_t)m_handle;

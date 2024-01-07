@@ -128,6 +128,28 @@ namespace core
 			return unique_from<WinOSSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
 		}
 
+		bool shutdown(SHUT how) override
+		{
+			int osHow = 0;
+			switch (how)
+			{
+			case SHUT_RD:
+				osHow = SD_RECEIVE;
+				break;
+			case SHUT_WR:
+				osHow = SD_SEND;
+				break;
+			case SHUT_RDWR:
+				osHow = SD_BOTH;
+				break;
+			default:
+				return false;
+			}
+
+			auto res = ::shutdown(m_handle, osHow);
+			return res == 0;
+		}
+
 		int64_t fd() override
 		{
 			return (int64_t)m_handle;
