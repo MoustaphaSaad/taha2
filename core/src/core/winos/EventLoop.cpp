@@ -2,9 +2,20 @@
 #include "core/Hash.h"
 
 #include <Windows.h>
+#include <WinSock2.h>
 
 namespace core
 {
+	class WinOSEventLoop;
+
+	class EventSource
+	{
+	public:
+		virtual ~EventSource() = default;
+
+		virtual HumanError read(WinOSEventLoop* loop) = 0;
+	};
+
 	class WinOSEventLoop: public EventLoop
 	{
 		struct Op: OVERLAPPED
@@ -12,7 +23,8 @@ namespace core
 			enum KIND
 			{
 				KIND_NONE,
-				KIND_CLOSE
+				KIND_CLOSE,
+				KIND_READ,
 			};
 
 			explicit Op(KIND kind_)
@@ -36,6 +48,59 @@ namespace core
 			CloseOp()
 				: Op(KIND_CLOSE)
 			{}
+		};
+
+		struct ReadOp: Op
+		{
+			DWORD bytesReceived = 0;
+			DWORD flags = 0;
+			WSABUF wsaBuf{};
+
+			explicit ReadOp(Span<std::byte> buffer)
+				: Op(KIND_READ)
+			{
+				wsaBuf.buf = (CHAR*)buffer.data();
+				wsaBuf.len = (ULONG)buffer.count();
+			}
+		};
+
+		class WinOSSocketEventSource: public EventSource
+		{
+			Unique<Socket> m_socket;
+			std::byte recvLine[2048];
+		public:
+			explicit WinOSSocketEventSource(Unique<Socket> socket)
+				: m_socket(std::move(socket))
+			{
+				::memset(recvLine, 0, sizeof(recvLine));
+			}
+
+			HumanError read(WinOSEventLoop* loop) override
+			{
+				auto op = unique_from<ReadOp>(loop->m_allocator, Span<std::byte>{recvLine, sizeof(recvLine)});
+
+				auto res = WSARecv(
+					(SOCKET)m_socket->fd(),
+					&op->wsaBuf,
+					1,
+					&op->bytesReceived,
+					&op->flags,
+					(OVERLAPPED*)op.get(),
+					NULL
+				);
+
+				if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
+				{
+					loop->pushPendingOp(std::move(op));
+				}
+				else
+				{
+					auto error = WSAGetLastError();
+					return errf(loop->m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
+				}
+
+				return {};
+			}
 		};
 
 		void pushPendingOp(Unique<Op> op)
@@ -105,6 +170,9 @@ namespace core
 						m_log->debug("closed event loop"_sv);
 						m_scheduledOperations.clear();
 						return {};
+					case Op::KIND_READ:
+						m_log->debug("read event loop"_sv);
+						break;
 					default:
 						return errf(m_allocator, "unknown operation kind, {}"_sv, (int)op->kind);
 					}
@@ -118,6 +186,22 @@ namespace core
 			[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (LPOVERLAPPED)op.get());
 			assert(SUCCEEDED(res));
 			pushPendingOp(std::move(op));
+		}
+
+		Unique<EventSource> createEventSource(Unique<Socket> socket) override
+		{
+			if (socket == nullptr)
+				return nullptr;
+
+			return unique_from<WinOSSocketEventSource>(m_allocator, std::move(socket));
+		}
+
+		HumanError read(EventSource* source) override
+		{
+			if (source == nullptr)
+				return {};
+
+			return source->read(this);
 		}
 	};
 
