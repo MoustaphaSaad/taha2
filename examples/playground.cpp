@@ -15,11 +15,28 @@ void signalHandler(int signal)
 	}
 }
 
+class Acceptor: public core::Reactor
+{
+	core::Log* m_log = nullptr;
+public:
+	explicit Acceptor(core::Log* log)
+		: m_log(log)
+	{}
+
+	void onAccept(core::AcceptEvent* event) override
+	{
+		// create printer here and do stuff with it
+		auto socket = event->releaseSocket();
+		// reschedule accept
+		event->eventLoop()->accept(event->source(), this);
+		m_log->debug("accepted socket: {}"_sv, socket->fd());
+	}
+};
+
 class Printer: public core::Reactor
 {
 	core::Log* m_log = nullptr;
 public:
-
 	explicit Printer(core::Log* log)
 		: m_log(log)
 	{}
@@ -47,19 +64,27 @@ int main()
 	auto eventLoop = eventLoopResult.releaseValue();
 	EVENT_LOOP = eventLoop.get();
 
+	Acceptor acceptor{&log};
 	Printer printer{&log};
 
 	auto acceptSocket = core::Socket::open(&mallocator, core::Socket::FAMILY_IPV4, core::Socket::TYPE_TCP);
 	acceptSocket->bind("8080"_sv);
 	acceptSocket->listen();
-	auto socket = acceptSocket->accept();
-
-	auto eventSocket = eventLoop->createEventSource(std::move(socket));
-	auto err = eventLoop->read(eventSocket.get(), &printer);
+	auto acceptEventSocket = eventLoop->createEventSource(std::move(acceptSocket));
+	auto err = eventLoop->accept(acceptEventSocket.get(), &acceptor);
 	if (err)
 	{
-		log.critical("socket read error, {}"_sv, err);
+		log.critical("socket accept error, {}"_sv, err);
+		return EXIT_FAILURE;
 	}
+
+	// auto eventSocket = eventLoop->createEventSource(std::move(socket));
+	// auto err = eventLoop->read(eventSocket.get(), &printer);
+	// if (err)
+	// {
+	// 	log.critical("socket read error, {}"_sv, err);
+	// 	return EXIT_FAILURE;
+	// }
 
 	err = eventLoop->run();
 	if (err)

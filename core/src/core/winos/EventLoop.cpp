@@ -3,6 +3,8 @@
 
 #include <Windows.h>
 #include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <Mswsock.h>
 
 namespace core
 {
@@ -17,6 +19,7 @@ namespace core
 				KIND_NONE,
 				KIND_CLOSE,
 				KIND_READ,
+				KIND_ACCEPT,
 			};
 
 			explicit Op(KIND kind_, WinOSEventSource* source_)
@@ -61,6 +64,19 @@ namespace core
 			}
 		};
 
+		struct AcceptOp: Op
+		{
+			Unique<Socket> socket;
+			std::byte buffer[2 * sizeof(SOCKADDR_IN) + 16] = {};
+			Reactor* reactor = nullptr;
+
+			AcceptOp(Unique<Socket> socket_, WinOSEventSource* source_, Reactor* reactor_)
+				: Op(KIND_ACCEPT, source_),
+				  socket(std::move(socket_)),
+				  reactor(reactor_)
+			{}
+		};
+
 		class WinOSEventSource: public EventSource
 		{
 			Map<Op*, Unique<Op>> m_scheduledOperations;
@@ -86,6 +102,7 @@ namespace core
 			}
 
 			virtual HumanError read(WinOSEventLoop* loop, Reactor* reactor) = 0;
+			virtual HumanError accept(WinOSEventLoop* loop, Reactor* reactor) = 0;
 		};
 
 		class WinOSSocketEventSource: public WinOSEventSource
@@ -132,6 +149,36 @@ namespace core
 
 				return {};
 			}
+
+			HumanError accept(WinOSEventLoop* loop, Reactor* reactor) override
+			{
+				// TODO: get the family and type from the accepting socket
+				auto socket = Socket::open(loop->m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
+
+				auto op = unique_from<AcceptOp>(loop->m_allocator, std::move(socket), this, reactor);
+
+				DWORD bytesReceived = 0;
+				auto res = loop->m_acceptEx(
+					(SOCKET)m_socket->fd(), // listen socket
+					(SOCKET)op->socket->fd(), // accept socket
+					op->buffer, // pointer to a buffer that receives the first block of data sent on new connection
+					0, // number of bytes for receive data (it doesn't include server and client address)
+					sizeof(SOCKADDR_IN) + 16, // local address length
+					sizeof(SOCKADDR_IN) + 16, // remote address length
+					&bytesReceived, // bytes received in case of sync completion
+					(OVERLAPPED*)op.get() // overlapped structure
+				);
+				if (res == TRUE || WSAGetLastError() == ERROR_IO_PENDING)
+				{
+					pushPendingOp(std::move(op));
+				}
+				else
+				{
+					auto error = WSAGetLastError();
+					return errf(loop->m_allocator, "failed to schedule accept operation: ErrorCode({})"_sv, error);
+				}
+				return {};
+			}
 		};
 
 		void pushPendingOp(Unique<Op> op)
@@ -157,12 +204,14 @@ namespace core
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
+		LPFN_ACCEPTEX m_acceptEx = nullptr;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
 	public:
-		WinOSEventLoop(HANDLE completionPort, Log* log, Allocator* allocator)
+		WinOSEventLoop(HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
+			  m_acceptEx(acceptEx),
 			  m_scheduledOperations(allocator)
 		{}
 
@@ -222,6 +271,17 @@ namespace core
 						m_log->debug("read event loop"_sv);
 						break;
 					}
+					case Op::KIND_ACCEPT:
+					{
+						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
+						if (acceptOp->reactor)
+						{
+							AcceptEvent acceptEvent{std::move(acceptOp->socket), acceptOp->source};
+							acceptOp->reactor->handle(&acceptEvent);
+						}
+						m_log->debug("accept event loop"_sv);
+						break;
+					}
 					default:
 						return errf(m_allocator, "unknown operation kind, {}"_sv, (int)op->kind);
 					}
@@ -255,6 +315,15 @@ namespace core
 			auto winOSSource = (WinOSEventSource*)source;
 			return winOSSource->read(this, reactor);
 		}
+
+		HumanError accept(EventSource* source, Reactor* reactor) override
+		{
+			if (source == nullptr)
+				return {};
+
+			auto winOSSource = (WinOSEventSource*)source;
+			return winOSSource->accept(this, reactor);
+		}
 	};
 
 	Result<Unique<EventLoop>> EventLoop::create(Log* log, Allocator* allocator)
@@ -263,6 +332,27 @@ namespace core
 		if (completionPort == NULL)
 			return errf(allocator, "failed to create completion port"_sv);
 
-		return unique_from<WinOSEventLoop>(allocator, completionPort, log, allocator);
+		auto dummySocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+		if (dummySocket == INVALID_SOCKET)
+			return errf(allocator, "failed to create dummy socket"_sv);
+
+		GUID guidAcceptEx = WSAID_ACCEPTEX;
+		LPFN_ACCEPTEX acceptEx = nullptr;
+		DWORD bytesReturned = 0;
+		auto res = WSAIoctl(
+			dummySocket,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			&guidAcceptEx,
+			sizeof(guidAcceptEx),
+			&acceptEx,
+			sizeof(acceptEx),
+			&bytesReturned,
+			NULL,
+			NULL
+		);
+		if (res == SOCKET_ERROR)
+			return errf(allocator, "failed to get AcceptEx function pointer, ErrorCode({})"_sv, res);
+
+		return unique_from<WinOSEventLoop>(allocator, completionPort, acceptEx, log, allocator);
 	}
 }

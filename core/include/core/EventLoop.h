@@ -30,6 +30,7 @@ namespace core
 		{
 			KIND_NONE,
 			KIND_READ,
+			KIND_ACCEPT,
 		};
 
 		explicit Event(KIND kind, EventSource* source)
@@ -59,6 +60,18 @@ namespace core
 		Span<const std::byte> buffer() const { return m_buffer; }
 	};
 
+	class AcceptEvent: public Event
+	{
+		Unique<Socket> m_socket;
+	public:
+		AcceptEvent(Unique<Socket> socket, EventSource* source)
+			: Event(Event::KIND_ACCEPT, source),
+			  m_socket(std::move(socket))
+		{}
+
+		Unique<Socket> releaseSocket() { return std::move(m_socket); }
+	};
+
 	class Reactor
 	{
 	public:
@@ -71,6 +84,9 @@ namespace core
 			case Event::KIND_READ:
 				onRead((const ReadEvent*)event);
 				break;
+			case Event::KIND_ACCEPT:
+				onAccept((AcceptEvent*)event);
+				break;
 			default:
 				assert(false);
 				break;
@@ -78,6 +94,9 @@ namespace core
 		}
 
 		virtual void onRead(const ReadEvent* event)
+		{}
+
+		virtual void onAccept(AcceptEvent* event)
 		{}
 	};
 
@@ -93,5 +112,6 @@ namespace core
 
 		virtual Unique<EventSource> createEventSource(Unique<Socket> socket) = 0;
 		virtual HumanError read(EventSource* source, Reactor* reactor) = 0;
+		virtual HumanError accept(EventSource* source, Reactor* reactor) = 0;
 	};
 }
