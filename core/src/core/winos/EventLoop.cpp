@@ -8,6 +8,8 @@ namespace core
 {
 	class WinOSEventLoop: public EventLoop
 	{
+		class WinOSEventSource;
+
 		struct Op: OVERLAPPED
 		{
 			enum KIND
@@ -17,8 +19,9 @@ namespace core
 				KIND_READ,
 			};
 
-			explicit Op(KIND kind_)
-				: kind(kind_)
+			explicit Op(KIND kind_, WinOSEventSource* source_)
+				: kind(kind_),
+				  source(source_)
 			{
 				::memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
 				hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -30,13 +33,14 @@ namespace core
 				assert(SUCCEEDED(res));
 			}
 
-			KIND kind;
+			KIND kind = KIND_NONE;
+			WinOSEventSource* source = nullptr;
 		};
 
 		struct CloseOp: Op
 		{
 			CloseOp()
-				: Op(KIND_CLOSE)
+				: Op(KIND_CLOSE, nullptr)
 			{}
 		};
 
@@ -45,13 +49,11 @@ namespace core
 			HANDLE handle;
 			DWORD flags = 0;
 			WSABUF wsaBuf{};
-			EventSource* source = nullptr;
 			Reactor* reactor = nullptr;
 
-			ReadOp(HANDLE handle_, Span<std::byte> buffer, EventSource* source_, Reactor* reactor_)
-				: Op(KIND_READ),
+			ReadOp(HANDLE handle_, Span<std::byte> buffer, WinOSEventSource* source_, Reactor* reactor_)
+				: Op(KIND_READ, source_),
 				  handle(handle_),
-				  source(source_),
 				  reactor(reactor_)
 			{
 				wsaBuf.buf = (CHAR*)buffer.data();
@@ -61,10 +63,27 @@ namespace core
 
 		class WinOSEventSource: public EventSource
 		{
+			Map<Op*, Unique<Op>> m_scheduledOperations;
 		public:
-			explicit WinOSEventSource(EventLoop* loop)
-				: EventSource(loop)
+			WinOSEventSource(EventLoop* loop, Allocator* allocator)
+				: EventSource(loop),
+				  m_scheduledOperations(allocator)
 			{}
+
+			void pushPendingOp(Unique<Op> op)
+			{
+				m_scheduledOperations.insert(op.get(), std::move(op));
+			}
+
+			Unique<Op> popPendingOp(Op* op)
+			{
+				auto it = m_scheduledOperations.lookup(op);
+				if (it == m_scheduledOperations.end())
+					return nullptr;
+				auto res = std::move(it->value);
+				m_scheduledOperations.remove(op);
+				return res;
+			}
 
 			virtual HumanError read(WinOSEventLoop* loop, Reactor* reactor) = 0;
 		};
@@ -74,8 +93,8 @@ namespace core
 			Unique<Socket> m_socket;
 			std::byte recvLine[2048];
 		public:
-			explicit WinOSSocketEventSource(Unique<Socket> socket, EventLoop* loop)
-				: WinOSEventSource(loop),
+			WinOSSocketEventSource(Unique<Socket> socket, EventLoop* loop, Allocator* allocator)
+				: WinOSEventSource(loop, allocator),
 				  m_socket(std::move(socket))
 			{
 				::memset(recvLine, 0, sizeof(recvLine));
@@ -97,7 +116,7 @@ namespace core
 
 				if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
 				{
-					loop->pushPendingOp(std::move(op));
+					pushPendingOp(std::move(op));
 				}
 				else
 				{
@@ -116,6 +135,11 @@ namespace core
 
 		Unique<Op> popPendingOp(Op* op)
 		{
+			// check if this operation is related to a source
+			if (op->source)
+				return op->source->popPendingOp(op);
+
+			// if not then this is a global operation
 			auto it = m_scheduledOperations.lookup(op);
 			if (it == m_scheduledOperations.end())
 				return nullptr;
@@ -214,7 +238,7 @@ namespace core
 
 			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
 			assert(newPort == m_completionPort);
-			return unique_from<WinOSSocketEventSource>(m_allocator, std::move(socket), this);
+			return unique_from<WinOSSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
 		}
 
 		HumanError read(EventSource* source, Reactor* reactor) override
