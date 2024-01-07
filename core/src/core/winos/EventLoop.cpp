@@ -148,8 +148,7 @@ namespace core
 
 			~WinOSSocketEventSource() override
 			{
-				[[maybe_unused]] auto res = m_socket->shutdown(Socket::SHUT_RDWR);
-				assert(res);
+				m_socket->shutdown(Socket::SHUT_RDWR);
 			}
 
 			HumanError processWriteQueue(WinOSEventLoop* loop) override

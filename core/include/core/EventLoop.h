@@ -102,6 +102,7 @@ namespace core
 				break;
 			case Event::KIND_WRITE:
 				onWrite((const WriteEvent*)event);
+				break;
 			default:
 				assert(false);
 				break;
