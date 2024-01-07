@@ -8,15 +8,19 @@
 
 namespace core
 {
-	class WinOSEventLoop;
-	class Reactor;
+	class EventLoop;
 
 	class EventSource
 	{
+		EventLoop* m_eventLoop = nullptr;
 	public:
+		explicit EventSource(EventLoop* eventLoop)
+			: m_eventLoop(eventLoop)
+		{}
+
 		virtual ~EventSource() = default;
 
-		virtual HumanError read(WinOSEventLoop* loop, Reactor* reactor) = 0;
+		EventLoop* eventLoop() const { return m_eventLoop; }
 	};
 
 	class Event
@@ -28,23 +32,27 @@ namespace core
 			KIND_READ,
 		};
 
-		explicit Event(KIND kind)
-			: m_kind(kind)
+		explicit Event(KIND kind, EventSource* source)
+			: m_kind(kind),
+			  m_source(source)
 		{}
 
 		virtual ~Event() = default;
 
 		KIND kind() const { return m_kind; }
+		EventSource* source() const { return m_source; }
+		EventLoop* eventLoop() const { return m_source->eventLoop(); }
 	private:
 		KIND m_kind = KIND_NONE;
+		EventSource* m_source = nullptr;
 	};
 
 	class ReadEvent: public Event
 	{
 		Span<const std::byte> m_buffer;
 	public:
-		ReadEvent(Span<const std::byte> buffer)
-			: Event(Event::KIND_READ),
+		ReadEvent(Span<const std::byte> buffer, EventSource* source)
+			: Event(Event::KIND_READ, source),
 			  m_buffer(buffer)
 		{}
 

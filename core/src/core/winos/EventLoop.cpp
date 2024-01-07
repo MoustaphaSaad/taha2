@@ -6,8 +6,6 @@
 
 namespace core
 {
-	class WinOSEventLoop;
-
 	class WinOSEventLoop: public EventLoop
 	{
 		struct Op: OVERLAPPED
@@ -47,11 +45,13 @@ namespace core
 			HANDLE handle;
 			DWORD flags = 0;
 			WSABUF wsaBuf{};
+			EventSource* source = nullptr;
 			Reactor* reactor = nullptr;
 
-			ReadOp(HANDLE handle_, Span<std::byte> buffer, Reactor* reactor_)
+			ReadOp(HANDLE handle_, Span<std::byte> buffer, EventSource* source_, Reactor* reactor_)
 				: Op(KIND_READ),
 				  handle(handle_),
+				  source(source_),
 				  reactor(reactor_)
 			{
 				wsaBuf.buf = (CHAR*)buffer.data();
@@ -59,20 +59,31 @@ namespace core
 			}
 		};
 
-		class WinOSSocketEventSource: public EventSource
+		class WinOSEventSource: public EventSource
+		{
+		public:
+			explicit WinOSEventSource(EventLoop* loop)
+				: EventSource(loop)
+			{}
+
+			virtual HumanError read(WinOSEventLoop* loop, Reactor* reactor) = 0;
+		};
+
+		class WinOSSocketEventSource: public WinOSEventSource
 		{
 			Unique<Socket> m_socket;
 			std::byte recvLine[2048];
 		public:
-			explicit WinOSSocketEventSource(Unique<Socket> socket)
-				: m_socket(std::move(socket))
+			explicit WinOSSocketEventSource(Unique<Socket> socket, EventLoop* loop)
+				: WinOSEventSource(loop),
+				  m_socket(std::move(socket))
 			{
 				::memset(recvLine, 0, sizeof(recvLine));
 			}
 
 			HumanError read(WinOSEventLoop* loop, Reactor* reactor) override
 			{
-				auto op = unique_from<ReadOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<std::byte>{recvLine, sizeof(recvLine)}, reactor);
+				auto op = unique_from<ReadOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<std::byte>{recvLine, sizeof(recvLine)}, this, reactor);
 
 				auto res = WSARecv(
 					(SOCKET)m_socket->fd(),
@@ -175,7 +186,7 @@ namespace core
 							DWORD bytesReceived = 0;
 							auto res = GetOverlappedResult(readOp->handle, readOp.get(), &bytesReceived, FALSE);
 							assert(SUCCEEDED(res));
-							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesReceived}};
+							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesReceived}, readOp->source};
 							readOp->reactor->handle(&readEvent);
 						}
 						m_log->debug("read event loop"_sv);
@@ -203,7 +214,7 @@ namespace core
 
 			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
 			assert(newPort == m_completionPort);
-			return unique_from<WinOSSocketEventSource>(m_allocator, std::move(socket));
+			return unique_from<WinOSSocketEventSource>(m_allocator, std::move(socket), this);
 		}
 
 		HumanError read(EventSource* source, Reactor* reactor) override
@@ -211,7 +222,8 @@ namespace core
 			if (source == nullptr)
 				return {};
 
-			return source->read(this, reactor);
+			auto winOSSource = (WinOSEventSource*)source;
+			return winOSSource->read(this, reactor);
 		}
 	};
 

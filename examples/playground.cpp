@@ -27,6 +27,7 @@ public:
 	void onRead(const core::ReadEvent* event) override
 	{
 		m_log->debug("read: \"{}\""_sv, core::StringView{event->buffer()});
+		event->eventLoop()->read(event->source(), this);
 	}
 };
 
