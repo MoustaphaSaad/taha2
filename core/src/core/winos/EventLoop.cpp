@@ -91,13 +91,19 @@ namespace core
 		class WinOSSocketEventSource: public WinOSEventSource
 		{
 			Unique<Socket> m_socket;
-			std::byte recvLine[2048];
+			std::byte recvLine[2048] = {};
 		public:
 			WinOSSocketEventSource(Unique<Socket> socket, EventLoop* loop, Allocator* allocator)
 				: WinOSEventSource(loop, allocator),
 				  m_socket(std::move(socket))
 			{
 				::memset(recvLine, 0, sizeof(recvLine));
+			}
+
+			~WinOSSocketEventSource() override
+			{
+				[[maybe_unused]] auto res = m_socket->shutdown(Socket::SHUT_RDWR);
+				assert(res);
 			}
 
 			HumanError read(WinOSEventLoop* loop, Reactor* reactor) override
