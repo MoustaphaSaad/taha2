@@ -1,5 +1,6 @@
 #include "core/EventLoop.h"
 #include "core/Hash.h"
+#include "core/Queue.h"
 
 #include <Windows.h>
 #include <WinSock2.h>
@@ -20,6 +21,7 @@ namespace core
 				KIND_CLOSE,
 				KIND_READ,
 				KIND_ACCEPT,
+				KIND_WRITE,
 			};
 
 			explicit Op(KIND kind_, WinOSEventSource* source_)
@@ -77,6 +79,29 @@ namespace core
 			{}
 		};
 
+		struct WriteOp: Op
+		{
+			HANDLE handle;
+			WSABUF wsaBuf{};
+			Reactor* reactor = nullptr;
+
+			WriteOp(HANDLE handle_, Span<const std::byte> buffer, WinOSEventSource* source_, Reactor* reactor_)
+				: Op(KIND_WRITE, source_),
+				  handle(handle_),
+				  reactor(reactor_)
+			{
+				wsaBuf.buf = (CHAR*)buffer.data();
+				wsaBuf.len = (ULONG)buffer.count();
+			}
+		};
+
+		struct OutboundBytes
+		{
+			Buffer buffer;
+			Reactor* reactor;
+			bool isScheduled = false;
+		};
+
 		class WinOSEventSource: public EventSource
 		{
 			Map<Op*, Unique<Op>> m_scheduledOperations;
@@ -101,7 +126,9 @@ namespace core
 				return res;
 			}
 
+			virtual HumanError processWriteQueue(WinOSEventLoop* loop) = 0;
 			virtual HumanError read(WinOSEventLoop* loop, Reactor* reactor) = 0;
+			virtual HumanError write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> buffer) = 0;
 			virtual HumanError accept(WinOSEventLoop* loop, Reactor* reactor) = 0;
 		};
 
@@ -109,10 +136,12 @@ namespace core
 		{
 			Unique<Socket> m_socket;
 			std::byte recvLine[2048] = {};
+			Queue<OutboundBytes> m_writeQueue;
 		public:
 			WinOSSocketEventSource(Unique<Socket> socket, EventLoop* loop, Allocator* allocator)
 				: WinOSEventSource(loop, allocator),
-				  m_socket(std::move(socket))
+				  m_socket(std::move(socket)),
+				  m_writeQueue(allocator)
 			{
 				::memset(recvLine, 0, sizeof(recvLine));
 			}
@@ -121,6 +150,42 @@ namespace core
 			{
 				[[maybe_unused]] auto res = m_socket->shutdown(Socket::SHUT_RDWR);
 				assert(res);
+			}
+
+			HumanError processWriteQueue(WinOSEventLoop* loop) override
+			{
+				if (m_writeQueue.count() == 0)
+					return {};
+
+				if (m_writeQueue.front().isScheduled)
+					return {};
+
+				auto& outboundBytes = m_writeQueue.front();
+				outboundBytes.isScheduled = true;
+
+				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<const std::byte>{outboundBytes.buffer}, this, outboundBytes.reactor);
+
+				auto res = WSASend(
+					(SOCKET)m_socket->fd(),
+					&op->wsaBuf,
+					1,
+					NULL,
+					0,
+					(OVERLAPPED*)op.get(),
+					NULL
+				);
+
+				if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
+				{
+					pushPendingOp(std::move(op));
+				}
+				else
+				{
+					auto error = WSAGetLastError();
+					return errf(loop->m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
+				}
+
+				return {};
 			}
 
 			HumanError read(WinOSEventLoop* loop, Reactor* reactor) override
@@ -148,6 +213,16 @@ namespace core
 				}
 
 				return {};
+			}
+
+			HumanError write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> bytes) override
+			{
+				Buffer buffer{loop->m_allocator};
+				buffer.push(bytes);
+
+				m_writeQueue.push_back(OutboundBytes{.buffer = buffer, .reactor = reactor});
+
+				return processWriteQueue(loop);
 			}
 
 			HumanError accept(WinOSEventLoop* loop, Reactor* reactor) override
@@ -282,6 +357,22 @@ namespace core
 						m_log->debug("accept event loop"_sv);
 						break;
 					}
+					case Op::KIND_WRITE:
+					{
+						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+						if (writeOp->reactor)
+						{
+							DWORD bytesSent = 0;
+							auto res = GetOverlappedResult(writeOp->handle, writeOp.get(), &bytesSent, FALSE);
+							assert(SUCCEEDED(res));
+							WriteEvent writeEvent{bytesSent, writeOp->source};
+							writeOp->reactor->handle(&writeEvent);
+						}
+						m_log->debug("write event loop"_sv);
+						// TODO: do something about this potential error
+						(void)writeOp->source->processWriteQueue(this);
+						break;
+					}
 					default:
 						return errf(m_allocator, "unknown operation kind, {}"_sv, (int)op->kind);
 					}
@@ -315,6 +406,16 @@ namespace core
 			auto winOSSource = (WinOSEventSource*)source;
 			return winOSSource->read(this, reactor);
 		}
+
+		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
+		{
+			if (source == nullptr)
+				return {};
+
+			auto winOSSource = (WinOSEventSource*)source;
+			return winOSSource->write(this, reactor, buffer);
+		}
+
 
 		HumanError accept(EventSource* source, Reactor* reactor) override
 		{

@@ -31,6 +31,7 @@ namespace core
 			KIND_NONE,
 			KIND_READ,
 			KIND_ACCEPT,
+			KIND_WRITE,
 		};
 
 		explicit Event(KIND kind, EventSource* source)
@@ -72,6 +73,18 @@ namespace core
 		Unique<Socket> releaseSocket() { return std::move(m_socket); }
 	};
 
+	class WriteEvent: public Event
+	{
+		size_t m_writtenSize = 0;
+	public:
+		WriteEvent(size_t writtenSize, EventSource* source)
+			: Event(Event::KIND_WRITE, source),
+			  m_writtenSize(writtenSize)
+		{}
+
+		size_t writtenSize() const { return m_writtenSize; }
+	};
+
 	class Reactor
 	{
 	public:
@@ -87,6 +100,8 @@ namespace core
 			case Event::KIND_ACCEPT:
 				onAccept((AcceptEvent*)event);
 				break;
+			case Event::KIND_WRITE:
+				onWrite((const WriteEvent*)event);
 			default:
 				assert(false);
 				break;
@@ -97,6 +112,9 @@ namespace core
 		{}
 
 		virtual void onAccept(AcceptEvent* event)
+		{}
+
+		virtual void onWrite(const WriteEvent* event)
 		{}
 	};
 
@@ -112,6 +130,7 @@ namespace core
 
 		virtual Unique<EventSource> createEventSource(Unique<Socket> socket) = 0;
 		virtual HumanError read(EventSource* source, Reactor* reactor) = 0;
+		virtual HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) = 0;
 		virtual HumanError accept(EventSource* source, Reactor* reactor) = 0;
 	};
 }
