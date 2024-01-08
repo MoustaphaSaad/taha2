@@ -98,6 +98,7 @@ namespace core
 		struct OutboundBytes
 		{
 			Buffer buffer;
+			Span<const std::byte> remainingBytes;
 			Reactor* reactor;
 			bool isScheduled = false;
 		};
@@ -127,6 +128,7 @@ namespace core
 			}
 
 			virtual HumanError processWriteQueue(WinOSEventLoop* loop) = 0;
+			virtual HumanError handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) = 0;
 			virtual HumanError read(WinOSEventLoop* loop, Reactor* reactor) = 0;
 			virtual HumanError write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> buffer) = 0;
 			virtual HumanError accept(WinOSEventLoop* loop, Reactor* reactor) = 0;
@@ -151,19 +153,8 @@ namespace core
 				m_socket->shutdown(Socket::SHUT_RDWR);
 			}
 
-			HumanError processWriteQueue(WinOSEventLoop* loop) override
+			HumanError scheduleWriteOp(WinOSEventLoop* loop, Unique<WriteOp> op)
 			{
-				if (m_writeQueue.count() == 0)
-					return {};
-
-				if (m_writeQueue.front().isScheduled)
-					return {};
-
-				auto& outboundBytes = m_writeQueue.front();
-				outboundBytes.isScheduled = true;
-
-				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<const std::byte>{outboundBytes.buffer}, this, outboundBytes.reactor);
-
 				auto res = WSASend(
 					(SOCKET)m_socket->fd(),
 					&op->wsaBuf,
@@ -185,6 +176,38 @@ namespace core
 				}
 
 				return {};
+			}
+
+			HumanError processWriteQueue(WinOSEventLoop* loop) override
+			{
+				if (m_writeQueue.count() == 0)
+					return {};
+
+				if (m_writeQueue.front().isScheduled)
+					return {};
+
+				auto& outboundBytes = m_writeQueue.front();
+				outboundBytes.isScheduled = true;
+
+				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, this, outboundBytes.reactor);
+				return scheduleWriteOp(loop, std::move(op));
+			}
+
+			HumanError handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) override
+			{
+				assert(m_writeQueue.count() > 0);
+				auto& outboundBytes = m_writeQueue.front();
+				assert(outboundBytes.isScheduled == true);
+				outboundBytes.remainingBytes = outboundBytes.remainingBytes.slice(writtenSize, outboundBytes.remainingBytes.count() - writtenSize);
+
+				if (writtenSize == outboundBytes.remainingBytes.count())
+				{
+					m_writeQueue.pop_front();
+					return processWriteQueue(loop);
+				}
+
+				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, this, outboundBytes.reactor);
+				return scheduleWriteOp(loop, std::move(op));
 			}
 
 			HumanError read(WinOSEventLoop* loop, Reactor* reactor) override
@@ -219,7 +242,7 @@ namespace core
 				Buffer buffer{loop->m_allocator};
 				buffer.push(bytes);
 
-				m_writeQueue.push_back(OutboundBytes{.buffer = buffer, .reactor = reactor});
+				m_writeQueue.push_back(OutboundBytes{.buffer = buffer, .remainingBytes = Span<const std::byte>{buffer}, .reactor = reactor});
 
 				return processWriteQueue(loop);
 			}
@@ -359,17 +382,17 @@ namespace core
 					case Op::KIND_WRITE:
 					{
 						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+						DWORD bytesSent = 0;
+						auto res = GetOverlappedResult(writeOp->handle, writeOp.get(), &bytesSent, FALSE);
+						assert(SUCCEEDED(res));
 						if (writeOp->reactor)
 						{
-							DWORD bytesSent = 0;
-							auto res = GetOverlappedResult(writeOp->handle, writeOp.get(), &bytesSent, FALSE);
-							assert(SUCCEEDED(res));
 							WriteEvent writeEvent{bytesSent, writeOp->source};
 							writeOp->reactor->handle(&writeEvent);
 						}
 						m_log->debug("write event loop"_sv);
 						// TODO: do something about this potential error
-						(void)writeOp->source->processWriteQueue(this);
+						(void)writeOp->source->handleWriteEvent(this, bytesSent);
 						break;
 					}
 					default:
@@ -402,6 +425,7 @@ namespace core
 			if (source == nullptr)
 				return {};
 
+			m_log->debug("scheduling read ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
 			return winOSSource->read(this, reactor);
 		}
@@ -411,6 +435,7 @@ namespace core
 			if (source == nullptr)
 				return {};
 
+			m_log->debug("scheduling write ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
 			return winOSSource->write(this, reactor, buffer);
 		}
@@ -421,6 +446,7 @@ namespace core
 			if (source == nullptr)
 				return {};
 
+			m_log->debug("scheduling accept ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
 			return winOSSource->accept(this, reactor);
 		}
