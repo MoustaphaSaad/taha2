@@ -11,6 +11,7 @@ namespace core::websocket
 	{
 		StringView host = "127.0.0.1"_sv;
 		StringView port = "8080"_sv;
+		size_t maxHandshakeSize = 1ULL * 1024ULL;
 	};
 
 	class Server2
