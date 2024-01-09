@@ -107,7 +107,7 @@ int main()
 	EchoServer echoServer{&log, &mallocator};
 
 	auto acceptSocket = core::Socket::open(&mallocator, core::Socket::FAMILY_IPV4, core::Socket::TYPE_TCP);
-	acceptSocket->bind("8080"_sv);
+	acceptSocket->bind("127.0.0.1"_sv, "8080"_sv);
 	acceptSocket->listen();
 	auto acceptEventSocket = eventLoop->createEventSource(std::move(acceptSocket));
 	auto err = eventLoop->accept(acceptEventSocket.get(), &echoServer);

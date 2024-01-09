@@ -82,7 +82,7 @@ namespace core
 			return false;
 		}
 
-		bool bind(StringView port) override
+		bool bind(StringView host, StringView port) override
 		{
 			addrinfo hints = {};
 			hints.ai_family = m_family;
@@ -90,9 +90,10 @@ namespace core
 			hints.ai_protocol = m_protocol;
 			hints.ai_flags = AI_PASSIVE;
 
-			String c_port(port, m_allocator);
+			String c_port{port, m_allocator};
+			String c_host{host, m_allocator};
 			addrinfo* result = nullptr;
-			auto err = ::getaddrinfo(nullptr, c_port.data(), &hints, &result);
+			auto err = ::getaddrinfo(c_host.data(), c_port.data(), &hints, &result);
 			if (err != 0)
 				return false;
 

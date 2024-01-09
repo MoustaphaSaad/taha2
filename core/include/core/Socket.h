@@ -34,7 +34,7 @@ namespace core
 
 		virtual bool close() = 0;
 		virtual bool connect(StringView address, StringView port) = 0;
-		virtual bool bind(StringView port) = 0;
+		virtual bool bind(StringView host, StringView port) = 0;
 		virtual bool listen(int max_connections = 0) = 0;
 		virtual Unique<Socket> accept() = 0;
 		virtual bool shutdown(SHUT how) = 0;
