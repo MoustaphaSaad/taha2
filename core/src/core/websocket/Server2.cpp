@@ -1,5 +1,6 @@
 #include "core/websocket/Server2.h"
 #include "core/websocket/Handshake.h"
+#include "core/websocket/MessageParser.h"
 #include "core/Hash.h"
 #include "core/SHA1.h"
 #include "core/Base64.h"
@@ -23,8 +24,10 @@ namespace core::websocket
 			Unique<EventSource> m_socketSource;
 			Buffer m_handshakeBuffer;
 			size_t m_maxHandshakeSize = 1ULL * 1024ULL;
+			Buffer m_messageBuffer;
+			MessageParser m_messageParser;
 
-			void error(StringView str)
+			void sendError(StringView str)
 			{
 				auto eventLoop = m_socketSource->eventLoop();
 				(void)eventLoop->write(m_socketSource.get(), nullptr, Span<const std::byte>{str});
@@ -56,7 +59,9 @@ namespace core::websocket
 				  m_server(server),
 				  m_socketSource(std::move(socketSource)),
 				  m_handshakeBuffer(allocator),
-				  m_maxHandshakeSize(maxHanshakeSize)
+				  m_maxHandshakeSize(maxHanshakeSize),
+				  m_messageBuffer(allocator),
+				  m_messageParser(allocator, 64ULL * 1024ULL * 1024ULL)
 			{}
 
 			void onRead(const ReadEvent* event)
@@ -70,7 +75,7 @@ namespace core::websocket
 					auto totalHandshakeBuffer = m_handshakeBuffer.count() + event->buffer().count();
 					if (totalHandshakeBuffer > m_maxHandshakeSize)
 					{
-						error(R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv);
+						sendError(R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv);
 						m_server->removeConn(this);
 						return;
 					}
@@ -83,11 +88,12 @@ namespace core::websocket
 						auto handshakeResult = Handshake::parse(handshakeString, m_allocator);
 						if (handshakeResult.isError())
 						{
-							error(R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv);
+							sendError(R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv);
 							m_server->removeConn(this);
 							return;
 						}
 						auto handshake = handshakeResult.releaseValue();
+						m_handshakeBuffer = Buffer{m_allocator};
 
 						m_log->debug("handshake: {}"_sv, handshake.key());
 
@@ -120,6 +126,55 @@ namespace core::websocket
 				}
 				case STATE_READ_MESSAGE:
 				{
+					m_messageBuffer.push(event->buffer());
+
+					auto bytes = Span<const std::byte>{m_messageBuffer};
+					HumanError error{};
+					while (bytes.count() > 0)
+					{
+						auto parserResult = m_messageParser.consume(bytes);
+						if (parserResult.isError())
+						{
+							error = parserResult.releaseError();
+							break;
+						}
+						auto consumedBytes = parserResult.value();
+
+						// if we didn't consume any bytes we just wait for more bytes
+						if (consumedBytes == 0)
+							break;
+
+						bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
+
+						if (m_messageParser.hasMessage())
+						{
+							auto msg = m_messageParser.message();
+							m_log->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
+							// TODO: handle message
+						}
+					}
+
+					if (bytes.count() == 0)
+					{
+						m_messageBuffer.clear();
+					}
+					else
+					{
+						::memcpy(m_messageBuffer.data(), bytes.data(), bytes.count());
+						m_messageBuffer.resize(bytes.count());
+					}
+
+					if (error)
+					{
+						// TODO: do something about this error
+					}
+
+					if (auto err = eventLoop->read(m_socketSource.get(), this))
+					{
+						sendError("failed to schedule read"_sv);
+						m_server->removeConn(this);
+						return;
+					}
 					break;
 				}
 				default:
