@@ -13,6 +13,12 @@ void signalHandler(int signal)
 	}
 }
 
+core::HumanError onMsg(const core::websocket::Message& msg)
+{
+	// TODO: handle message
+	return {};
+}
+
 int main()
 {
 	signal(SIGINT, signalHandler);
@@ -38,7 +44,9 @@ int main()
 	auto server = serverResult.releaseValue();
 
 	core::websocket::ServerConfig2 config{};
-	auto err = server->start(config, eventLoop.get());
+	core::websocket::ServerHandler2 handler{};
+	handler.onMsg = onMsg;
+	auto err = server->start(config, eventLoop.get(), &handler);
 	if (err)
 	{
 		log.critical("failed to start websocket server, {}"_sv, err);
