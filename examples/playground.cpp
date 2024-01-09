@@ -35,7 +35,7 @@ int main()
 		log.critical("failed to create websocket server, {}"_sv, eventLoopResult.error());
 		return EXIT_FAILURE;
 	}
-	auto server =serverResult.releaseValue();
+	auto server = serverResult.releaseValue();
 
 	core::websocket::ServerConfig2 config{};
 	auto err = server->start(config, eventLoop.get());
