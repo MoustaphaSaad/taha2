@@ -261,6 +261,13 @@ namespace core::websocket
 			{
 				auto eventLoop = event->eventLoop();
 
+				// zero read means connection is closed
+				if (event->buffer().count() == 0)
+				{
+					m_server->removeConn(this);
+					return;
+				}
+
 				switch (m_state)
 				{
 				case STATE_HANDSHAKE:
@@ -349,6 +356,13 @@ namespace core::websocket
 							{
 								// NOTE: we can fail to close the connection cleanly here
 								(void)writeCloseWithCode(1011, err.message());
+								m_server->removeConn(this);
+								return;
+							}
+
+							// check if this is a close message
+							if (msg.type == Message::TYPE_CLOSE)
+							{
 								m_server->removeConn(this);
 								return;
 							}
@@ -473,6 +487,14 @@ namespace core::websocket
 				return acceptHandlerResult.releaseError();
 			m_acceptHandler = acceptHandlerResult.releaseValue();
 			return {};
+		}
+
+		void stop() override
+		{
+			m_acceptHandler = nullptr;
+			for (auto& [conn, _]: m_connections)
+				(void)conn->writeCloseNormally();
+			m_connections.clear();
 		}
 
 		HumanError writeText(Conn* conn, StringView str) override

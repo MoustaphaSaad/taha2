@@ -4,19 +4,31 @@
 #include <signal.h>
 
 core::EventLoop* EVENT_LOOP = nullptr;
+core::websocket::Server2* SERVER = nullptr;
 
 void signalHandler(int signal)
 {
 	if (signal == SIGINT)
 	{
+		// stop the server
+		SERVER->stop();
+		// then quit the app
 		EVENT_LOOP->stop();
 	}
 }
 
 core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Server2* server, core::websocket::Conn* conn)
 {
-	// TODO: handle message
-	return {};
+	switch (msg.type)
+	{
+	case core::websocket::Message::TYPE_TEXT:
+		return server->writeText(conn, core::StringView{msg.payload});
+	case core::websocket::Message::TYPE_BINARY:
+		return server->writeBinary(conn, core::Span<const std::byte>{msg.payload});
+	default:
+		assert(false);
+		return {};
+	}
 }
 
 int main()

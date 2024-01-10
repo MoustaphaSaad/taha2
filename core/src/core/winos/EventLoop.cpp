@@ -241,8 +241,9 @@ namespace core
 			{
 				Buffer buffer{loop->m_allocator};
 				buffer.push(bytes);
+				auto remainingBytes = Span<const std::byte>{buffer};
 
-				m_writeQueue.push_back(OutboundBytes{.buffer = buffer, .remainingBytes = Span<const std::byte>{buffer}, .reactor = reactor});
+				m_writeQueue.push_back(OutboundBytes{.buffer = std::move(buffer), .remainingBytes = remainingBytes, .reactor = reactor});
 
 				return processWriteQueue(loop);
 			}
