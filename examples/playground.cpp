@@ -13,7 +13,7 @@ void signalHandler(int signal)
 	}
 }
 
-core::HumanError onMsg(const core::websocket::Message& msg)
+core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Server2* server, core::websocket::Conn* conn)
 {
 	// TODO: handle message
 	return {};

@@ -26,7 +26,7 @@ namespace core::websocket
 		bool handleClose = false;
 		size_t maxPayloadSize = 16ULL * 1024ULL * 1024ULL;
 
-		Func<HumanError(const Message&)> onMsg;
+		Func<HumanError(const Message&, Server2*, Conn*)> onMsg;
 	};
 
 	class Server2

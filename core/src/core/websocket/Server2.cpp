@@ -7,9 +7,20 @@
 
 namespace core::websocket
 {
+	class Conn
+	{
+		void* m_connHandler = nullptr;
+	public:
+		Conn(void* connHandler)
+			: m_connHandler(connHandler)
+		{}
+
+		void* connHandler() const { return m_connHandler; }
+	};
+
 	class Server2Impl: public Server2
 	{
-		class Conn: public Reactor
+		class ConnHandler: public Reactor
 		{
 			enum STATE
 			{
@@ -90,7 +101,7 @@ namespace core::websocket
 				(void)writeRaw(str);
 			}
 
-			HumanError onTextMsg(const Message& msg)
+			HumanError onTextMsg(const Message& msg, Conn* conn)
 			{
 				auto text = StringView{msg.payload};
 				if (text.isValidUtf8() == false)
@@ -98,25 +109,25 @@ namespace core::websocket
 
 				if (m_server->m_handler->onMsg)
 				{
-					return m_server->m_handler->onMsg(msg);
+					return m_server->m_handler->onMsg(msg, m_server, conn);
 				}
 				return {};
 			}
 
-			HumanError onBinaryMsg(const Message& msg)
+			HumanError onBinaryMsg(const Message& msg, Conn* conn)
 			{
 				if (m_server->m_handler->onMsg)
 				{
-					return m_server->m_handler->onMsg(msg);
+					return m_server->m_handler->onMsg(msg, m_server, conn);
 				}
 				return {};
 			}
 
-			HumanError onCloseMsg(const Message& msg)
+			HumanError onCloseMsg(const Message& msg, Conn* conn)
 			{
 				if (m_server->m_handler->handleClose)
 				{
-					return m_server->m_handler->onMsg(msg);
+					return m_server->m_handler->onMsg(msg, m_server, conn);
 				}
 				else
 				{
@@ -145,11 +156,11 @@ namespace core::websocket
 				}
 			}
 
-			HumanError onPingMsg(const Message& msg)
+			HumanError onPingMsg(const Message& msg, Conn* conn)
 			{
 				if (m_server->m_handler->handlePing)
 				{
-					return m_server->m_handler->onMsg(msg);
+					return m_server->m_handler->onMsg(msg, m_server, conn);
 				}
 				else
 				{
@@ -164,24 +175,24 @@ namespace core::websocket
 				}
 			}
 
-			HumanError onPongMsg(const Message& msg)
+			HumanError onPongMsg(const Message& msg, Conn* conn)
 			{
 				if (m_server->m_handler->handlePong)
 				{
-					return m_server->m_handler->onMsg(msg);
+					return m_server->m_handler->onMsg(msg, m_server, conn);
 				}
 				return {};
 			}
 
-			HumanError onMsg(const Message& msg)
+			HumanError onMsg(const Message& msg, Conn* conn)
 			{
 				switch (msg.type)
 				{
-				case Message::TYPE_TEXT: return onTextMsg(msg);
-				case Message::TYPE_BINARY: return onBinaryMsg(msg);
-				case Message::TYPE_CLOSE: return onCloseMsg(msg);
-				case Message::TYPE_PING: return onPingMsg(msg);
-				case Message::TYPE_PONG: return onPongMsg(msg);
+				case Message::TYPE_TEXT: return onTextMsg(msg, conn);
+				case Message::TYPE_BINARY: return onBinaryMsg(msg, conn);
+				case Message::TYPE_CLOSE: return onCloseMsg(msg, conn);
+				case Message::TYPE_PING: return onPingMsg(msg, conn);
+				case Message::TYPE_PONG: return onPongMsg(msg, conn);
 				default:
 					assert(false);
 					return errf(m_allocator, "invalid message type"_sv);
@@ -189,20 +200,20 @@ namespace core::websocket
 			}
 
 		public:
-			static Result<Unique<Conn>> create(Unique<Socket> socket, EventLoop* loop, Server2Impl* server, size_t maxHandshakeSize, Log* log, Allocator* allocator)
+			static Result<Unique<ConnHandler>> create(Unique<Socket> socket, EventLoop* loop, Server2Impl* server, size_t maxHandshakeSize, Log* log, Allocator* allocator)
 			{
 				auto socketSource = loop->createEventSource(std::move(socket));
 				if (socketSource == nullptr)
 					return errf(allocator, "failed to convert connection socket to event loop source"_sv);
 
-				auto res = unique_from<Conn>(allocator, std::move(socketSource), server, maxHandshakeSize, log, allocator);
+				auto res = unique_from<ConnHandler>(allocator, std::move(socketSource), server, maxHandshakeSize, log, allocator);
 				auto err = loop->read(res->m_socketSource.get(), res.get());
 				if (err)
 					return err;
 				return res;
 			}
 
-			Conn(Unique<EventSource> socketSource, Server2Impl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
+			ConnHandler(Unique<EventSource> socketSource, Server2Impl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
 				: m_allocator(allocator),
 				  m_log(log),
 				  m_server(server),
@@ -299,7 +310,8 @@ namespace core::websocket
 						{
 							auto msg = m_messageParser.message();
 							m_log->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
-							if (auto err = onMsg(msg))
+							Conn conn{this};
+							if (auto err = onMsg(msg, &conn))
 							{
 								// TODO: close with error
 								m_server->removeConn(this);
@@ -385,7 +397,7 @@ namespace core::websocket
 			{
 				auto socket = event->releaseSocket();
 				auto eventLoop = event->eventLoop();
-				auto connResult = Conn::create(std::move(socket), eventLoop, m_server, m_server->maxHandshakeSize, m_log, m_allocator);
+				auto connResult = ConnHandler::create(std::move(socket), eventLoop, m_server, m_server->maxHandshakeSize, m_log, m_allocator);
 				if (connResult.isError())
 				{
 					m_log->error("failed to create connection, {}"_sv, connResult.error());
@@ -401,12 +413,12 @@ namespace core::websocket
 			}
 		};
 
-		void addConn(Unique<Conn> conn)
+		void addConn(Unique<ConnHandler> conn)
 		{
 			m_connections.insert(conn.get(), std::move(conn));
 		}
 
-		void removeConn(Conn* conn)
+		void removeConn(ConnHandler* conn)
 		{
 			m_connections.remove(conn);
 		}
@@ -414,7 +426,7 @@ namespace core::websocket
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		Unique<AcceptHandler> m_acceptHandler;
-		Map<Conn*, Unique<Conn>> m_connections;
+		Map<ConnHandler*, Unique<ConnHandler>> m_connections;
 		size_t maxHandshakeSize = 1ULL * 1024ULL;
 		ServerHandler2* m_handler = nullptr;
 	public:
