@@ -322,14 +322,15 @@ namespace core::websocket
 					m_messageBuffer.push(event->buffer());
 
 					auto bytes = Span<const std::byte>{m_messageBuffer};
-					HumanError error{};
 					while (bytes.count() > 0)
 					{
 						auto parserResult = m_messageParser.consume(bytes);
 						if (parserResult.isError())
 						{
-							error = parserResult.releaseError();
-							break;
+							// NOTE: we can fail to close the connection cleanly here
+							(void)writeCloseWithCode(1002, parserResult.error().message());
+							m_server->removeConn(this);
+							return;
 						}
 						auto consumedBytes = parserResult.value();
 
@@ -346,7 +347,8 @@ namespace core::websocket
 							Conn conn{this};
 							if (auto err = onMsg(msg, &conn))
 							{
-								// TODO: close with error
+								// NOTE: we can fail to close the connection cleanly here
+								(void)writeCloseWithCode(1011, err.message());
 								m_server->removeConn(this);
 								return;
 							}
@@ -363,17 +365,10 @@ namespace core::websocket
 						m_messageBuffer.resize(bytes.count());
 					}
 
-					if (error)
-					{
-						// TODO: do something about this error
-						// sendError("failed to parse read message"_sv);
-						m_server->removeConn(this);
-						return;
-					}
-
 					if (auto err = eventLoop->read(m_socketSource.get(), this))
 					{
-						// sendError("failed to schedule read"_sv);
+						// NOTE: we can fail to close the connection cleanly here
+						(void)writeCloseWithCode(1011, err.message());
 						m_server->removeConn(this);
 						return;
 					}
