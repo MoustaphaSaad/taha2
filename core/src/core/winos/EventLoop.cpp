@@ -24,8 +24,9 @@ namespace core
 				KIND_WRITE,
 			};
 
-			explicit Op(KIND kind_, WinOSEventSource* source_)
+			explicit Op(KIND kind_, HANDLE handle_, WinOSEventSource* source_)
 				: kind(kind_),
+				  handle(handle_),
 				  source(source_)
 			{
 				::memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
@@ -39,26 +40,25 @@ namespace core
 			}
 
 			KIND kind = KIND_NONE;
+			HANDLE handle = INVALID_HANDLE_VALUE;
 			WinOSEventSource* source = nullptr;
 		};
 
 		struct CloseOp: Op
 		{
 			CloseOp()
-				: Op(KIND_CLOSE, nullptr)
+				: Op(KIND_CLOSE, nullptr, nullptr)
 			{}
 		};
 
 		struct ReadOp: Op
 		{
-			HANDLE handle;
 			DWORD flags = 0;
 			WSABUF wsaBuf{};
 			Reactor* reactor = nullptr;
 
 			ReadOp(HANDLE handle_, Span<std::byte> buffer, WinOSEventSource* source_, Reactor* reactor_)
-				: Op(KIND_READ, source_),
-				  handle(handle_),
+				: Op(KIND_READ, handle_, source_),
 				  reactor(reactor_)
 			{
 				wsaBuf.buf = (CHAR*)buffer.data();
@@ -72,8 +72,8 @@ namespace core
 			std::byte buffer[2 * sizeof(SOCKADDR_IN) + 16] = {};
 			Reactor* reactor = nullptr;
 
-			AcceptOp(Unique<Socket> socket_, WinOSEventSource* source_, Reactor* reactor_)
-				: Op(KIND_ACCEPT, source_),
+			AcceptOp(HANDLE handle_, Unique<Socket> socket_, WinOSEventSource* source_, Reactor* reactor_)
+				: Op(KIND_ACCEPT, handle_, source_),
 				  socket(std::move(socket_)),
 				  reactor(reactor_)
 			{}
@@ -81,13 +81,11 @@ namespace core
 
 		struct WriteOp: Op
 		{
-			HANDLE handle;
 			WSABUF wsaBuf{};
 			Reactor* reactor = nullptr;
 
 			WriteOp(HANDLE handle_, Span<const std::byte> buffer, WinOSEventSource* source_, Reactor* reactor_)
-				: Op(KIND_WRITE, source_),
-				  handle(handle_),
+				: Op(KIND_WRITE, handle_, source_),
 				  reactor(reactor_)
 			{
 				wsaBuf.buf = (CHAR*)buffer.data();
@@ -252,8 +250,9 @@ namespace core
 			{
 				// TODO: get the family and type from the accepting socket
 				auto socket = Socket::open(loop->m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
+				auto handle = (HANDLE)socket->fd();
 
-				auto op = unique_from<AcceptOp>(loop->m_allocator, std::move(socket), this, reactor);
+				auto op = unique_from<AcceptOp>(loop->m_allocator, handle, std::move(socket), this, reactor);
 
 				DWORD bytesReceived = 0;
 				auto res = loop->m_acceptEx(
