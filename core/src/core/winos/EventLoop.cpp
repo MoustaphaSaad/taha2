@@ -18,6 +18,7 @@ namespace core
 			enum KIND
 			{
 				KIND_NONE,
+				KIND_CANCELED,
 				KIND_CLOSE,
 				KIND_READ,
 				KIND_ACCEPT,
@@ -103,33 +104,16 @@ namespace core
 
 		class WinOSEventSource: public EventSource
 		{
-			Map<Op*, Unique<Op>> m_scheduledOperations;
 		public:
 			WinOSEventSource(EventLoop* loop, Allocator* allocator)
-				: EventSource(loop),
-				  m_scheduledOperations(allocator)
+				: EventSource(loop)
 			{}
 
-			void pushPendingOp(Unique<Op> op)
-			{
-				m_scheduledOperations.insert(op.get(), std::move(op));
-			}
-
-			Unique<Op> popPendingOp(Op* op)
-			{
-				auto it = m_scheduledOperations.lookup(op);
-				if (it == m_scheduledOperations.end())
-					return nullptr;
-				auto res = std::move(it->value);
-				m_scheduledOperations.remove(op);
-				return res;
-			}
-
-			virtual HumanError processWriteQueue(WinOSEventLoop* loop) = 0;
-			virtual HumanError handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) = 0;
-			virtual HumanError read(WinOSEventLoop* loop, Reactor* reactor) = 0;
-			virtual HumanError write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> buffer) = 0;
-			virtual HumanError accept(WinOSEventLoop* loop, Reactor* reactor) = 0;
+			virtual Result<Unique<Op>> processWriteQueue(WinOSEventLoop* loop) = 0;
+			virtual Result<Unique<Op>> handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) = 0;
+			virtual Result<Unique<Op>> read(WinOSEventLoop* loop, Reactor* reactor) = 0;
+			virtual Result<Unique<Op>> write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> buffer) = 0;
+			virtual Result<Unique<Op>> accept(WinOSEventLoop* loop, Reactor* reactor) = 0;
 		};
 
 		class WinOSSocketEventSource: public WinOSEventSource
@@ -149,9 +133,11 @@ namespace core
 			~WinOSSocketEventSource() override
 			{
 				m_socket->shutdown(Socket::SHUT_RDWR);
+				auto loop = (WinOSEventLoop*)eventLoop();
+				loop->destroyEventSource(this);
 			}
 
-			HumanError scheduleWriteOp(WinOSEventLoop* loop, Unique<WriteOp> op)
+			Result<Unique<Op>> scheduleWriteOp(WinOSEventLoop* loop, Unique<WriteOp> op)
 			{
 				auto res = WSASend(
 					(SOCKET)m_socket->fd(),
@@ -165,24 +151,22 @@ namespace core
 
 				if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
 				{
-					pushPendingOp(std::move(op));
+					return std::move(op);
 				}
 				else
 				{
 					auto error = WSAGetLastError();
 					return errf(loop->m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
 				}
-
-				return {};
 			}
 
-			HumanError processWriteQueue(WinOSEventLoop* loop) override
+			Result<Unique<Op>> processWriteQueue(WinOSEventLoop* loop) override
 			{
 				if (m_writeQueue.count() == 0)
-					return {};
+					return nullptr;
 
 				if (m_writeQueue.front().isScheduled)
-					return {};
+					return nullptr;
 
 				auto& outboundBytes = m_writeQueue.front();
 				outboundBytes.isScheduled = true;
@@ -191,7 +175,7 @@ namespace core
 				return scheduleWriteOp(loop, std::move(op));
 			}
 
-			HumanError handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) override
+			Result<Unique<Op>> handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) override
 			{
 				assert(m_writeQueue.count() > 0);
 				auto& outboundBytes = m_writeQueue.front();
@@ -208,7 +192,7 @@ namespace core
 				return scheduleWriteOp(loop, std::move(op));
 			}
 
-			HumanError read(WinOSEventLoop* loop, Reactor* reactor) override
+			Result<Unique<Op>> read(WinOSEventLoop* loop, Reactor* reactor) override
 			{
 				auto op = unique_from<ReadOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<std::byte>{recvLine, sizeof(recvLine)}, this, reactor);
 
@@ -224,18 +208,16 @@ namespace core
 
 				if (res != SOCKET_ERROR || WSAGetLastError() == ERROR_IO_PENDING)
 				{
-					pushPendingOp(std::move(op));
+					return std::move(op);
 				}
 				else
 				{
 					auto error = WSAGetLastError();
 					return errf(loop->m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
 				}
-
-				return {};
 			}
 
-			HumanError write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> bytes) override
+			Result<Unique<Op>> write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> bytes) override
 			{
 				Buffer buffer{loop->m_allocator};
 				buffer.push(bytes);
@@ -246,7 +228,7 @@ namespace core
 				return processWriteQueue(loop);
 			}
 
-			HumanError accept(WinOSEventLoop* loop, Reactor* reactor) override
+			Result<Unique<Op>> accept(WinOSEventLoop* loop, Reactor* reactor) override
 			{
 				// TODO: get the family and type from the accepting socket
 				auto socket = Socket::open(loop->m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
@@ -267,28 +249,28 @@ namespace core
 				);
 				if (res == TRUE || WSAGetLastError() == ERROR_IO_PENDING)
 				{
-					pushPendingOp(std::move(op));
+					return std::move(op);
 				}
 				else
 				{
 					auto error = WSAGetLastError();
 					return errf(loop->m_allocator, "failed to schedule accept operation: ErrorCode({})"_sv, error);
 				}
-				return {};
 			}
 		};
 
 		void pushPendingOp(Unique<Op> op)
 		{
-			m_scheduledOperations.insert(op.get(), std::move(op));
+			// ignore null operations that may rise because of calling process write queue functions
+			if (op == nullptr)
+				return;
+
+			auto handle = (OVERLAPPED*)op.get();
+			m_scheduledOperations.insert(handle, std::move(op));
 		}
 
-		Unique<Op> popPendingOp(Op* op)
+		Unique<Op> popPendingOp(OVERLAPPED* op)
 		{
-			// check if this operation is related to a source
-			if (op->source)
-				return op->source->popPendingOp(op);
-
 			// if not then this is a global operation
 			auto it = m_scheduledOperations.lookup(op);
 			if (it == m_scheduledOperations.end())
@@ -298,11 +280,25 @@ namespace core
 			return res;
 		}
 
+		void destroyEventSource(EventSource* source)
+		{
+			// TODO: maybe operations should keep a weak pointer to the event source until they are done
+			// THIS IS A WEIRD WAY TO HANDLE CANCELLATION, CHANGE IT
+			for (auto& [_, op]: m_scheduledOperations)
+			{
+				if (op->source == source)
+				{
+					CancelIoEx(op->handle, (OVERLAPPED*)op.get());
+					op->kind = Op::KIND_CANCELED;
+				}
+			}
+		}
+
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		LPFN_ACCEPTEX m_acceptEx = nullptr;
-		Map<Op*, Unique<Op>> m_scheduledOperations;
+		Map<OVERLAPPED*, Unique<Op>> m_scheduledOperations;
 	public:
 		WinOSEventLoop(HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
@@ -342,12 +338,21 @@ namespace core
 				for (size_t i = 0; i < numEntries; ++i)
 				{
 					auto overlapped = entries[i].lpOverlapped;
+					auto overlappedOp = (Op*)overlapped;
 
-					auto op = popPendingOp((Op*)overlapped);
+					DWORD bytesTransferred = 0;
+					GetOverlappedResult(overlappedOp->handle, overlapped, &bytesTransferred, FALSE);
+
+					auto op = popPendingOp(overlapped);
 					assert(op != nullptr);
 
 					switch (op->kind)
 					{
+					case Op::KIND_CANCELED:
+					{
+						m_log->debug("operation cancelled"_sv);
+						break;
+					}
 					case Op::KIND_CLOSE:
 					{
 						m_log->debug("closed event loop"_sv);
@@ -359,10 +364,8 @@ namespace core
 						auto readOp = unique_static_cast<ReadOp>(std::move(op));
 						if (readOp->reactor)
 						{
-							DWORD bytesReceived = 0;
-							auto res = GetOverlappedResult(readOp->handle, readOp.get(), &bytesReceived, FALSE);
-							assert(SUCCEEDED(res));
-							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesReceived}, readOp->source};
+
+							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesTransferred}, readOp->source};
 							readOp->reactor->handle(&readEvent);
 						}
 						m_log->debug("read event loop"_sv);
@@ -382,17 +385,22 @@ namespace core
 					case Op::KIND_WRITE:
 					{
 						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
-						DWORD bytesSent = 0;
-						auto res = GetOverlappedResult(writeOp->handle, writeOp.get(), &bytesSent, FALSE);
-						assert(SUCCEEDED(res));
 						if (writeOp->reactor)
 						{
-							WriteEvent writeEvent{bytesSent, writeOp->source};
+							WriteEvent writeEvent{bytesTransferred, writeOp->source};
 							writeOp->reactor->handle(&writeEvent);
 						}
 						m_log->debug("write event loop"_sv);
-						// TODO: do something about this potential error
-						(void)writeOp->source->handleWriteEvent(this, bytesSent);
+						auto opResult = writeOp->source->handleWriteEvent(this, bytesTransferred);
+						if (opResult.isError())
+						{
+							// TODO: do something about this potential error
+							m_log->error("failed to handle write queue of an event source, {}"_sv, opResult.error());
+						}
+						else
+						{
+							pushPendingOp(opResult.releaseValue());
+						}
 						break;
 					}
 					default:
@@ -427,7 +435,11 @@ namespace core
 
 			m_log->debug("scheduling read ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
-			return winOSSource->read(this, reactor);
+			auto opResult = winOSSource->read(this, reactor);
+			if (opResult.isError())
+				return opResult.releaseError();
+			pushPendingOp(opResult.releaseValue());
+			return {};
 		}
 
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
@@ -437,7 +449,12 @@ namespace core
 
 			m_log->debug("scheduling write ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
-			return winOSSource->write(this, reactor, buffer);
+			auto opResult = winOSSource->write(this, reactor, buffer);
+			if (opResult.isError())
+				return opResult.releaseError();
+			else
+				pushPendingOp(opResult.releaseValue());
+			return {};
 		}
 
 
@@ -448,7 +465,11 @@ namespace core
 
 			m_log->debug("scheduling accept ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
-			return winOSSource->accept(this, reactor);
+			auto opResult = winOSSource->accept(this, reactor);
+			if (opResult.isError())
+				return opResult.releaseError();
+			pushPendingOp(opResult.releaseValue());
+			return {};
 		}
 	};
 
