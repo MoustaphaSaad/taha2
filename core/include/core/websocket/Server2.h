@@ -36,5 +36,11 @@ namespace core::websocket
 
 		virtual ~Server2() = default;
 		virtual HumanError start(ServerConfig2 config, EventLoop* loop, ServerHandler2* handler) = 0;
+		virtual HumanError writeText(Conn* conn, StringView str) = 0;
+		virtual HumanError writeBinary(Conn* conn, Span<const std::byte> bytes) = 0;
+		virtual HumanError writePing(Conn* conn, Span<const std::byte> bytes) = 0;
+		virtual HumanError writePong(Conn* conn, Span<const std::byte> bytes) = 0;
+		virtual HumanError writeClose(Conn* conn) = 0;
+		virtual HumanError writeClose(Conn* conn, uint16_t code, StringView optionalReason) = 0;
 	};
 }

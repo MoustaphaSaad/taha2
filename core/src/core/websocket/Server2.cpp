@@ -91,11 +91,6 @@ namespace core::websocket
 				return {};
 			}
 
-			HumanError writePong(Span<const std::byte> bytes)
-			{
-				return writeFrame(FrameHeader::OPCODE_PONG, bytes);
-			}
-
 			void sendHTTPError(StringView str)
 			{
 				(void)writeRaw(str);
@@ -223,6 +218,44 @@ namespace core::websocket
 				  m_messageBuffer(allocator),
 				  m_messageParser(allocator, 64ULL * 1024ULL * 1024ULL)
 			{}
+
+			HumanError writeText(StringView str)
+			{
+				return writeFrame(FrameHeader::OPCODE_TEXT, Span<const std::byte>{str});
+			}
+
+			HumanError writeBinary(Span<const std::byte> bytes)
+			{
+				return writeFrame(FrameHeader::OPCODE_BINARY, bytes);
+			}
+
+			HumanError writePing(Span<const std::byte> bytes)
+			{
+				return writeFrame(FrameHeader::OPCODE_PING, bytes);
+			}
+
+			HumanError writeCloseNormally()
+			{
+				return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+			}
+
+			HumanError writeCloseWithCode(uint16_t code, StringView optionalReason)
+			{
+				uint8_t buf[2];
+				buf[0] = (code >> 8) & 0xFF;
+				buf[1] = code & 0xFF;
+				auto payloadSize = sizeof(buf) + optionalReason.count();
+				if (auto err = writeFrameHeader(FrameHeader::OPCODE_CLOSE, payloadSize)) return err;
+				if (auto err = writeRaw(Span<const std::byte>{(const std::byte*)buf, sizeof(buf)})) return err;
+				if (optionalReason.count() > 0)
+					if (auto err = writeRaw(optionalReason)) return err;
+				return {};
+			}
+
+			HumanError writePong(Span<const std::byte> bytes)
+			{
+				return writeFrame(FrameHeader::OPCODE_PONG, bytes);
+			}
 
 			void onRead(const ReadEvent* event)
 			{
@@ -445,6 +478,42 @@ namespace core::websocket
 				return acceptHandlerResult.releaseError();
 			m_acceptHandler = acceptHandlerResult.releaseValue();
 			return {};
+		}
+
+		HumanError writeText(Conn* conn, StringView str) override
+		{
+			auto connHandler = (ConnHandler*)conn->connHandler();
+			return connHandler->writeText(str);
+		}
+
+		HumanError writeBinary(Conn* conn, Span<const std::byte> bytes) override
+		{
+			auto connHandler = (ConnHandler*)conn->connHandler();
+			return connHandler->writeBinary(bytes);
+		}
+
+		HumanError writePing(Conn* conn, Span<const std::byte> bytes) override
+		{
+			auto connHandler = (ConnHandler*)conn->connHandler();
+			return connHandler->writePing(bytes);
+		}
+
+		HumanError writePong(Conn* conn, Span<const std::byte> bytes) override
+		{
+			auto connHandler = (ConnHandler*)conn->connHandler();
+			return connHandler->writePong(bytes);
+		}
+
+		HumanError writeClose(Conn* conn) override
+		{
+			auto connHandler = (ConnHandler*)conn->connHandler();
+			return connHandler->writeCloseNormally();
+		}
+
+		HumanError writeClose(Conn* conn, uint16_t code, StringView optionalReason) override
+		{
+			auto connHandler = (ConnHandler*)conn->connHandler();
+			return connHandler->writeCloseWithCode(code, optionalReason);
 		}
 	};
 
