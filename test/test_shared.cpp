@@ -26,3 +26,31 @@ TEST_CASE("basic core::Unique test")
 	REQUIRE(weak_ptr.ref_count() == 0);
 	REQUIRE(weak_ptr.expired() == true);
 }
+
+class Foo
+{
+public:
+	virtual ~Foo() = default;
+};
+
+class Bar: public Foo
+{};
+
+class Baz
+{
+public:
+	operator Foo() const { return Foo{}; }
+};
+
+TEST_CASE("pointer to parent class")
+{
+	core::Mallocator allocator;
+
+	core::Shared<Foo> foo;
+	auto bar = core::shared_from<Bar>(&allocator);
+	foo = bar;
+
+	// THIS SHOULD ERROR
+	// auto baz = core::shared_from<Baz>(&allocator);
+	// foo = baz;
+}

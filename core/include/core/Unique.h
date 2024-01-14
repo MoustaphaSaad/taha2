@@ -44,6 +44,7 @@ namespace core
 		Unique(const Unique&) = delete;
 
 		template<typename U>
+		requires std::is_convertible_v<U*, T*>
 		Unique(Unique<U>&& other)
 			: m_allocator(other.allocator()),
 			  m_ptr(other.leak())
@@ -59,6 +60,7 @@ namespace core
 		Unique& operator=(const Unique&) = delete;
 
 		template<typename U>
+		requires std::is_convertible_v<U*, T*>
 		Unique& operator=(Unique<U>&& other)
 		{
 			destroy();
