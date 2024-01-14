@@ -13,6 +13,9 @@ namespace core
 	class Weak;
 
 	template<typename T>
+	class SharedFromThis;
+
+	template<typename T>
 	class Shared
 	{
 		template<typename>
@@ -22,7 +25,11 @@ namespace core
 		friend inline Shared<TPtr>
 		shared_from(Allocator* allocator, TArgs&&... args);
 
-		friend class Weak<T>;
+		template<typename>
+		friend class Weak;
+
+		template<typename>
+		friend class SharedFromThis;
 
 		struct Control
 		{
@@ -50,8 +57,8 @@ namespace core
 				if (m_control->strong.fetch_sub(1) == 1)
 				{
 					m_control->ptr->~T();
-					m_allocator->release(m_control->ptr, sizeof(T));
-					m_allocator->free(m_control->ptr, sizeof(T));
+					m_allocator->release((void*)m_control->ptr, sizeof(T));
+					m_allocator->free((void*)m_control->ptr, sizeof(T));
 					m_control->ptr = nullptr;
 
 					if (m_control->weak.fetch_sub(1) == 1)
@@ -80,6 +87,10 @@ namespace core
 			other.m_allocator = nullptr;
 			other.m_control = nullptr;
 		}
+
+		template<typename U>
+		requires std::is_convertible_v<U*, T*>
+		bool constructFromWeak(const Weak<U>& weak);
 
 	public:
 		Shared() = default;
@@ -218,6 +229,12 @@ namespace core
 	{
 		friend struct Hash<Weak<T>>;
 
+		template<typename>
+		friend class Shared;
+
+		template<typename>
+		friend class Weak;
+
 		Allocator* allocator = nullptr;
 		typename Shared<T>::Control* control = nullptr;
 
@@ -240,17 +257,19 @@ namespace core
 			}
 		}
 
-		void copyFrom(const Weak& other)
+		template<typename U>
+		void copyFrom(const Weak<U>& other)
 		{
 			allocator = other.allocator;
-			control = other.control;
+			control = (typename Shared<T>::Control*)other.control;
 			ref();
 		}
 
-		void moveFrom(Weak&& other)
+		template<typename U>
+		void moveFrom(Weak<U>&& other)
 		{
 			allocator = other.allocator;
-			control = other.control;
+			control = (typename Shared<T>::Control*)other.control;
 
 			other.allocator = nullptr;
 			other.control = nullptr;
@@ -259,31 +278,41 @@ namespace core
 	public:
 		Weak() = default;
 
-		Weak(const Shared<T>& shared)
+		template<typename U>
+		requires std::is_convertible_v<U*, T*>
+		Weak(const Shared<U>& shared)
 		{
 			allocator = shared.m_allocator;
-			control = shared.m_control;
+			control = (typename Shared<T>::Control*)shared.m_control;
 			ref();
 		}
 
-		Weak(const Weak& other)
+		template<typename U>
+		requires std::is_convertible_v<U*, T*>
+		Weak(const Weak<U>& other)
 		{
 			copyFrom(other);
 		}
 
-		Weak(Weak&& other)
+		template<typename U>
+		requires std::is_convertible_v<U*, T*>
+		Weak(Weak<U>&& other)
 		{
 			moveFrom(std::move(other));
 		}
 
-		Weak& operator=(const Weak& other)
+		template<typename U>
+		requires std::is_convertible_v<U*, T*>
+		Weak& operator=(const Weak<U>& other)
 		{
 			unref();
 			copyFrom(other);
 			return *this;
 		}
 
-		Weak& operator=(Weak&& other)
+		template<typename U>
+		requires std::is_convertible_v<U*, T*>
+		Weak& operator=(Weak<U>&& other)
 		{
 			unref();
 			moveFrom(std::move(other));
@@ -321,24 +350,61 @@ namespace core
 
 		Shared<T> lock() const
 		{
-			if (control)
+			Shared<T> res{};
+			res.constructFromWeak(*this);
+			return res;
+		}
+	};
+
+	template<typename T>
+	template<typename U>
+	requires std::is_convertible_v<U*, T*>
+	bool Shared<T>::constructFromWeak(const Weak<U>& weak)
+	{
+		if (weak.control)
+		{
+			auto count = weak.control->strong.load();
+			while (count != 0)
 			{
-				auto count = control->strong.load();
-				while (count != 0)
+				if (weak.control->strong.compare_exchange_weak(count, count + 1))
 				{
-					if (control->strong.compare_exchange_weak(count, count + 1))
-					{
-						Shared<T> res{};
-						res.m_allocator = allocator;
-						res.m_control = control;
-						return res;
-					}
-
-					count = control->strong.load();
+					m_allocator = weak.allocator;
+					m_control = (Shared<T>::Control*)weak.control;
+					return true;
 				}
-			}
 
-			return Shared<T>{};
+				count = weak.control->strong.load();
+			}
+		}
+
+		return false;
+	}
+
+	template<typename T>
+	class SharedFromThis
+	{
+		template<typename TPtr, typename... TArgs>
+		friend inline Shared<TPtr>
+		shared_from(Allocator* allocator, TArgs&&... args);
+
+		Weak<T> m_ptr;
+	public:
+		using SharedFromThisType = SharedFromThis;
+
+		[[nodiscard]] Weak<T> weakFromThis() { return m_ptr; }
+		[[nodiscard]] Weak<const T> weakFromThis() const { return m_ptr; }
+		[[nodiscard]] Shared<T> sharedFromThis()
+		{
+			Shared<T> res;
+			res.constructFromWeak(m_ptr);
+			return res;
+		}
+
+		[[nodiscard]] Shared<const T> sharedFromThis() const
+		{
+			Shared<const T> res;
+			res.constructFromWeak(m_ptr);
+			return res;
 		}
 	};
 
@@ -350,6 +416,14 @@ namespace core
 			return Hash<void*>{}(value.control);
 		}
 	};
+
+	template <class T, class = void>
+	struct InheritsFromEnableSharedFromThis : std::false_type {};
+
+	template <class T>
+	struct InheritsFromEnableSharedFromThis<T, std::void_t<typename T::SharedFromThisType>>
+		: std::is_convertible<std::remove_cv_t<T>*, typename T::SharedFromThisType*>::type
+	{};
 
 	template<typename T, typename ... TArgs>
 	inline Shared<T>
@@ -366,6 +440,14 @@ namespace core
 		::new (ptr) T{std::forward<TArgs>(args)...};
 		::new (control) Control{};
 		control->ptr = ptr;
-		return Shared<T>{allocator, control};
+
+		auto res = Shared<T>{allocator, control};
+
+		if constexpr (InheritsFromEnableSharedFromThis<T>::value)
+		{
+			control->ptr->m_ptr = res;
+		}
+
+		return res;
 	}
 }

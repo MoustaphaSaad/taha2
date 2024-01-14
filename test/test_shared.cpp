@@ -27,10 +27,15 @@ TEST_CASE("basic core::Unique test")
 	REQUIRE(weak_ptr.expired() == true);
 }
 
-class Foo
+class Foo: public core::SharedFromThis<Foo>
 {
 public:
 	virtual ~Foo() = default;
+
+	core::Weak<Foo> getWeakPtr() { return weakFromThis(); }
+	core::Weak<const Foo> getWeakPtr() const { return weakFromThis(); }
+	core::Shared<Foo> getPtr() { return sharedFromThis(); }
+	core::Shared<const Foo> getPtr() const { return sharedFromThis(); }
 };
 
 class Bar: public Foo
@@ -50,6 +55,11 @@ TEST_CASE("pointer to parent class")
 	auto bar = core::shared_from<Bar>(&allocator);
 	foo = bar;
 
+	static_assert(std::is_convertible_v<Bar*, core::SharedFromThis<Foo>*>);
+	auto sharedFoo = foo->getPtr();
+	REQUIRE(sharedFoo == foo);
+
+	// std::enable_shared_from_this
 	// THIS SHOULD ERROR
 	// auto baz = core::shared_from<Baz>(&allocator);
 	// foo = baz;
