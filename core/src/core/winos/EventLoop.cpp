@@ -25,7 +25,7 @@ namespace core
 				KIND_WRITE,
 			};
 
-			explicit Op(KIND kind_, HANDLE handle_, WinOSEventSource* source_)
+			explicit Op(KIND kind_, HANDLE handle_, const Weak<WinOSEventSource>& source_)
 				: kind(kind_),
 				  handle(handle_),
 				  source(source_)
@@ -42,7 +42,7 @@ namespace core
 
 			KIND kind = KIND_NONE;
 			HANDLE handle = INVALID_HANDLE_VALUE;
-			WinOSEventSource* source = nullptr;
+			Weak<WinOSEventSource> source;
 		};
 
 		struct CloseOp: Op
@@ -58,7 +58,7 @@ namespace core
 			WSABUF wsaBuf{};
 			Reactor* reactor = nullptr;
 
-			ReadOp(HANDLE handle_, Span<std::byte> buffer, WinOSEventSource* source_, Reactor* reactor_)
+			ReadOp(HANDLE handle_, Span<std::byte> buffer, const Weak<WinOSEventSource>& source_, Reactor* reactor_)
 				: Op(KIND_READ, handle_, source_),
 				  reactor(reactor_)
 			{
@@ -73,7 +73,7 @@ namespace core
 			std::byte buffer[2 * sizeof(SOCKADDR_IN) + 16] = {};
 			Reactor* reactor = nullptr;
 
-			AcceptOp(HANDLE handle_, Unique<Socket> socket_, WinOSEventSource* source_, Reactor* reactor_)
+			AcceptOp(HANDLE handle_, Unique<Socket> socket_, const Weak<WinOSEventSource>& source_, Reactor* reactor_)
 				: Op(KIND_ACCEPT, handle_, source_),
 				  socket(std::move(socket_)),
 				  reactor(reactor_)
@@ -85,7 +85,7 @@ namespace core
 			WSABUF wsaBuf{};
 			Reactor* reactor = nullptr;
 
-			WriteOp(HANDLE handle_, Span<const std::byte> buffer, WinOSEventSource* source_, Reactor* reactor_)
+			WriteOp(HANDLE handle_, Span<const std::byte> buffer, const Weak<WinOSEventSource>& source_, Reactor* reactor_)
 				: Op(KIND_WRITE, handle_, source_),
 				  reactor(reactor_)
 			{
@@ -98,11 +98,12 @@ namespace core
 		{
 			Buffer buffer;
 			Span<const std::byte> remainingBytes;
+			Weak<WinOSEventSource> source;
 			Reactor* reactor;
 			bool isScheduled = false;
 		};
 
-		class WinOSEventSource: public EventSource
+		class WinOSEventSource: public EventSource, public SharedFromThis<WinOSEventSource>
 		{
 		public:
 			WinOSEventSource(EventLoop* loop, Allocator* allocator)
@@ -133,8 +134,6 @@ namespace core
 			~WinOSSocketEventSource() override
 			{
 				m_socket->shutdown(Socket::SHUT_RDWR);
-				auto loop = (WinOSEventLoop*)eventLoop();
-				loop->destroyEventSource(this);
 			}
 
 			Result<Unique<Op>> scheduleWriteOp(WinOSEventLoop* loop, Unique<WriteOp> op)
@@ -156,7 +155,7 @@ namespace core
 				else
 				{
 					auto error = WSAGetLastError();
-					return errf(loop->m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
+					return errf(loop->m_allocator, "failed to schedule write operation: ErrorCode({})"_sv, error);
 				}
 			}
 
@@ -171,7 +170,7 @@ namespace core
 				auto& outboundBytes = m_writeQueue.front();
 				outboundBytes.isScheduled = true;
 
-				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, this, outboundBytes.reactor);
+				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, outboundBytes.source, outboundBytes.reactor);
 				return scheduleWriteOp(loop, std::move(op));
 			}
 
@@ -182,19 +181,19 @@ namespace core
 				assert(outboundBytes.isScheduled == true);
 				outboundBytes.remainingBytes = outboundBytes.remainingBytes.slice(writtenSize, outboundBytes.remainingBytes.count() - writtenSize);
 
-				if (writtenSize == outboundBytes.remainingBytes.count())
+				if (outboundBytes.remainingBytes.count() == 0)
 				{
 					m_writeQueue.pop_front();
 					return processWriteQueue(loop);
 				}
 
-				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, this, outboundBytes.reactor);
+				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, weakFromThis(), outboundBytes.reactor);
 				return scheduleWriteOp(loop, std::move(op));
 			}
 
 			Result<Unique<Op>> read(WinOSEventLoop* loop, Reactor* reactor) override
 			{
-				auto op = unique_from<ReadOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<std::byte>{recvLine, sizeof(recvLine)}, this, reactor);
+				auto op = unique_from<ReadOp>(loop->m_allocator, (HANDLE)m_socket->fd(), Span<std::byte>{recvLine, sizeof(recvLine)}, weakFromThis(), reactor);
 
 				auto res = WSARecv(
 					(SOCKET)m_socket->fd(),
@@ -223,7 +222,7 @@ namespace core
 				buffer.push(bytes);
 				auto remainingBytes = Span<const std::byte>{buffer};
 
-				m_writeQueue.push_back(OutboundBytes{.buffer = std::move(buffer), .remainingBytes = remainingBytes, .reactor = reactor});
+				m_writeQueue.push_back(OutboundBytes{.buffer = std::move(buffer), .remainingBytes = remainingBytes, .source = weakFromThis(), .reactor = reactor});
 
 				return processWriteQueue(loop);
 			}
@@ -234,7 +233,7 @@ namespace core
 				auto socket = Socket::open(loop->m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 				auto handle = (HANDLE)socket->fd();
 
-				auto op = unique_from<AcceptOp>(loop->m_allocator, handle, std::move(socket), this, reactor);
+				auto op = unique_from<AcceptOp>(loop->m_allocator, handle, std::move(socket), weakFromThis(), reactor);
 
 				DWORD bytesReceived = 0;
 				auto res = loop->m_acceptEx(
@@ -278,20 +277,6 @@ namespace core
 			auto res = std::move(it->value);
 			m_scheduledOperations.remove(op);
 			return res;
-		}
-
-		void destroyEventSource(EventSource* source)
-		{
-			// TODO: maybe operations should keep a weak pointer to the event source until they are done
-			// THIS IS A WEIRD WAY TO HANDLE CANCELLATION, CHANGE IT
-			for (auto& [_, op]: m_scheduledOperations)
-			{
-				if (op->source == source)
-				{
-					CancelIoEx(op->handle, (OVERLAPPED*)op.get());
-					op->kind = Op::KIND_CANCELED;
-				}
-			}
 		}
 
 		Allocator* m_allocator = nullptr;
@@ -346,6 +331,13 @@ namespace core
 					auto op = popPendingOp(overlapped);
 					assert(op != nullptr);
 
+					if (op->source.expired())
+					{
+						m_log->debug("expired source, bytesTransferred: {}"_sv, bytesTransferred);
+						continue;
+					}
+					auto source = op->source.lock();
+
 					switch (op->kind)
 					{
 					case Op::KIND_CANCELED:
@@ -365,7 +357,7 @@ namespace core
 						if (readOp->reactor)
 						{
 
-							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesTransferred}, readOp->source};
+							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesTransferred}, source.get()};
 							readOp->reactor->handle(&readEvent);
 						}
 						m_log->debug("read event loop"_sv);
@@ -376,7 +368,7 @@ namespace core
 						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
 						if (acceptOp->reactor)
 						{
-							AcceptEvent acceptEvent{std::move(acceptOp->socket), acceptOp->source};
+							AcceptEvent acceptEvent{std::move(acceptOp->socket), source.get()};
 							acceptOp->reactor->handle(&acceptEvent);
 						}
 						m_log->debug("accept event loop"_sv);
@@ -387,11 +379,11 @@ namespace core
 						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
 						if (writeOp->reactor)
 						{
-							WriteEvent writeEvent{bytesTransferred, writeOp->source};
+							WriteEvent writeEvent{bytesTransferred, source.get()};
 							writeOp->reactor->handle(&writeEvent);
 						}
 						m_log->debug("write event loop"_sv);
-						auto opResult = writeOp->source->handleWriteEvent(this, bytesTransferred);
+						auto opResult = source->handleWriteEvent(this, bytesTransferred);
 						if (opResult.isError())
 						{
 							// TODO: do something about this potential error
@@ -418,14 +410,14 @@ namespace core
 			pushPendingOp(std::move(op));
 		}
 
-		Unique<EventSource> createEventSource(Unique<Socket> socket) override
+		Shared<EventSource> createEventSource(Unique<Socket> socket) override
 		{
 			if (socket == nullptr)
 				return nullptr;
 
 			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
 			assert(newPort == m_completionPort);
-			return unique_from<WinOSSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
+			return shared_from<WinOSSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
 		}
 
 		HumanError read(EventSource* source, Reactor* reactor) override
@@ -447,7 +439,7 @@ namespace core
 			if (source == nullptr)
 				return {};
 
-			m_log->debug("scheduling write ({})"_sv, (void*)source);
+			m_log->debug("scheduling write ({}, {})"_sv, (void*)source, buffer.count());
 			auto winOSSource = (WinOSEventSource*)source;
 			auto opResult = winOSSource->write(this, reactor, buffer);
 			if (opResult.isError())

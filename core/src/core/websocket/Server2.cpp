@@ -26,28 +26,37 @@ namespace core::websocket
 			{
 				STATE_HANDSHAKE,
 				STATE_READ_MESSAGE,
+				STATE_CLOSED,
 			};
 
 			STATE m_state = STATE_HANDSHAKE;
 			Allocator* m_allocator = nullptr;
 			Log* m_log = nullptr;
 			Server2Impl* m_server = nullptr;
-			Unique<EventSource> m_socketSource;
+			Shared<EventSource> m_socketSource;
 			Buffer m_handshakeBuffer;
 			size_t m_maxHandshakeSize = 1ULL * 1024ULL;
 			Buffer m_messageBuffer;
 			MessageParser m_messageParser;
+			// used to defer the destruction of the handler until it writes everything
+			size_t m_scheduledWriteBytes = 0;
 
 			HumanError writeRaw(StringView str)
 			{
 				auto eventLoop = m_socketSource->eventLoop();
-				return eventLoop->write(m_socketSource.get(), nullptr, Span<const std::byte>{str});
+				auto err = eventLoop->write(m_socketSource.get(), this, Span<const std::byte>{str});
+				if (err) return err;
+				m_scheduledWriteBytes += str.count();
+				return {};
 			}
 
 			HumanError writeRaw(Span<const std::byte> bytes)
 			{
 				auto eventLoop = m_socketSource->eventLoop();
-				return eventLoop->write(m_socketSource.get(), nullptr, bytes);
+				auto err = eventLoop->write(m_socketSource.get(), this, bytes);
+				if (err) return err;
+				m_scheduledWriteBytes += bytes.count();
+				return {};
 			}
 
 			HumanError writeFrameHeader(FrameHeader::OPCODE opcode, size_t payloadLength)
@@ -194,6 +203,21 @@ namespace core::websocket
 				}
 			}
 
+			void removeFromServer()
+			{
+				if (m_state == STATE_CLOSED && m_scheduledWriteBytes == 0)
+				{
+					m_log->debug("removed from server"_sv);
+					m_server->removeConn(this);
+				}
+			}
+
+			void close()
+			{
+				m_state = STATE_CLOSED;
+				removeFromServer();
+			}
+
 		public:
 			static Result<Unique<ConnHandler>> create(Unique<Socket> socket, EventLoop* loop, Server2Impl* server, size_t maxHandshakeSize, Log* log, Allocator* allocator)
 			{
@@ -208,7 +232,7 @@ namespace core::websocket
 				return res;
 			}
 
-			ConnHandler(Unique<EventSource> socketSource, Server2Impl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
+			ConnHandler(const Shared<EventSource>& socketSource, Server2Impl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
 				: m_allocator(allocator),
 				  m_log(log),
 				  m_server(server),
@@ -264,7 +288,7 @@ namespace core::websocket
 				// zero read means connection is closed
 				if (event->buffer().count() == 0)
 				{
-					m_server->removeConn(this);
+					removeFromServer();
 					return;
 				}
 
@@ -276,7 +300,7 @@ namespace core::websocket
 					if (totalHandshakeBuffer > m_maxHandshakeSize)
 					{
 						sendHTTPError(R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv);
-						m_server->removeConn(this);
+						removeFromServer();
 						return;
 					}
 
@@ -289,7 +313,7 @@ namespace core::websocket
 						if (handshakeResult.isError())
 						{
 							sendHTTPError(R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv);
-							m_server->removeConn(this);
+							removeFromServer();
 							return;
 						}
 						auto handshake = handshakeResult.releaseValue();
@@ -310,7 +334,7 @@ namespace core::websocket
 						if (auto err = writeRaw(reply))
 						{
 							m_log->error("failed to send handshake reply, {}"_sv, err);
-							m_server->removeConn(this);
+							removeFromServer();
 							return;
 						}
 
@@ -318,7 +342,7 @@ namespace core::websocket
 						if (auto err = eventLoop->read(m_socketSource.get(), this))
 						{
 							m_log->error("failed to schedule read operation"_sv);
-							m_server->removeConn(this);
+							removeFromServer();
 							return;
 						}
 					}
@@ -336,7 +360,7 @@ namespace core::websocket
 						{
 							// NOTE: we can fail to close the connection cleanly here
 							(void)writeCloseWithCode(1002, parserResult.error().message());
-							m_server->removeConn(this);
+							removeFromServer();
 							return;
 						}
 						auto consumedBytes = parserResult.value();
@@ -356,14 +380,14 @@ namespace core::websocket
 							{
 								// NOTE: we can fail to close the connection cleanly here
 								(void)writeCloseWithCode(1011, err.message());
-								m_server->removeConn(this);
+								removeFromServer();
 								return;
 							}
 
 							// check if this is a close message
 							if (msg.type == Message::TYPE_CLOSE)
 							{
-								m_server->removeConn(this);
+								close();
 								return;
 							}
 						}
@@ -383,15 +407,29 @@ namespace core::websocket
 					{
 						// NOTE: we can fail to close the connection cleanly here
 						(void)writeCloseWithCode(1011, err.message());
-						m_server->removeConn(this);
+						removeFromServer();
 						return;
 					}
 					break;
 				}
+				case STATE_CLOSED:
+					removeFromServer();
+					break;
 				default:
 					assert(false);
 					break;
 				}
+			}
+
+			void onWrite(const WriteEvent* event) override
+			{
+				if (event->writtenSize() == 0)
+				{
+					int x = 234;
+				}
+				m_scheduledWriteBytes -= event->writtenSize();
+				m_log->debug("writeBytes {} written {}"_sv, m_scheduledWriteBytes, event->writtenSize());
+				removeFromServer();
 			}
 		};
 
@@ -400,7 +438,7 @@ namespace core::websocket
 			Allocator* m_allocator = nullptr;
 			Log* m_log = nullptr;
 			Server2Impl* m_server = nullptr;
-			Unique<EventSource> m_socketSource;
+			Shared<EventSource> m_socketSource;
 		public:
 			static Result<Unique<AcceptHandler>> create(StringView host, StringView port, EventLoop* loop, Server2Impl* server, Log* log, Allocator* allocator)
 			{
@@ -420,7 +458,7 @@ namespace core::websocket
 				if (socketSource == nullptr)
 					return errf(allocator, "failed to convert socket to event loop source"_sv);
 
-				auto res = unique_from<AcceptHandler>(allocator, std::move(socketSource), server, log, allocator);
+				auto res = unique_from<AcceptHandler>(allocator, socketSource, server, log, allocator);
 				auto err = loop->accept(res->m_socketSource.get(), res.get());
 				if (err)
 					return err;
@@ -428,7 +466,7 @@ namespace core::websocket
 				return res;
 			}
 
-			AcceptHandler(Unique<EventSource> socketSource, Server2Impl* server, Log* log, Allocator* allocator)
+			AcceptHandler(const Shared<EventSource>& socketSource, Server2Impl* server, Log* log, Allocator* allocator)
 				: m_allocator(allocator),
 				  m_log(log),
 				  m_server(server),

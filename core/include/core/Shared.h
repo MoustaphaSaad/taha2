@@ -104,11 +104,21 @@ namespace core
 
 		Shared(std::nullptr_t){}
 
+		Shared(const Shared<T>& other)
+		{
+			copyFrom(other);
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Shared(const Shared<U>& other)
 		{
 			copyFrom(other);
+		}
+
+		Shared(Shared<T>&& other)
+		{
+			moveFrom(std::move(other));
 		}
 
 		template<typename U>
@@ -126,12 +136,26 @@ namespace core
 			return *this;
 		}
 
+		Shared& operator=(Shared<T>&& other)
+		{
+			unref();
+			moveFrom(std::move(other));
+			return *this;
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Shared& operator=(Shared<U>&& other)
 		{
 			unref();
 			moveFrom(std::move(other));
+			return *this;
+		}
+
+		Shared& operator=(const Shared<T>& other)
+		{
+			unref();
+			copyFrom(std::move(other));
 			return *this;
 		}
 
@@ -278,6 +302,8 @@ namespace core
 	public:
 		Weak() = default;
 
+		Weak(std::nullptr_t){}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Weak(const Shared<U>& shared)
@@ -287,11 +313,21 @@ namespace core
 			ref();
 		}
 
+		Weak(const Weak<T>& other)
+		{
+			copyFrom(other);
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Weak(const Weak<U>& other)
 		{
 			copyFrom(other);
+		}
+
+		Weak(Weak<T>&& other)
+		{
+			moveFrom(std::move(other));
 		}
 
 		template<typename U>
@@ -301,12 +337,26 @@ namespace core
 			moveFrom(std::move(other));
 		}
 
+		Weak& operator=(const Weak<T>& other)
+		{
+			unref();
+			copyFrom(other);
+			return *this;
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Weak& operator=(const Weak<U>& other)
 		{
 			unref();
 			copyFrom(other);
+			return *this;
+		}
+
+		Weak& operator=(Weak<T>&& other)
+		{
+			unref();
+			moveFrom(std::move(other));
 			return *this;
 		}
 

@@ -43,6 +43,11 @@ namespace core
 
 		Unique(const Unique&) = delete;
 
+		Unique(Unique<T>&& other)
+			: m_allocator(other.allocator()),
+			  m_ptr(other.leak())
+		{}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Unique(Unique<U>&& other)
@@ -58,6 +63,13 @@ namespace core
 		}
 
 		Unique& operator=(const Unique&) = delete;
+
+		Unique& operator=(Unique<T>&& other)
+		{
+			destroy();
+			moveFrom(std::move(other));
+			return *this;
+		}
 
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
