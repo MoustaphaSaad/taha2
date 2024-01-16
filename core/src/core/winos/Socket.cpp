@@ -41,6 +41,15 @@ namespace core
 			  m_protocol(protocol)
 		{}
 
+		~WinOSSocket() override
+		{
+			if (m_handle != INVALID_SOCKET)
+			{
+				[[maybe_unused]] auto res = ::closesocket(m_handle);
+				assert(res == 0);
+			}
+		}
+
 		bool close() override
 		{
 			if (m_handle == INVALID_SOCKET)
