@@ -104,11 +104,21 @@ namespace core
 
 		Shared(std::nullptr_t){}
 
+		Shared(const Shared& other)
+		{
+			copyFrom(other);
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Shared(const Shared<U>& other)
 		{
 			copyFrom(other);
+		}
+
+		Shared(Shared&& other)
+		{
+			moveFrom(std::move(other));
 		}
 
 		template<typename U>
@@ -126,12 +136,26 @@ namespace core
 			return *this;
 		}
 
+		Shared& operator=(Shared&& other)
+		{
+			unref();
+			moveFrom(std::move(other));
+			return *this;
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Shared& operator=(Shared<U>&& other)
 		{
 			unref();
 			moveFrom(std::move(other));
+			return *this;
+		}
+
+		Shared& operator=(const Shared& other)
+		{
+			unref();
+			copyFrom(std::move(other));
 			return *this;
 		}
 
@@ -278,6 +302,15 @@ namespace core
 	public:
 		Weak() = default;
 
+		Weak(std::nullptr_t){}
+
+		Weak(const Shared<T>& shared)
+		{
+			allocator = shared.m_allocator;
+			control = (typename Shared<T>::Control*)shared.m_control;
+			ref();
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Weak(const Shared<U>& shared)
@@ -287,11 +320,21 @@ namespace core
 			ref();
 		}
 
+		Weak(const Weak& other)
+		{
+			copyFrom(other);
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Weak(const Weak<U>& other)
 		{
 			copyFrom(other);
+		}
+
+		Weak(Weak&& other)
+		{
+			moveFrom(std::move(other));
 		}
 
 		template<typename U>
@@ -301,12 +344,34 @@ namespace core
 			moveFrom(std::move(other));
 		}
 
+		Weak& operator=(std::nullptr_t)
+		{
+			unref();
+			allocator = nullptr;
+			control = nullptr;
+			return *this;
+		}
+
+		Weak& operator=(const Weak& other)
+		{
+			unref();
+			copyFrom(other);
+			return *this;
+		}
+
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
 		Weak& operator=(const Weak<U>& other)
 		{
 			unref();
 			copyFrom(other);
+			return *this;
+		}
+
+		Weak& operator=(Weak&& other)
+		{
+			unref();
+			moveFrom(std::move(other));
 			return *this;
 		}
 
