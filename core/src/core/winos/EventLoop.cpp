@@ -182,7 +182,7 @@ namespace core
 				assert(outboundBytes.isScheduled == true);
 				outboundBytes.remainingBytes = outboundBytes.remainingBytes.slice(writtenSize, outboundBytes.remainingBytes.count() - writtenSize);
 
-				if (writtenSize == outboundBytes.remainingBytes.count())
+				if (outboundBytes.remainingBytes.count() == 0)
 				{
 					m_writeQueue.pop_front();
 					return processWriteQueue(loop);
