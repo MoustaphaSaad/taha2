@@ -129,7 +129,7 @@ namespace core
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 
-		virtual Unique<EventSource> createEventSource(Unique<Socket> socket) = 0;
+		virtual Shared<EventSource> createEventSource(Unique<Socket> socket) = 0;
 		virtual HumanError read(EventSource* source, Reactor* reactor) = 0;
 		virtual HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) = 0;
 		virtual HumanError accept(EventSource* source, Reactor* reactor) = 0;

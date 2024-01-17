@@ -26,28 +26,41 @@ namespace core::websocket
 			{
 				STATE_HANDSHAKE,
 				STATE_READ_MESSAGE,
+				STATE_CLOSED,
 			};
 
 			STATE m_state = STATE_HANDSHAKE;
 			Allocator* m_allocator = nullptr;
 			Log* m_log = nullptr;
 			Server2Impl* m_server = nullptr;
-			Unique<EventSource> m_socketSource;
+			Shared<EventSource> m_socketSource;
 			Buffer m_handshakeBuffer;
 			size_t m_maxHandshakeSize = 1ULL * 1024ULL;
 			Buffer m_messageBuffer;
 			MessageParser m_messageParser;
+			// used to wait until all the writes are done before destroying the connection
+			size_t m_pendingWriteBytes = 0;
 
-			HumanError writeRaw(StringView str)
+			HumanError writeRaw(StringView str, bool waitUntilDone)
 			{
 				auto eventLoop = m_socketSource->eventLoop();
-				return eventLoop->write(m_socketSource.get(), nullptr, Span<const std::byte>{str});
+				auto reactor = waitUntilDone ? this : nullptr;
+				auto err = eventLoop->write(m_socketSource.get(), reactor, Span<const std::byte>{str});
+				if (err) return err;
+				if (waitUntilDone)
+					m_pendingWriteBytes += str.count();
+				return {};
 			}
 
-			HumanError writeRaw(Span<const std::byte> bytes)
+			HumanError writeRaw(Span<const std::byte> bytes, bool waitUntilDone)
 			{
 				auto eventLoop = m_socketSource->eventLoop();
-				return eventLoop->write(m_socketSource.get(), nullptr, bytes);
+				auto reactor = waitUntilDone ? this : nullptr;
+				auto err = eventLoop->write(m_socketSource.get(), reactor, bytes);
+				if (err) return err;
+				if (waitUntilDone)
+					m_pendingWriteBytes += bytes.count();
+				return {};
 			}
 
 			HumanError writeFrameHeader(FrameHeader::OPCODE opcode, size_t payloadLength)
@@ -58,14 +71,14 @@ namespace core::websocket
 				if (payloadLength <= 125)
 				{
 					buf[1] = std::byte(payloadLength);
-					if (auto err = writeRaw(Span<const std::byte>{buf, 2})) return err;
+					if (auto err = writeRaw(Span<const std::byte>{buf, 2}, opcode == FrameHeader::OPCODE_CLOSE)) return err;
 				}
 				else if (payloadLength <= UINT16_MAX)
 				{
 					buf[1] = std::byte(126);
 					buf[2] = std::byte((payloadLength >> 8) & 0xFF);
 					buf[3] = std::byte(payloadLength & 0xFF);
-					if (auto err = writeRaw(Span<const std::byte>{buf, 4})) return err;
+					if (auto err = writeRaw(Span<const std::byte>{buf, 4}, opcode == FrameHeader::OPCODE_CLOSE)) return err;
 				}
 				else
 				{
@@ -78,7 +91,7 @@ namespace core::websocket
 					buf[7] = std::byte((payloadLength >> 16) & 0xFF);
 					buf[8] = std::byte((payloadLength >> 8) & 0xFF);
 					buf[9] = std::byte(payloadLength & 0xFF);
-					if (auto err = writeRaw(Span<const std::byte>{buf, 10})) return err;
+					if (auto err = writeRaw(Span<const std::byte>{buf, 10}, opcode == FrameHeader::OPCODE_CLOSE)) return err;
 				}
 
 				return {};
@@ -87,13 +100,13 @@ namespace core::websocket
 			HumanError writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> data)
 			{
 				if (auto err = writeFrameHeader(opcode, data.count())) return err;
-				if (auto err = writeRaw(data)) return err;
+				if (auto err = writeRaw(data, opcode == FrameHeader::OPCODE_CLOSE)) return err;
 				return {};
 			}
 
 			void sendHTTPError(StringView str)
 			{
-				(void)writeRaw(str);
+				(void)writeRaw(str, true);
 			}
 
 			HumanError onTextMsg(const Message& msg, Conn* conn)
@@ -127,27 +140,27 @@ namespace core::websocket
 				else
 				{
 					if (msg.payload.count() == 0)
-						return writeRaw(Span<const std::byte>{(const std::byte *)CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+						return writeRaw(Span<const std::byte>{(const std::byte *)CLOSE_NORMAL, sizeof(CLOSE_NORMAL)}, true);
 
 					// error protocol close payload should have at least 2 byte
 					if (msg.payload.count() == 1)
-						return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+						return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)}, true);
 
 					auto errorCode = uint16_t(msg.payload[1]) | (uint16_t(msg.payload[0]) << 8);
 					if (errorCode < 1000 || errorCode == 1004 || errorCode == 1005 || errorCode == 1006 || (errorCode > 1013  && errorCode < 3000))
 					{
-						return writeRaw(Span<const std::byte>{(const std::byte*) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+						return writeRaw(Span<const std::byte>{(const std::byte*) CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)}, true);
 					}
 
 					if (msg.payload.count() == 2)
-						return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+						return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_NORMAL, sizeof(CLOSE_NORMAL)}, true);
 
 					// close payload should be utf8
 					auto payload = StringView{msg.payload}.slice(2, msg.payload.count());
 					if (payload.isValidUtf8() == false)
-						return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)});
+						return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_PROTOCOL_ERROR, sizeof(CLOSE_PROTOCOL_ERROR)}, true);
 
-					return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+					return writeRaw(Span<const std::byte>{(const std::byte*)CLOSE_NORMAL, sizeof(CLOSE_NORMAL)}, true);
 				}
 			}
 
@@ -161,7 +174,7 @@ namespace core::websocket
 				{
 					if (msg.payload.count() == 0)
 					{
-						return writeRaw(Span<const std::byte>{(const std::byte*)EMPTY_PONG, sizeof(EMPTY_PONG)});
+						return writeRaw(Span<const std::byte>{(const std::byte*)EMPTY_PONG, sizeof(EMPTY_PONG)}, false);
 					}
 					else
 					{
@@ -194,6 +207,28 @@ namespace core::websocket
 				}
 			}
 
+			void removeFromServer()
+			{
+				if (m_state == STATE_CLOSED && m_pendingWriteBytes == 0)
+					m_server->removeConn(this);
+			}
+
+			void closeAndDestroy()
+			{
+				m_state = STATE_CLOSED;
+				removeFromServer();
+			}
+
+			void sendCloseFrameAndDestroy(uint16_t code, StringView optionalReason)
+			{
+				if (m_state != STATE_CLOSED)
+				{
+					(void)writeCloseWithCode(code, optionalReason);
+					m_state = STATE_CLOSED;
+				}
+				removeFromServer();
+			}
+
 		public:
 			static Result<Unique<ConnHandler>> create(Unique<Socket> socket, EventLoop* loop, Server2Impl* server, size_t maxHandshakeSize, Log* log, Allocator* allocator)
 			{
@@ -208,11 +243,11 @@ namespace core::websocket
 				return res;
 			}
 
-			ConnHandler(Unique<EventSource> socketSource, Server2Impl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
+			ConnHandler(const Shared<EventSource>& socketSource, Server2Impl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
 				: m_allocator(allocator),
 				  m_log(log),
 				  m_server(server),
-				  m_socketSource(std::move(socketSource)),
+				  m_socketSource(socketSource),
 				  m_handshakeBuffer(allocator),
 				  m_maxHandshakeSize(maxHanshakeSize),
 				  m_messageBuffer(allocator),
@@ -236,7 +271,7 @@ namespace core::websocket
 
 			HumanError writeCloseNormally()
 			{
-				return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)});
+				return writeRaw(Span<const std::byte>{(const std::byte *) CLOSE_NORMAL, sizeof(CLOSE_NORMAL)}, true);
 			}
 
 			HumanError writeCloseWithCode(uint16_t code, StringView optionalReason)
@@ -246,9 +281,9 @@ namespace core::websocket
 				buf[1] = code & 0xFF;
 				auto payloadSize = sizeof(buf) + optionalReason.count();
 				if (auto err = writeFrameHeader(FrameHeader::OPCODE_CLOSE, payloadSize)) return err;
-				if (auto err = writeRaw(Span<const std::byte>{(const std::byte*)buf, sizeof(buf)})) return err;
+				if (auto err = writeRaw(Span<const std::byte>{(const std::byte*)buf, sizeof(buf)}, true)) return err;
 				if (optionalReason.count() > 0)
-					if (auto err = writeRaw(optionalReason)) return err;
+					if (auto err = writeRaw(optionalReason, true)) return err;
 				return {};
 			}
 
@@ -264,7 +299,7 @@ namespace core::websocket
 				// zero read means connection is closed
 				if (event->buffer().count() == 0)
 				{
-					m_server->removeConn(this);
+					closeAndDestroy();
 					return;
 				}
 
@@ -276,7 +311,7 @@ namespace core::websocket
 					if (totalHandshakeBuffer > m_maxHandshakeSize)
 					{
 						sendHTTPError(R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv);
-						m_server->removeConn(this);
+						closeAndDestroy();
 						return;
 					}
 
@@ -289,7 +324,7 @@ namespace core::websocket
 						if (handshakeResult.isError())
 						{
 							sendHTTPError(R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)"_sv);
-							m_server->removeConn(this);
+							closeAndDestroy();
 							return;
 						}
 						auto handshake = handshakeResult.releaseValue();
@@ -307,10 +342,10 @@ namespace core::websocket
 						auto base64 = Base64::encode(sha1.asBytes(), m_allocator);
 						auto reply = strf(m_allocator, StringView{REPLY, strlen(REPLY)}, base64);
 						m_log->debug("response: {}"_sv, reply);
-						if (auto err = writeRaw(reply))
+						if (auto err = writeRaw(reply, true))
 						{
 							m_log->error("failed to send handshake reply, {}"_sv, err);
-							m_server->removeConn(this);
+							closeAndDestroy();
 							return;
 						}
 
@@ -318,7 +353,7 @@ namespace core::websocket
 						if (auto err = eventLoop->read(m_socketSource.get(), this))
 						{
 							m_log->error("failed to schedule read operation"_sv);
-							m_server->removeConn(this);
+							closeAndDestroy();
 							return;
 						}
 					}
@@ -335,8 +370,7 @@ namespace core::websocket
 						if (parserResult.isError())
 						{
 							// NOTE: we can fail to close the connection cleanly here
-							(void)writeCloseWithCode(1002, parserResult.error().message());
-							m_server->removeConn(this);
+							sendCloseFrameAndDestroy(1002, parserResult.error().message());
 							return;
 						}
 						auto consumedBytes = parserResult.value();
@@ -355,15 +389,14 @@ namespace core::websocket
 							if (auto err = onMsg(msg, &conn))
 							{
 								// NOTE: we can fail to close the connection cleanly here
-								(void)writeCloseWithCode(1011, err.message());
-								m_server->removeConn(this);
+								sendCloseFrameAndDestroy(1011, err.message());
 								return;
 							}
 
 							// check if this is a close message
 							if (msg.type == Message::TYPE_CLOSE)
 							{
-								m_server->removeConn(this);
+								closeAndDestroy();
 								return;
 							}
 						}
@@ -382,8 +415,7 @@ namespace core::websocket
 					if (auto err = eventLoop->read(m_socketSource.get(), this))
 					{
 						// NOTE: we can fail to close the connection cleanly here
-						(void)writeCloseWithCode(1011, err.message());
-						m_server->removeConn(this);
+						sendCloseFrameAndDestroy(1011, err.message());
 						return;
 					}
 					break;
@@ -393,6 +425,13 @@ namespace core::websocket
 					break;
 				}
 			}
+
+			void onWrite(const WriteEvent* event) override
+			{
+				assert(m_pendingWriteBytes >= event->writtenSize());
+				m_pendingWriteBytes -= event->writtenSize();
+				removeFromServer();
+			}
 		};
 
 		class AcceptHandler: public Reactor
@@ -400,7 +439,7 @@ namespace core::websocket
 			Allocator* m_allocator = nullptr;
 			Log* m_log = nullptr;
 			Server2Impl* m_server = nullptr;
-			Unique<EventSource> m_socketSource;
+			Shared<EventSource> m_socketSource;
 		public:
 			static Result<Unique<AcceptHandler>> create(StringView host, StringView port, EventLoop* loop, Server2Impl* server, Log* log, Allocator* allocator)
 			{
@@ -420,7 +459,7 @@ namespace core::websocket
 				if (socketSource == nullptr)
 					return errf(allocator, "failed to convert socket to event loop source"_sv);
 
-				auto res = unique_from<AcceptHandler>(allocator, std::move(socketSource), server, log, allocator);
+				auto res = unique_from<AcceptHandler>(allocator, socketSource, server, log, allocator);
 				auto err = loop->accept(res->m_socketSource.get(), res.get());
 				if (err)
 					return err;
@@ -428,11 +467,11 @@ namespace core::websocket
 				return res;
 			}
 
-			AcceptHandler(Unique<EventSource> socketSource, Server2Impl* server, Log* log, Allocator* allocator)
+			AcceptHandler(const Shared<EventSource>& socketSource, Server2Impl* server, Log* log, Allocator* allocator)
 				: m_allocator(allocator),
 				  m_log(log),
 				  m_server(server),
-				  m_socketSource(std::move(socketSource))
+				  m_socketSource(socketSource)
 			{}
 
 			void onAccept(AcceptEvent* event) override

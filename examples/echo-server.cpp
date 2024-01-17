@@ -21,10 +21,10 @@ class EchoServer;
 class EchoClient: public core::Reactor
 {
 	core::Log* m_log = nullptr;
-	core::Unique<core::EventSource> m_eventSource;
+	core::Shared<core::EventSource> m_eventSource;
 	EchoServer* m_server = nullptr;
 public:
-	explicit EchoClient(EchoServer* acceptor, core::Unique<core::EventSource> eventSource, core::Log* log)
+	explicit EchoClient(EchoServer* acceptor, const core::Shared<core::EventSource>& eventSource, core::Log* log)
 		: m_log(log),
 		  m_eventSource(std::move(eventSource)),
 		  m_server(acceptor)
