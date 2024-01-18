@@ -1,10 +1,10 @@
 #include <core/Mallocator.h>
 #include <core/Log.h>
-#include <core/websocket/Server2.h>
+#include <core/websocket/Server.h>
 #include <signal.h>
 
 core::EventLoop* EVENT_LOOP = nullptr;
-core::websocket::Server2* SERVER = nullptr;
+core::websocket::Server* SERVER = nullptr;
 
 void signalHandler(int signal)
 {
@@ -17,7 +17,7 @@ void signalHandler(int signal)
 	}
 }
 
-core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Server2* server, core::websocket::Conn* conn)
+core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Server* server, core::websocket::Conn* conn)
 {
 	switch (msg.type)
 	{
@@ -47,7 +47,7 @@ int main()
 	auto eventLoop = eventLoopResult.releaseValue();
 	EVENT_LOOP = eventLoop.get();
 
-	auto serverResult = core::websocket::Server2::create(&log, &mallocator);
+	auto serverResult = core::websocket::Server::create(&log, &mallocator);
 	if (serverResult.isError())
 	{
 		log.critical("failed to create websocket server, {}"_sv, eventLoopResult.error());
@@ -55,8 +55,8 @@ int main()
 	}
 	auto server = serverResult.releaseValue();
 
-	core::websocket::ServerConfig2 config{};
-	core::websocket::ServerHandler2 handler{};
+	core::websocket::ServerConfig config{};
+	core::websocket::ServerHandler handler{};
 	handler.onMsg = onMsg;
 	auto err = server->start(config, eventLoop.get(), &handler);
 	if (err)

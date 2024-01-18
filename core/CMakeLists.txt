@@ -42,7 +42,7 @@ target_sources(core PRIVATE
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Client.h
 	include/core/websocket/Message.h
-	include/core/websocket/Server2.h
+		include/core/websocket/Server.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp

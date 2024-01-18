@@ -1,4 +1,4 @@
-#include "core/websocket/Server2.h"
+#include "core/websocket/Server.h"
 #include "core/websocket/Handshake.h"
 #include "core/websocket/MessageParser.h"
 #include "core/Hash.h"
@@ -18,7 +18,7 @@ namespace core::websocket
 		void* connHandler() const { return m_connHandler; }
 	};
 
-	class Server2Impl: public Server2
+	class Server2Impl: public Server
 	{
 		class ConnHandler: public Reactor
 		{
@@ -509,7 +509,7 @@ namespace core::websocket
 		Unique<AcceptHandler> m_acceptHandler;
 		Map<ConnHandler*, Unique<ConnHandler>> m_connections;
 		size_t maxHandshakeSize = 1ULL * 1024ULL;
-		ServerHandler2* m_handler = nullptr;
+		ServerHandler* m_handler = nullptr;
 	public:
 		Server2Impl(Log* log, Allocator* allocator)
 			: m_allocator(allocator),
@@ -517,7 +517,7 @@ namespace core::websocket
 			  m_connections(allocator)
 		{}
 
-		HumanError start(ServerConfig2 config, EventLoop* loop, ServerHandler2* handler) override
+		HumanError start(ServerConfig config, EventLoop* loop, ServerHandler* handler) override
 		{
 			m_handler = handler;
 			maxHandshakeSize = config.maxHandshakeSize;
@@ -573,7 +573,7 @@ namespace core::websocket
 		}
 	};
 
-	Result<Unique<Server2>> Server2::create(Log *log, Allocator *allocator)
+	Result<Unique<Server>> Server::create(Log *log, Allocator *allocator)
 	{
 		return unique_from<Server2Impl>(allocator, log, allocator);
 	}
