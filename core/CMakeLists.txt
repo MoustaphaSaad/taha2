@@ -39,7 +39,6 @@ target_sources(core PRIVATE
 	include/core/Rand.h
 	include/core/EventLoop.h
 	include/core/websocket/Handshake.h
-	include/core/websocket/Server.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Client.h
 	include/core/websocket/Message.h
@@ -76,7 +75,6 @@ if (WIN32)
 			src/core/winos/ConditionVariable.cpp
 			src/core/winos/IMutex.h
 			src/core/winos/Socket.cpp
-			src/core/winos/websocket/Server.cpp
 			src/core/winos/Rand.cpp
 			src/core/winos/websocket/Client.cpp
 			src/core/winos/EventLoop.cpp
