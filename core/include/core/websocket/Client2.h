@@ -20,6 +20,8 @@ namespace core::websocket
 		bool handleClose = false;
 		size_t maxMessageSize = 16ULL * 1024ULL * 1024ULL;
 		Func<HumanError(const Message&, Client2*)> onMsg;
+		Func<HumanError(Client2*)> onConnected;
+		Func<HumanError()> onDisconnected;
 	};
 
 	class Client2

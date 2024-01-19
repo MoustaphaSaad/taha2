@@ -11,29 +11,7 @@
 
 core::EventLoop* EVENT_LOOP = nullptr;
 core::websocket::Client2* CLIENT = nullptr;
-
-void signalHandler(int signal)
-{
-	if (signal == SIGINT)
-	{
-		CLIENT->stop();
-		EVENT_LOOP->stop();
-	}
-}
-
-core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Client2* client)
-{
-	switch (msg.type)
-	{
-	case core::websocket::Message::TYPE_TEXT:
-		return client->writeText(core::StringView{msg.payload});
-	case core::websocket::Message::TYPE_BINARY:
-		return client->writeBinary(core::Span<const std::byte>{msg.payload});
-	default:
-		assert(false);
-		return {};
-	}
-}
+core::websocket::Client2* UPDATE_REPORT_CLIENT = nullptr;
 
 static const char* TESTS[] = {
 	"1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.1.5", "1.1.6", "1.1.7", "1.1.8",
@@ -81,6 +59,103 @@ static const char* TESTS[] = {
 	"10.1.1",
 };
 
+void signalHandler(int signal)
+{
+	if (signal == SIGINT)
+	{
+		CLIENT->stop();
+		EVENT_LOOP->stop();
+	}
+}
+
+core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Client2* client)
+{
+	switch (msg.type)
+	{
+	case core::websocket::Message::TYPE_TEXT:
+		return client->writeText(core::StringView{msg.payload});
+	case core::websocket::Message::TYPE_BINARY:
+		return client->writeBinary(core::Span<const std::byte>{msg.payload});
+	default:
+		assert(false);
+		return {};
+	}
+}
+
+core::HumanError updateReport(core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
+{
+	auto eventLoopResult = core::EventLoop::create(log, allocator);
+	if (eventLoopResult.isError())
+		return core::errf(allocator, "failed to create event loop, {}"_sv, eventLoopResult.error());
+	auto eventLoop = eventLoopResult.releaseValue();
+	EVENT_LOOP = eventLoop.get();
+
+	auto urlWithPath = core::strf(allocator, "{}//updateReports?agent=websocket.zig"_sv, baseUrl);
+
+	auto config = core::websocket::Client2Config
+	{
+		.onMsg = onMsg,
+		.onDisconnected = [eventLoop = eventLoop.get()]() -> core::HumanError {
+			eventLoop->stop();
+			return {};
+		},
+	};
+	auto clientResult = core::websocket::Client2::connect(urlWithPath, std::move(config), eventLoop.get(), log, allocator);
+	if (clientResult.isError())
+		return clientResult.releaseError();
+	auto client = clientResult.releaseValue();
+
+	auto err = client->start();
+	if (err)
+		return err;
+
+	err = eventLoop->run();
+	if (err)
+		return err;
+	return {};
+}
+
+core::HumanError runTest(core::StringView testname, core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
+{
+	auto eventLoopResult = core::EventLoop::create(log, allocator);
+	if (eventLoopResult.isError())
+		return core::errf(allocator, "failed to create event loop, {}"_sv, eventLoopResult.error());
+	auto eventLoop = eventLoopResult.releaseValue();
+	EVENT_LOOP = eventLoop.get();
+
+	auto urlWithPath = core::strf(allocator, "{}/runCase?casetuple={}&agent=websocket.zig"_sv, baseUrl, testname);
+
+	auto config = core::websocket::Client2Config
+	{
+		.onMsg = onMsg,
+		.onDisconnected = [log, eventLoop = eventLoop.get()]() -> core::HumanError {
+			log->debug("closing event loop"_sv);
+			eventLoop->stop();
+			return {};
+		},
+	};
+	auto clientResult = core::websocket::Client2::connect(urlWithPath, std::move(config), eventLoop.get(), log, allocator);
+	if (clientResult.isError())
+		return clientResult.releaseError();
+	auto client = clientResult.releaseValue();
+
+	auto err = client->start();
+	if (err)
+		return err;
+
+	err = eventLoop->run();
+	if (err)
+		return err;
+	return {};
+}
+
+core::HumanError runSingleTest(core::StringView testname, core::StringView url, core::Log* log, core::Allocator* allocator)
+{
+	if (auto err = runTest(testname, url, log, allocator)) return err;
+	if (auto err = updateReport(url, log, allocator)) return err;
+	return {};
+}
+
 int main(int argc, char** argv)
 {
 	auto url = "ws://172.25.48.1:9010"_sv;
@@ -91,41 +166,19 @@ int main(int argc, char** argv)
 	core::Mallocator mallocator;
 	core::Log log{&mallocator};
 
-	auto eventLoopResult = core::EventLoop::create(&log, &mallocator);
-	if (eventLoopResult.isError())
-	{
-		log.critical("failed to create event loop, {}"_sv, eventLoopResult.error());
-		return EXIT_FAILURE;
-	}
-	auto eventLoop = eventLoopResult.releaseValue();
-	EVENT_LOOP = eventLoop.get();
+	(void)runSingleTest("2.10"_sv, url, &log, &mallocator);
+	return 0;
 
-	auto urlWithPath = core::strf(&mallocator, "{}/runCase?casetuple={}&agent=websocket.zig"_sv, url, "1.1.1"_sv);
-
-	auto config = core::websocket::Client2Config
+	for (size_t i = 0; i < sizeof(TESTS); ++i)
 	{
-		.onMsg = onMsg,
-	};
-	auto clientResult = core::websocket::Client2::connect(urlWithPath, std::move(config), eventLoop.get(), &log, &mallocator);
-	if (clientResult.isError())
-	{
-		log.critical("failed to connect to websocket server, {}"_sv, clientResult.error());
-		return EXIT_FAILURE;
-	}
-	auto client = clientResult.releaseValue();
-
-	auto err = client->start();
-	if (err)
-	{
-		log.critical("failed to start client, {}"_sv, err);
-		return EXIT_FAILURE;
+		auto testname = core::StringView{TESTS[i]};
+		log.info("running test: {}"_sv, testname);
+		if (auto err = runSingleTest(testname, url, &log, &mallocator))
+		{
+			log.critical("{}"_sv, err);
+			return EXIT_FAILURE;
+		}
 	}
 
-	err = eventLoop->run();
-	if (err)
-	{
-		log.critical("event loop error, {}"_sv, err);
-		return EXIT_FAILURE;
-	}
 	return 0;
 }

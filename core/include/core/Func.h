@@ -16,11 +16,12 @@ namespace core
 		{
 			void (*dtor)(void*) noexcept;
 			void (*move)(void*, void*) noexcept;
+			bool (*isEmpty)() noexcept;
 			TReturn (*invoke)(void*, TArgs&& ...);
 		};
 
 		static constexpr size_t SMALL_SIZE = sizeof(void*) * 4;
-		static constexpr Concept EMPTY_CONCEPT{[](void*) noexcept {}};
+		inline static constexpr Concept EMPTY_CONCEPT{[](void*) noexcept {}, [](void*, void*) noexcept {}, []() noexcept { return true; }};
 		alignas(Concept) std::byte m_model[SMALL_SIZE];
 		const Concept* m_concept = &EMPTY_CONCEPT;
 
@@ -42,12 +43,13 @@ namespace core
 			{
 				new (p) Model(std::move(*static_cast<Model*>(self)));
 			}
+			static bool isEmpty() noexcept { return false; }
 			static TReturn invoke(void* self, TArgs&& ... args)
 			{
 				return std::invoke(static_cast<Model*>(self)->m_func, std::forward<TArgs>(args)...);
 			}
 
-			static constexpr Concept vtable{dtor, move, invoke};
+			static constexpr Concept vtable{dtor, move, isEmpty, invoke};
 		};
 
 		template<typename TFunc>
@@ -65,12 +67,13 @@ namespace core
 			{
 				new (p) Model(std::move(*static_cast<Model*>(self)));
 			}
+			static bool isEmpty() noexcept { return false; }
 			static TReturn invoke(void* self, TArgs&& ... args)
 			{
 				return std::invoke(*static_cast<Model*>(self)->m_func, std::forward<TArgs>(args)...);
 			}
 
-			static constexpr Concept vtable{dtor, move, invoke};
+			static constexpr Concept vtable{dtor, move, isEmpty, invoke};
 		};
 
 	public:
@@ -116,6 +119,6 @@ namespace core
 			return m_concept->invoke(&m_model, std::forward<TArgs>(args)...);
 		}
 
-		operator bool() const { return m_concept != &EMPTY_CONCEPT; }
+		operator bool() const { return m_concept->isEmpty() == false; }
 	};
 }

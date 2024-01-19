@@ -303,8 +303,6 @@ namespace core
 
 		HumanError run() override
 		{
-			m_log->debug("started event loop"_sv);
-
 			while (true)
 			{
 				constexpr int MAX_ENTRIES = 32;
@@ -329,23 +327,22 @@ namespace core
 
 					auto op = popPendingOp(overlapped);
 					assert(op != nullptr);
-					if (op->source.expired())
+					if (op->source && op->source.expired())
 					{
-						m_log->debug("source expired"_sv);
 						continue;
 					}
-					auto source = op->source.lock();
+					Shared<WinOSEventSource> source{};
+					if (op->source)
+						source = op->source.lock();
 
 					switch (op->kind)
 					{
 					case Op::KIND_CANCELED:
 					{
-						m_log->debug("operation cancelled"_sv);
 						break;
 					}
 					case Op::KIND_CLOSE:
 					{
-						m_log->debug("closed event loop"_sv);
 						m_scheduledOperations.clear();
 						return {};
 					}
@@ -358,7 +355,6 @@ namespace core
 							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesTransferred}, source.get()};
 							readOp->reactor->handle(&readEvent);
 						}
-						m_log->debug("read event loop"_sv);
 						break;
 					}
 					case Op::KIND_ACCEPT:
@@ -369,7 +365,6 @@ namespace core
 							AcceptEvent acceptEvent{std::move(acceptOp->socket), source.get()};
 							acceptOp->reactor->handle(&acceptEvent);
 						}
-						m_log->debug("accept event loop"_sv);
 						break;
 					}
 					case Op::KIND_WRITE:
@@ -380,7 +375,6 @@ namespace core
 							WriteEvent writeEvent{bytesTransferred, source.get()};
 							writeOp->reactor->handle(&writeEvent);
 						}
-						m_log->debug("write event loop"_sv);
 						auto opResult = source->handleWriteEvent(this, bytesTransferred);
 						if (opResult.isError())
 						{
@@ -423,7 +417,6 @@ namespace core
 			if (source == nullptr)
 				return {};
 
-			m_log->debug("scheduling read ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
 			auto opResult = winOSSource->read(this, reactor);
 			if (opResult.isError())
@@ -437,7 +430,6 @@ namespace core
 			if (source == nullptr)
 				return {};
 
-			m_log->debug("scheduling write ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
 			auto opResult = winOSSource->write(this, reactor, buffer);
 			if (opResult.isError())
@@ -453,7 +445,6 @@ namespace core
 			if (source == nullptr)
 				return {};
 
-			m_log->debug("scheduling accept ({})"_sv, (void*)source);
 			auto winOSSource = (WinOSEventSource*)source;
 			auto opResult = winOSSource->accept(this, reactor);
 			if (opResult.isError())

@@ -120,6 +120,9 @@ namespace core::websocket
 
 		HumanError writeRaw(Span<const std::byte> bytes, bool waitUntilDone)
 		{
+			if (bytes.count() == 0)
+				return {};
+
 			auto eventLoop = m_socketSource->eventLoop();
 			auto reactor = waitUntilDone ? this : nullptr;
 			auto err = eventLoop->write(m_socketSource.get(), reactor, bytes);
@@ -185,6 +188,7 @@ namespace core::websocket
 
 		HumanError onText(const Message& msg)
 		{
+			m_log->debug("on text"_sv);
 			auto text = StringView{msg.payload};
 			if (text.isValidUtf8() == false)
 				return errf(m_allocator, "invalid utf8 string"_sv);
@@ -207,6 +211,7 @@ namespace core::websocket
 
 		HumanError onClose(const Message& msg)
 		{
+			m_log->debug("on close"_sv);
 			if (m_config.handleClose)
 			{
 				return m_config.onMsg(msg, this);
@@ -283,6 +288,20 @@ namespace core::websocket
 			}
 		}
 
+		HumanError onConnected()
+		{
+			if (m_config.onConnected)
+				return m_config.onConnected(this);
+			return {};
+		}
+
+		HumanError onDisconnected()
+		{
+			if (m_config.onDisconnected)
+				return m_config.onDisconnected();
+			return {};
+		}
+
 		void onHandshake()
 		{
 			auto eventLoop = m_socketSource->eventLoop();
@@ -297,6 +316,13 @@ namespace core::websocket
 				if (!handshakeErr)
 				{
 					m_state = STATE_READ_MESSAGE;
+
+					if (auto err = onConnected())
+					{
+						sendCloseFrameAndDestroy(1011, err.message());
+						return;
+					}
+
 					if (m_readBuffer.count() > handshakeResponse.count())
 					{
 						::memcpy(m_readBuffer.data(), m_readBuffer.data() + handshakeResponse.count(),
@@ -379,6 +405,14 @@ namespace core::websocket
 						}
 					}
 				}
+				else
+				{
+					if (auto err = eventLoop->read(m_socketSource.get(), this))
+					{
+						sendCloseFrameAndDestroy(1011, "failed to read more bytes from socket"_sv);
+					}
+					break;
+				}
 			}
 
 			if (recvBytes.count() == 0)
@@ -397,6 +431,8 @@ namespace core::websocket
 			m_state = STATE_FAILED;
 			m_socketSource = nullptr;
 			m_readBuffer = Buffer{m_allocator};
+			if (auto err = onDisconnected())
+				m_log->error("{}"_sv, err);
 		}
 
 		void destroy()
@@ -406,6 +442,8 @@ namespace core::websocket
 				m_log->debug("client destroyed"_sv);
 				m_socketSource = nullptr;
 				m_readBuffer = Buffer{m_allocator};
+				if (auto err = onDisconnected())
+					m_log->error("{}"_sv, err);
 			}
 		}
 
@@ -447,7 +485,7 @@ namespace core::websocket
 
 		void stop() override
 		{
-			(void)writeClose();
+			sendCloseFrameAndDestroy(1000, {});
 		}
 
 		HumanError writeText(StringView str) override
