@@ -12,8 +12,8 @@ import (
 
 var (
 	targetAddr  = flag.String("a", "127.0.0.1:8080", "target echo server address")
-	testMsgLen  = flag.Int("l", 26, "test message length")
-	testConnNum = flag.Int("c", 50, "test connection number")
+	testMsgLen  = flag.Int("l", 128, "test message length")
+	testConnNum = flag.Int("c", 200, "test connection number")
 	testSeconds = flag.Int("t", 10, "test duration in seconds")
 )
 
