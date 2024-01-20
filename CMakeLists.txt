@@ -10,6 +10,22 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 option(BUILD_SHARED_LIBS "Build all libraries as shared" ON)
 option(TRACY_ENABLE "Build all tests" OFF)
+option(ADDRESS_SANITIZER "Enables address sanitizer" OFF)
+option(THREAD_SANITIZER "Enables thread sanitizer" OFF)
+
+if (ADDRESS_SANITIZER AND THREAD_SANITIZER)
+	message(FATAL_ERROR "address sanitizer and thread sanitizer cannot run at the same time")
+endif ()
+
+if (ADDRESS_SANITIZER)
+	add_compile_options(-fsanitize=address)
+	add_link_options(-fsanitize=address)
+endif()
+
+if (THREAD_SANITIZER)
+	add_compile_options(-fsanitize=thread)
+	add_link_options(-fsanitize=thread)
+endif()
 
 include(CPM)
 CPMUsePackageLock(package-lock.cmake)

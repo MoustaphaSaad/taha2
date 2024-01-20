@@ -66,6 +66,26 @@
 			}
 		},
 		{
+			"name": "asan-msvc-debug",
+			"inherits": "msvc-base",
+			"displayName": "Address Sanitizer MSVC Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"ADDRESS_SANITIZER": "ON"
+			}
+		},
+		{
+			"name": "tsan-msvc-debug",
+			"inherits": "msvc-base",
+			"displayName": "Thread Sanitizer MSVC Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"THREAD_SANITIZER": "ON"
+			}
+		},
+		{
 			"name": "ninja-base",
 			"hidden": true,
 			"generator": "Ninja",
@@ -115,6 +135,26 @@
 			"binaryDir": "${sourceDir}/build/${presetName}",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release"
+			}
+		},
+		{
+			"name": "asan-ninja-debug",
+			"inherits": "ninja-base",
+			"displayName": "Address Sanitizer Ninja Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"ADDRESS_SANITIZER": "ON"
+			}
+		},
+		{
+			"name": "tsan-ninja-debug",
+			"inherits": "ninja-base",
+			"displayName": "Thread Sanitizer Ninja Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"THREAD_SANITIZER": "ON"
 			}
 		}
 	]
