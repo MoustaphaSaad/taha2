@@ -41,6 +41,15 @@ namespace core
 			  m_protocol(protocol)
 		{}
 
+		~WinOSSocket() override
+		{
+			if (m_handle != INVALID_SOCKET)
+			{
+				[[maybe_unused]] auto res = ::closesocket(m_handle);
+				assert(res == 0);
+			}
+		}
+
 		bool close() override
 		{
 			if (m_handle == INVALID_SOCKET)
@@ -82,7 +91,7 @@ namespace core
 			return false;
 		}
 
-		bool bind(StringView port) override
+		bool bind(StringView host, StringView port) override
 		{
 			addrinfo hints = {};
 			hints.ai_family = m_family;
@@ -90,9 +99,10 @@ namespace core
 			hints.ai_protocol = m_protocol;
 			hints.ai_flags = AI_PASSIVE;
 
-			String c_port(port, m_allocator);
+			String c_port{port, m_allocator};
+			String c_host{host, m_allocator};
 			addrinfo* result = nullptr;
-			auto err = ::getaddrinfo(nullptr, c_port.data(), &hints, &result);
+			auto err = ::getaddrinfo(c_host.data(), c_port.data(), &hints, &result);
 			if (err != 0)
 				return false;
 
@@ -126,6 +136,28 @@ namespace core
 				return nullptr;
 
 			return unique_from<WinOSSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
+		}
+
+		bool shutdown(SHUT how) override
+		{
+			int osHow = 0;
+			switch (how)
+			{
+			case SHUT_RD:
+				osHow = SD_RECEIVE;
+				break;
+			case SHUT_WR:
+				osHow = SD_SEND;
+				break;
+			case SHUT_RDWR:
+				osHow = SD_BOTH;
+				break;
+			default:
+				return false;
+			}
+
+			auto res = ::shutdown(m_handle, osHow);
+			return res == 0;
 		}
 
 		int64_t fd() override

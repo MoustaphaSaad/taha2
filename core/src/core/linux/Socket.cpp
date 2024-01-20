@@ -68,7 +68,7 @@ namespace core
 			return false;
 		}
 
-		bool bind(StringView port) override
+		bool bind(StringView host, StringView port) override
 		{
 			addrinfo hints = {};
 			hints.ai_family = m_family;
@@ -76,9 +76,10 @@ namespace core
 			hints.ai_protocol = m_protocol;
 			hints.ai_flags = AI_PASSIVE;
 
-			String c_port(port, m_allocator);
+			String c_port{port, m_allocator};
+			String c_host{host, m_allocator};
 			addrinfo* result = nullptr;
-			auto err = ::getaddrinfo(nullptr, c_port.data(), &hints, &result);
+			auto err = ::getaddrinfo(c_host.data(), c_port.data(), &hints, &result);
 			if (err != 0)
 				return false;
 
@@ -112,6 +113,28 @@ namespace core
 				return nullptr;
 
 			return unique_from<LinuxSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
+		}
+
+		bool shutdown(SHUT how) override
+		{
+			int osHow = 0;
+			switch (how)
+			{
+			case SHUT_RD:
+				osHow = ::SHUT_RD;
+				break;
+			case SHUT_WR:
+				osHow = ::SHUT_WR;
+				break;
+			case SHUT_RDWR:
+				osHow = ::SHUT_RDWR;
+				break;
+			default:
+				return false;
+			}
+
+			auto res = ::shutdown(m_handle, osHow);
+			return res == 0;
 		}
 
 		int64_t fd() override

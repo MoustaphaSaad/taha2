@@ -23,13 +23,21 @@ namespace core
 			TYPE_UDP,
 		};
 
+		enum SHUT
+		{
+			SHUT_RD,
+			SHUT_WR,
+			SHUT_RDWR,
+		};
+
 		CORE_EXPORT static Unique<Socket> open(Allocator* allocator, FAMILY family, TYPE type);
 
 		virtual bool close() = 0;
 		virtual bool connect(StringView address, StringView port) = 0;
-		virtual bool bind(StringView port) = 0;
+		virtual bool bind(StringView host, StringView port) = 0;
 		virtual bool listen(int max_connections = 0) = 0;
 		virtual Unique<Socket> accept() = 0;
+		virtual bool shutdown(SHUT how) = 0;
 		virtual int64_t fd() = 0;
 	};
 }

@@ -1,4 +1,6 @@
-add_library(core)
+add_library(core
+		include/core/EventLoop.h
+		src/core/winos/EventLoop.cpp)
 
 target_sources(core PRIVATE
 	include/core/Allocator.h
@@ -35,11 +37,12 @@ target_sources(core PRIVATE
 	include/core/Base64.h
 	include/core/SHA1.h
 	include/core/Rand.h
+	include/core/EventLoop.h
 	include/core/websocket/Handshake.h
-	include/core/websocket/Server.h
 	include/core/websocket/MessageParser.h
-	include/core/websocket/Client.h
 	include/core/websocket/Message.h
+	include/core/websocket/Server.h
+		include/core/websocket/Client.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
@@ -56,7 +59,8 @@ target_sources(core PRIVATE
 	src/core/SHA1.cpp
 	src/core/websocket/Handshake.cpp
 	src/core/websocket/MessageParser.cpp
-	src/core/websocket/Client.cpp
+	src/core/websocket/Server.cpp
+		src/core/websocket/Client.cpp
 )
 
 if (WIN32)
@@ -71,9 +75,8 @@ if (WIN32)
 			src/core/winos/ConditionVariable.cpp
 			src/core/winos/IMutex.h
 			src/core/winos/Socket.cpp
-			src/core/winos/websocket/Server.cpp
 			src/core/winos/Rand.cpp
-			src/core/winos/websocket/Client.cpp
+			src/core/winos/EventLoop.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)

@@ -26,3 +26,41 @@ TEST_CASE("basic core::Unique test")
 	REQUIRE(weak_ptr.ref_count() == 0);
 	REQUIRE(weak_ptr.expired() == true);
 }
+
+class Foo: public core::SharedFromThis<Foo>
+{
+public:
+	virtual ~Foo() = default;
+
+	core::Weak<Foo> getWeakPtr() { return weakFromThis(); }
+	core::Weak<const Foo> getWeakPtr() const { return weakFromThis(); }
+	core::Shared<Foo> getPtr() { return sharedFromThis(); }
+	core::Shared<const Foo> getPtr() const { return sharedFromThis(); }
+};
+
+class Bar: public Foo
+{};
+
+class Baz
+{
+public:
+	operator Foo() const { return Foo{}; }
+};
+
+TEST_CASE("pointer to parent class")
+{
+	core::Mallocator allocator;
+
+	core::Shared<Foo> foo;
+	auto bar = core::shared_from<Bar>(&allocator);
+	foo = bar;
+
+	static_assert(std::is_convertible_v<Bar*, core::SharedFromThis<Foo>*>);
+	auto sharedFoo = foo->getPtr();
+	REQUIRE(sharedFoo == foo);
+
+	// std::enable_shared_from_this
+	// THIS SHOULD ERROR
+	// auto baz = core::shared_from<Baz>(&allocator);
+	// foo = baz;
+}
