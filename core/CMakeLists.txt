@@ -105,6 +105,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/IMutex.h
 			src/core/linux/Socket.cpp
 			src/core/linux/Rand.cpp
+			src/core/linux/EventLoop.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()
