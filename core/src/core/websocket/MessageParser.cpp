@@ -1,5 +1,5 @@
 #include "core/websocket/MessageParser.h"
-#include "core/intrinsics.h"
+#include "core/Intrinsics.h"
 
 namespace core::websocket
 {

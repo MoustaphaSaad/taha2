@@ -36,11 +36,11 @@ namespace math
 		}
 
 	private:
-		template<typename T, size_t N, typename SrcSpace, typename DstSpace>
-		Vector<T, N, DstSpace> castSpace(const Vector<T, N, SrcSpace>& other) const
+		template<typename T2, size_t N2, typename SrcSpace2, typename DstSpace2>
+		Vector<T2, N2, DstSpace2> castSpace(const Vector<T2, N2, SrcSpace2>& other) const
 		{
-			Vector<T, N, DstSpace> result{};
-			for (size_t i = 0; i < N; ++i)
+			Vector<T2, N2, DstSpace2> result{};
+			for (size_t i = 0; i < N2; ++i)
 				result[i] = other[i];
 			return result;
 		}
