@@ -1,6 +1,10 @@
 #pragma once
 
-#include "core/websocket/Server.h"
+#include "core/websocket/Message.h"
+#include "core/Buffer.h"
+#include "core/Result.h"
+
+#include <cstdint>
 
 namespace core::websocket
 {
