@@ -6,13 +6,13 @@
 
 #include <core/Mallocator.h>
 #include <core/Log.h>
-#include <core/websocket/Client2.h>
+#include <core/websocket/Client.h>
 #include <tracy/Tracy.hpp>
 #include <signal.h>
 
 core::EventLoop* EVENT_LOOP = nullptr;
-core::websocket::Client2* CLIENT = nullptr;
-core::websocket::Client2* UPDATE_REPORT_CLIENT = nullptr;
+core::websocket::Client* CLIENT = nullptr;
+core::websocket::Client* UPDATE_REPORT_CLIENT = nullptr;
 
 static const char* TESTS[] = {
 	"1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.1.5", "1.1.6", "1.1.7", "1.1.8",
@@ -69,7 +69,7 @@ void signalHandler(int signal)
 	}
 }
 
-core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Client2* client)
+core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Client* client)
 {
 	switch (msg.type)
 	{
@@ -94,7 +94,7 @@ core::HumanError updateReport(core::StringView baseUrl, core::Log* log, core::Al
 
 	auto urlWithPath = core::strf(allocator, "{}//updateReports?agent=websocket.zig"_sv, baseUrl);
 
-	auto config = core::websocket::Client2Config
+	auto config = core::websocket::ClientConfig
 	{
 		.onMsg = onMsg,
 		.onDisconnected = [eventLoop = eventLoop.get()]() -> core::HumanError {
@@ -102,7 +102,7 @@ core::HumanError updateReport(core::StringView baseUrl, core::Log* log, core::Al
 			return {};
 		},
 	};
-	auto clientResult = core::websocket::Client2::connect(urlWithPath, std::move(config), eventLoop.get(), log, allocator);
+	auto clientResult = core::websocket::Client::connect(urlWithPath, std::move(config), eventLoop.get(), log, allocator);
 	if (clientResult.isError())
 		return clientResult.releaseError();
 	auto client = clientResult.releaseValue();
@@ -129,7 +129,7 @@ core::HumanError runTest(core::StringView testname, core::StringView baseUrl, co
 
 	auto urlWithPath = core::strf(allocator, "{}/runCase?casetuple={}&agent=websocket.zig"_sv, baseUrl, testname);
 
-	auto config = core::websocket::Client2Config
+	auto config = core::websocket::ClientConfig
 	{
 		.onMsg = onMsg,
 		.onDisconnected = [log, eventLoop = eventLoop.get()]() -> core::HumanError {
@@ -137,7 +137,7 @@ core::HumanError runTest(core::StringView testname, core::StringView baseUrl, co
 			return {};
 		},
 	};
-	auto clientResult = core::websocket::Client2::connect(urlWithPath, std::move(config), eventLoop.get(), log, allocator);
+	auto clientResult = core::websocket::Client::connect(urlWithPath, std::move(config), eventLoop.get(), log, allocator);
 	if (clientResult.isError())
 		return clientResult.releaseError();
 	auto client = clientResult.releaseValue();

@@ -18,7 +18,7 @@ namespace core::websocket
 		void* connHandler() const { return m_connHandler; }
 	};
 
-	class Server2Impl: public Server
+	class ServerImpl: public Server
 	{
 		class ConnHandler: public Reactor
 		{
@@ -32,7 +32,7 @@ namespace core::websocket
 			STATE m_state = STATE_HANDSHAKE;
 			Allocator* m_allocator = nullptr;
 			Log* m_log = nullptr;
-			Server2Impl* m_server = nullptr;
+			ServerImpl* m_server = nullptr;
 			Shared<EventSource> m_socketSource;
 			Buffer m_handshakeBuffer;
 			size_t m_maxHandshakeSize = 1ULL * 1024ULL;
@@ -230,7 +230,7 @@ namespace core::websocket
 			}
 
 		public:
-			static Result<Unique<ConnHandler>> create(Unique<Socket> socket, EventLoop* loop, Server2Impl* server, size_t maxHandshakeSize, Log* log, Allocator* allocator)
+			static Result<Unique<ConnHandler>> create(Unique<Socket> socket, EventLoop* loop, ServerImpl* server, size_t maxHandshakeSize, Log* log, Allocator* allocator)
 			{
 				auto socketSource = loop->createEventSource(std::move(socket));
 				if (socketSource == nullptr)
@@ -243,7 +243,7 @@ namespace core::websocket
 				return res;
 			}
 
-			ConnHandler(const Shared<EventSource>& socketSource, Server2Impl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
+			ConnHandler(const Shared<EventSource>& socketSource, ServerImpl* server, size_t maxHanshakeSize, Log* log, Allocator* allocator)
 				: m_allocator(allocator),
 				  m_log(log),
 				  m_server(server),
@@ -439,10 +439,10 @@ namespace core::websocket
 		{
 			Allocator* m_allocator = nullptr;
 			Log* m_log = nullptr;
-			Server2Impl* m_server = nullptr;
+			ServerImpl* m_server = nullptr;
 			Shared<EventSource> m_socketSource;
 		public:
-			static Result<Unique<AcceptHandler>> create(StringView host, StringView port, EventLoop* loop, Server2Impl* server, Log* log, Allocator* allocator)
+			static Result<Unique<AcceptHandler>> create(StringView host, StringView port, EventLoop* loop, ServerImpl* server, Log* log, Allocator* allocator)
 			{
 				auto acceptSocket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 				if (acceptSocket == nullptr)
@@ -468,7 +468,7 @@ namespace core::websocket
 				return res;
 			}
 
-			AcceptHandler(const Shared<EventSource>& socketSource, Server2Impl* server, Log* log, Allocator* allocator)
+			AcceptHandler(const Shared<EventSource>& socketSource, ServerImpl* server, Log* log, Allocator* allocator)
 				: m_allocator(allocator),
 				  m_log(log),
 				  m_server(server),
@@ -512,7 +512,7 @@ namespace core::websocket
 		size_t maxHandshakeSize = 1ULL * 1024ULL;
 		ServerHandler* m_handler = nullptr;
 	public:
-		Server2Impl(Log* log, Allocator* allocator)
+		ServerImpl(Log* log, Allocator* allocator)
 			: m_allocator(allocator),
 			  m_log(log),
 			  m_connections(allocator)
@@ -576,6 +576,6 @@ namespace core::websocket
 
 	Result<Unique<Server>> Server::create(Log *log, Allocator *allocator)
 	{
-		return unique_from<Server2Impl>(allocator, log, allocator);
+		return unique_from<ServerImpl>(allocator, log, allocator);
 	}
 }
