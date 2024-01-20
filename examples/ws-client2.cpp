@@ -57,7 +57,7 @@ static const char* TESTS[] = {
 	"9.6.5", "9.6.6", "9.7.1", "9.7.2", "9.7.3", "9.7.4", "9.7.5", "9.7.6", "9.8.1", "9.8.2",
 	"9.8.3", "9.8.4", "9.8.5", "9.8.6",
 
-	"10.1.1",
+	"10.1.1"
 };
 
 void signalHandler(int signal)
@@ -169,7 +169,8 @@ int main(int argc, char** argv)
 	core::Mallocator mallocator;
 	core::Log log{&mallocator};
 
-	for (size_t i = 0; i < sizeof(TESTS); ++i)
+	auto testsCount = sizeof(TESTS)/sizeof(*TESTS);
+	for (size_t i = 0; i < testsCount; ++i)
 	{
 		auto testname = core::StringView{TESTS[i]};
 		log.info("running test: {}"_sv, testname);
