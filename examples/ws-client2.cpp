@@ -7,6 +7,7 @@
 #include <core/Mallocator.h>
 #include <core/Log.h>
 #include <core/websocket/Client2.h>
+#include <tracy/Tracy.hpp>
 #include <signal.h>
 
 core::EventLoop* EVENT_LOOP = nullptr;
@@ -84,6 +85,7 @@ core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Cli
 
 core::HumanError updateReport(core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
 {
+	ZoneScoped;
 	auto eventLoopResult = core::EventLoop::create(log, allocator);
 	if (eventLoopResult.isError())
 		return core::errf(allocator, "failed to create event loop, {}"_sv, eventLoopResult.error());
@@ -117,6 +119,8 @@ core::HumanError updateReport(core::StringView baseUrl, core::Log* log, core::Al
 
 core::HumanError runTest(core::StringView testname, core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
 {
+	ZoneScoped;
+
 	auto eventLoopResult = core::EventLoop::create(log, allocator);
 	if (eventLoopResult.isError())
 		return core::errf(allocator, "failed to create event loop, {}"_sv, eventLoopResult.error());
@@ -129,7 +133,6 @@ core::HumanError runTest(core::StringView testname, core::StringView baseUrl, co
 	{
 		.onMsg = onMsg,
 		.onDisconnected = [log, eventLoop = eventLoop.get()]() -> core::HumanError {
-			log->debug("closing event loop"_sv);
 			eventLoop->stop();
 			return {};
 		},
@@ -165,9 +168,6 @@ int main(int argc, char** argv)
 
 	core::Mallocator mallocator;
 	core::Log log{&mallocator};
-
-	(void)runSingleTest("2.10"_sv, url, &log, &mallocator);
-	return 0;
 
 	for (size_t i = 0; i < sizeof(TESTS); ++i)
 	{

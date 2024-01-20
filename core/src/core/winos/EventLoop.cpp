@@ -7,6 +7,8 @@
 #include <WS2tcpip.h>
 #include <Mswsock.h>
 
+#include <tracy/Tracy.hpp>
+
 namespace core
 {
 	class WinOSEventLoop: public EventLoop
@@ -31,13 +33,13 @@ namespace core
 				  source(source_)
 			{
 				::memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
-				hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+				// hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 			}
 
 			virtual ~Op()
 			{
-				[[maybe_unused]] auto res = CloseHandle(hEvent);
-				assert(SUCCEEDED(res));
+				// [[maybe_unused]] auto res = CloseHandle(hEvent);
+				// assert(SUCCEEDED(res));
 			}
 
 			KIND kind = KIND_NONE;
@@ -82,24 +84,18 @@ namespace core
 
 		struct WriteOp: Op
 		{
+			Buffer buffer;
 			WSABUF wsaBuf{};
 			Reactor* reactor = nullptr;
 
-			WriteOp(HANDLE handle_, Span<const std::byte> buffer, const Weak<WinOSEventSource>& source_, Reactor* reactor_)
+			WriteOp(HANDLE handle_, Buffer&& buffer_, const Weak<WinOSEventSource>& source_, Reactor* reactor_)
 				: Op(KIND_WRITE, handle_, source_),
+				  buffer(std::move(buffer_)),
 				  reactor(reactor_)
 			{
 				wsaBuf.buf = (CHAR*)buffer.data();
 				wsaBuf.len = (ULONG)buffer.count();
 			}
-		};
-
-		struct OutboundBytes
-		{
-			Buffer buffer;
-			Span<const std::byte> remainingBytes;
-			Reactor* reactor;
-			bool isScheduled = false;
 		};
 
 		class WinOSEventSource: public EventSource, public SharedFromThis<WinOSEventSource>
@@ -109,8 +105,6 @@ namespace core
 				: EventSource(loop)
 			{}
 
-			virtual Result<Unique<Op>> processWriteQueue(WinOSEventLoop* loop) = 0;
-			virtual Result<Unique<Op>> handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) = 0;
 			virtual Result<Unique<Op>> read(WinOSEventLoop* loop, Reactor* reactor) = 0;
 			virtual Result<Unique<Op>> write(WinOSEventLoop* loop, Reactor* reactor, Span<const std::byte> buffer) = 0;
 			virtual Result<Unique<Op>> accept(WinOSEventLoop* loop, Reactor* reactor) = 0;
@@ -120,12 +114,10 @@ namespace core
 		{
 			Unique<Socket> m_socket;
 			std::byte recvLine[2048] = {};
-			Queue<OutboundBytes> m_writeQueue;
 		public:
 			WinOSSocketEventSource(Unique<Socket> socket, EventLoop* loop, Allocator* allocator)
 				: WinOSEventSource(loop, allocator),
-				  m_socket(std::move(socket)),
-				  m_writeQueue(allocator)
+				  m_socket(std::move(socket))
 			{
 				::memset(recvLine, 0, sizeof(recvLine));
 			}
@@ -154,40 +146,8 @@ namespace core
 				else
 				{
 					auto error = WSAGetLastError();
-					return errf(loop->m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
+					return errf(loop->m_allocator, "failed to schedule write operation: ErrorCode({})"_sv, error);
 				}
-			}
-
-			Result<Unique<Op>> processWriteQueue(WinOSEventLoop* loop) override
-			{
-				if (m_writeQueue.count() == 0)
-					return nullptr;
-
-				if (m_writeQueue.front().isScheduled)
-					return nullptr;
-
-				auto& outboundBytes = m_writeQueue.front();
-				outboundBytes.isScheduled = true;
-
-				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, weakFromThis(), outboundBytes.reactor);
-				return scheduleWriteOp(loop, std::move(op));
-			}
-
-			Result<Unique<Op>> handleWriteEvent(WinOSEventLoop* loop, size_t writtenSize) override
-			{
-				assert(m_writeQueue.count() > 0);
-				auto& outboundBytes = m_writeQueue.front();
-				assert(outboundBytes.isScheduled == true);
-				outboundBytes.remainingBytes = outboundBytes.remainingBytes.slice(writtenSize, outboundBytes.remainingBytes.count() - writtenSize);
-
-				if (outboundBytes.remainingBytes.count() == 0)
-				{
-					m_writeQueue.pop_front();
-					return processWriteQueue(loop);
-				}
-
-				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), outboundBytes.remainingBytes, weakFromThis(), outboundBytes.reactor);
-				return scheduleWriteOp(loop, std::move(op));
 			}
 
 			Result<Unique<Op>> read(WinOSEventLoop* loop, Reactor* reactor) override
@@ -219,11 +179,8 @@ namespace core
 			{
 				Buffer buffer{loop->m_allocator};
 				buffer.push(bytes);
-				auto remainingBytes = Span<const std::byte>{buffer};
-
-				m_writeQueue.push_back(OutboundBytes{.buffer = std::move(buffer), .remainingBytes = remainingBytes, .reactor = reactor});
-
-				return processWriteQueue(loop);
+				auto op = unique_from<WriteOp>(loop->m_allocator, (HANDLE)m_socket->fd(), std::move(buffer), weakFromThis(), reactor);
+				return scheduleWriteOp(loop, std::move(op));
 			}
 
 			Result<Unique<Op>> accept(WinOSEventLoop* loop, Reactor* reactor) override
@@ -259,10 +216,6 @@ namespace core
 
 		void pushPendingOp(Unique<Op> op)
 		{
-			// ignore null operations that may rise because of calling process write queue functions
-			if (op == nullptr)
-				return;
-
 			auto handle = (OVERLAPPED*)op.get();
 			m_scheduledOperations.insert(handle, std::move(op));
 		}
@@ -303,6 +256,7 @@ namespace core
 
 		HumanError run() override
 		{
+			ZoneScoped;
 			while (true)
 			{
 				constexpr int MAX_ENTRIES = 32;
@@ -343,6 +297,7 @@ namespace core
 					}
 					case Op::KIND_CLOSE:
 					{
+						ZoneScopedN("EventLoop::close");
 						m_scheduledOperations.clear();
 						return {};
 					}
@@ -351,7 +306,7 @@ namespace core
 						auto readOp = unique_static_cast<ReadOp>(std::move(op));
 						if (readOp->reactor)
 						{
-
+							ZoneScopedN("EventLoop::handle");
 							ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->wsaBuf.buf, bytesTransferred}, source.get()};
 							readOp->reactor->handle(&readEvent);
 						}
@@ -362,6 +317,7 @@ namespace core
 						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
 						if (acceptOp->reactor)
 						{
+							ZoneScopedN("EventLoop::accept");
 							AcceptEvent acceptEvent{std::move(acceptOp->socket), source.get()};
 							acceptOp->reactor->handle(&acceptEvent);
 						}
@@ -370,20 +326,14 @@ namespace core
 					case Op::KIND_WRITE:
 					{
 						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+						if (writeOp->buffer.count() != bytesTransferred)
+							return errf(m_allocator, "{}/{} bytes delieverd, failed to deliver full async send"_sv, bytesTransferred, writeOp->buffer.count());
+
 						if (writeOp->reactor)
 						{
+							ZoneScopedN("EventLoop::write");
 							WriteEvent writeEvent{bytesTransferred, source.get()};
 							writeOp->reactor->handle(&writeEvent);
-						}
-						auto opResult = source->handleWriteEvent(this, bytesTransferred);
-						if (opResult.isError())
-						{
-							// TODO: do something about this potential error
-							m_log->error("failed to handle write queue of an event source, {}"_sv, opResult.error());
-						}
-						else
-						{
-							pushPendingOp(opResult.releaseValue());
 						}
 						break;
 					}
@@ -396,6 +346,7 @@ namespace core
 
 		void stop() override
 		{
+			ZoneScoped;
 			auto op = unique_from<CloseOp>(m_allocator);
 			[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (LPOVERLAPPED)op.get());
 			assert(SUCCEEDED(res));
@@ -404,6 +355,7 @@ namespace core
 
 		Shared<EventSource> createEventSource(Unique<Socket> socket) override
 		{
+			ZoneScoped;
 			if (socket == nullptr)
 				return nullptr;
 
@@ -414,6 +366,7 @@ namespace core
 
 		HumanError read(EventSource* source, Reactor* reactor) override
 		{
+			ZoneScoped;
 			if (source == nullptr)
 				return {};
 
@@ -427,6 +380,7 @@ namespace core
 
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
+			ZoneScoped;
 			if (source == nullptr)
 				return {};
 
@@ -442,6 +396,7 @@ namespace core
 
 		HumanError accept(EventSource* source, Reactor* reactor) override
 		{
+			ZoneScoped;
 			if (source == nullptr)
 				return {};
 

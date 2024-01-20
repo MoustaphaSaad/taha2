@@ -376,10 +376,11 @@ namespace core::websocket
 						auto consumedBytes = parserResult.value();
 
 						// if we didn't consume any bytes we just wait for more bytes
-						if (consumedBytes == 0)
+						if (consumedBytes == 0 && m_messageParser.hasMessage() == false)
 							break;
 
-						bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
+						if (consumedBytes > 0)
+							bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
 
 						if (m_messageParser.hasMessage())
 						{
