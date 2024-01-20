@@ -13,7 +13,7 @@ namespace core
 		std::atomic<size_t> atomic_count = 0;
 	public:
 		CORE_EXPORT FastLeak() = default;
-		CORE_EXPORT ~FastLeak();
+		CORE_EXPORT ~FastLeak() override;
 
 		CORE_EXPORT void* alloc(size_t size, size_t alignment) override;
 		CORE_EXPORT void commit(void* ptr, size_t size) override;
