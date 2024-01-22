@@ -41,9 +41,26 @@ namespace core
 			while (true)
 			{
 				auto count = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
-				for (size_t i = 0; i < count; ++i)
+				if (count == -1)
 				{
-					// TODO: handle events
+					if (errno == EINTR)
+					{
+						// that's an interrupt due to signal, just continue what we are doing
+					}
+					else
+					{
+						return errf(m_allocator, "epoll_wait failed, ErrorCode({})"_sv, errno);
+					}
+				}
+
+				for (int i = 0; i < count; ++i)
+				{
+					auto event = events[i];
+					if (m_closeEvent == event.data.fd)
+					{
+						m_log->debug("event loop closed"_sv);
+						return {};
+					}
 				}
 			}
 
