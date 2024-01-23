@@ -229,6 +229,21 @@ namespace core
 			}
 		};
 
+		Shared<LinuxEventSource> getSourceAndRemoveItWhenExpired(LinuxEventSource* source)
+		{
+			auto it = m_sources.lookup(source);
+			if (it == m_sources.end())
+				return nullptr;
+			auto& weakHandle = it->value;
+			if (weakHandle.expired())
+			{
+				m_sources.remove(source);
+				return nullptr;
+			}
+
+			return weakHandle.lock();
+		}
+
 		void continueWriteOp(Unique<WriteOp> op, LinuxEventSource* source)
 		{
 			assert(op->remainingBytes.count() > 0);
@@ -302,12 +317,14 @@ namespace core
 		int m_epoll = 0;
 		Shared<LinuxCloseEventSource> m_closeEventSource;
 		Map<Op*, Unique<Op>> m_scheduledOperations;
+		Map<LinuxEventSource*, Weak<LinuxEventSource>> m_sources;
 	public:
 		LinuxEventLoop(int epoll, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
 			  m_log(log),
 			  m_epoll(epoll),
-			  m_scheduledOperations(allocator)
+			  m_scheduledOperations(allocator),
+			  m_sources(allocator)
 		{}
 
 		~LinuxEventLoop() override
@@ -356,19 +373,26 @@ namespace core
 				for (int i = 0; i < count; ++i)
 				{
 					auto event = events[i];
-					auto source = (LinuxEventSource*) event.data.ptr;
+					auto sourceHandle = (LinuxEventSource*) event.data.ptr;
+
+					auto source = getSourceAndRemoveItWhenExpired(sourceHandle);
+					if (source == nullptr)
+					{
+						m_log->debug("expired source: {}, sources count: {}"_sv, (void*)sourceHandle, m_sources.count());
+						continue;
+					}
 
 					if (event.events | EPOLLIN)
 					{
 						auto op = source->popPollIn();
-						if (auto err = handleOp(op, source))
+						if (auto err = handleOp(op, source.get()))
 							return err;
 					}
 
 					if (event.events | EPOLLOUT)
 					{
 						auto op = source->popPollOut();
-						if (auto err = handleOp(op, source))
+						if (auto err = handleOp(op, source.get()))
 							return err;
 					}
 				}
@@ -399,6 +423,9 @@ namespace core
 				m_log->error("failed to create event source"_sv);
 				return nullptr;
 			}
+
+			auto sourceKey = res.get();
+			m_sources.insert(sourceKey, res);
 			return res;
 		}
 
