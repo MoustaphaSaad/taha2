@@ -11,5 +11,6 @@ namespace core
 		{
 			s += getrandom((char*)buffer.data() + s, buffer.count() - s, 0);
 		}
+		return true;
 	}
 }
