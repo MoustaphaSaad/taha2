@@ -16,6 +16,7 @@ namespace core
 				KIND_NONE,
 				KIND_CLOSE,
 				KIND_READ,
+				KIND_WRITE,
 			};
 
 			explicit Op(KIND kind_)
@@ -42,13 +43,29 @@ namespace core
 			{}
 		};
 
+		struct WriteOp: Op
+		{
+			Reactor* reactor = nullptr;
+			Buffer buffer;
+			Span<const std::byte> remainingBytes;
+
+			WriteOp(Reactor* reactor_, Buffer&& buffer_)
+				: Op(KIND_WRITE),
+				  reactor(reactor_),
+				  buffer(std::move(buffer_)),
+				  remainingBytes(buffer)
+			{};
+		};
+
 		class LinuxEventSource: public EventSource
 		{
 			Queue<Op*> m_pollInOps;
+			Queue<Op*> m_pollOutOps;
 		public:
 			explicit LinuxEventSource(EventLoop* loop, Allocator* allocator)
 				: EventSource(loop),
-				  m_pollInOps(allocator)
+				  m_pollInOps(allocator),
+				  m_pollOutOps(allocator)
 			{}
 
 			void pushPollIn(Op* op)
@@ -67,7 +84,29 @@ namespace core
 				return nullptr;
 			}
 
+			void pushPollOut(Op* op)
+			{
+				m_pollOutOps.push_back(op);
+			}
+
+			void pushPollOutToFront(Op* op)
+			{
+				m_pollOutOps.push_front(op);
+			}
+
+			Op* popPollOut()
+			{
+				if (m_pollOutOps.count() > 0)
+				{
+					auto res = m_pollOutOps.front();
+					m_pollOutOps.pop_front();
+					return res;
+				}
+				return nullptr;
+			}
+
 			virtual HumanError readReady(Unique<ReadOp> op) = 0;
+			virtual HumanError writeReady(Unique<WriteOp> op) = 0;
 		};
 
 		class LinuxCloseEventSource: public LinuxEventSource
@@ -98,6 +137,11 @@ namespace core
 			}
 
 			HumanError readReady(Unique<ReadOp> op) override
+			{
+				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			HumanError writeReady(Unique<WriteOp> op) override
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
@@ -132,7 +176,38 @@ namespace core
 				}
 				return {};
 			}
+
+			HumanError writeReady(Unique<WriteOp> op) override
+			{
+				auto writtenBytes = ::write(m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
+				if (writtenBytes == -1)
+					return errf(m_allocator, "failed to write to socket, ErrorCode({})"_sv, errno);
+				if (op->reactor)
+				{
+					WriteEvent writeEvent{(size_t)writtenBytes, this};
+					op->reactor->handle(&writeEvent);
+				}
+				op->remainingBytes = op->remainingBytes.slice(writtenBytes, op->remainingBytes.count() - writtenBytes);
+
+				if (op->remainingBytes.count() > 0)
+				{
+					auto loop = (LinuxEventLoop*)eventLoop();
+					loop->continueWriteOp(std::move(op), this);
+				}
+				return {};
+			}
 		};
+
+		void continueWriteOp(Unique<WriteOp> op, LinuxEventSource* source)
+		{
+			assert(op->remainingBytes.count() > 0);
+
+			auto key = (Op*)op.get();
+
+			source->pushPollOutToFront(key);
+
+			m_scheduledOperations.insert(key, std::move(op));
+		}
 
 		void pushPendingOp(Unique<Op> op, LinuxEventSource* source)
 		{
@@ -143,6 +218,9 @@ namespace core
 			case Op::KIND_CLOSE:
 			case Op::KIND_READ:
 				source->pushPollIn(key);
+				break;
+			case Op::KIND_WRITE:
+				source->pushPollOut(key);
 				break;
 			default:
 				assert(false);
@@ -241,11 +319,13 @@ namespace core
 						m_log->debug("event loop closed"_sv);
 						return {};
 					case Op::KIND_READ:
-					{
 						if (auto err = source->readReady(unique_static_cast<ReadOp>(std::move(op))))
 							return err;
 						break;
-					}
+					case Op::KIND_WRITE:
+						if (auto err = source->writeReady(unique_static_cast<WriteOp>(std::move(op))))
+							return err;
+						break;
 					default:
 						assert(false);
 						return errf(m_allocator, "unknown event loop event kind, {}"_sv, (int)op->kind);
@@ -290,7 +370,10 @@ namespace core
 
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
-			// TODO: implement this function
+			Buffer ownedBuffer{m_allocator};
+			ownedBuffer.push(buffer);
+			auto op = unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer));
+			pushPendingOp(std::move(op), (LinuxEventSource*)source);
 			return {};
 		}
 
