@@ -15,6 +15,7 @@ namespace core
 			{
 				KIND_NONE,
 				KIND_CLOSE,
+				KIND_READ,
 			};
 
 			explicit Op(KIND kind_)
@@ -28,6 +29,16 @@ namespace core
 		{
 			CloseOp()
 				: Op(KIND_CLOSE)
+			{}
+		};
+
+		struct ReadOp: Op
+		{
+			Reactor* reactor = nullptr;
+
+			ReadOp(Reactor* reactor_)
+				: Op(KIND_READ),
+				  reactor(reactor_)
 			{}
 		};
 
@@ -55,14 +66,18 @@ namespace core
 				}
 				return nullptr;
 			}
+
+			virtual HumanError readReady(Unique<ReadOp> op) = 0;
 		};
 
 		class LinuxCloseEventSource: public LinuxEventSource
 		{
+			Allocator* m_allocator = nullptr;
 			int m_eventfd = 0;
 		public:
 			LinuxCloseEventSource(int eventfd, EventLoop* loop, Allocator* allocator)
 				: LinuxEventSource(loop, allocator),
+				  m_allocator(allocator),
 				  m_eventfd(eventfd)
 			{}
 
@@ -81,20 +96,41 @@ namespace core
 				[[maybe_unused]] auto res = ::write(m_eventfd, &close, sizeof(close));
 				assert(res == sizeof(close));
 			}
+
+			HumanError readReady(Unique<ReadOp> op) override
+			{
+				return errf(m_allocator, "not implemented"_sv);
+			}
 		};
 
 		class LinuxSocketEventSource: public LinuxEventSource
 		{
+			Allocator* m_allocator = nullptr;
 			Unique<Socket> m_socket;
+			std::byte line[2048] = {};
 		public:
 			LinuxSocketEventSource(Unique<Socket> socket, EventLoop* loop, Allocator* allocator)
 				: LinuxEventSource(loop, allocator),
+				  m_allocator(allocator),
 				  m_socket(std::move(socket))
 			{}
 
 			~LinuxSocketEventSource() override
 			{
 				m_socket->shutdown(Socket::SHUT_RDWR);
+			}
+
+			HumanError readReady(Unique<ReadOp> op) override
+			{
+				auto readBytes = ::read(m_socket->fd(), line, sizeof(line));
+				if (readBytes == -1)
+					return errf(m_allocator, "failed to read from socket, ErrorCode({})"_sv, errno);
+				if (op->reactor)
+				{
+					ReadEvent readEvent{Span<const std::byte>{line, (size_t) readBytes}, this};
+					op->reactor->handle(&readEvent);
+				}
+				return {};
 			}
 		};
 
@@ -105,6 +141,7 @@ namespace core
 			switch (op->kind)
 			{
 			case Op::KIND_CLOSE:
+			case Op::KIND_READ:
 				source->pushPollIn(key);
 				break;
 			default:
@@ -203,6 +240,12 @@ namespace core
 					case Op::KIND_CLOSE:
 						m_log->debug("event loop closed"_sv);
 						return {};
+					case Op::KIND_READ:
+					{
+						if (auto err = source->readReady(unique_static_cast<ReadOp>(std::move(op))))
+							return err;
+						break;
+					}
 					default:
 						assert(false);
 						return errf(m_allocator, "unknown event loop event kind, {}"_sv, (int)op->kind);
@@ -240,7 +283,8 @@ namespace core
 
 		HumanError read(EventSource* source, Reactor* reactor) override
 		{
-			// TODO: implement this function
+			auto op = unique_from<ReadOp>(m_allocator, reactor);
+			pushPendingOp(std::move(op), (LinuxEventSource*)source);
 			return {};
 		}
 
