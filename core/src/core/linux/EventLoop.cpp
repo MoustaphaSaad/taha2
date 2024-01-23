@@ -4,6 +4,7 @@
 
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/socket.h>
 
 namespace core
 {
@@ -17,6 +18,7 @@ namespace core
 				KIND_CLOSE,
 				KIND_READ,
 				KIND_WRITE,
+				KIND_ACCEPT,
 			};
 
 			explicit Op(KIND kind_)
@@ -55,6 +57,16 @@ namespace core
 				  buffer(std::move(buffer_)),
 				  remainingBytes(buffer)
 			{};
+		};
+
+		struct AcceptOp: Op
+		{
+			Reactor* reactor = nullptr;
+
+			AcceptOp(Reactor* reactor_)
+				: Op(KIND_ACCEPT),
+				  reactor(reactor_)
+			{}
 		};
 
 		class LinuxEventSource: public EventSource
@@ -107,6 +119,7 @@ namespace core
 
 			virtual HumanError readReady(Unique<ReadOp> op) = 0;
 			virtual HumanError writeReady(Unique<WriteOp> op) = 0;
+			virtual HumanError acceptReady(Unique<AcceptOp> op) = 0;
 		};
 
 		class LinuxCloseEventSource: public LinuxEventSource
@@ -142,6 +155,11 @@ namespace core
 			}
 
 			HumanError writeReady(Unique<WriteOp> op) override
+			{
+				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			HumanError acceptReady(Unique<AcceptOp> op) override
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
@@ -196,6 +214,19 @@ namespace core
 				}
 				return {};
 			}
+
+			HumanError acceptReady(Unique<AcceptOp> op) override
+			{
+				auto acceptedSocket = m_socket->accept();
+				if (acceptedSocket == nullptr)
+					return errf(m_allocator, "failed to accept from socket, ErrorCode({})"_sv, errno);
+				if (op->reactor)
+				{
+					AcceptEvent acceptEvent{std::move(acceptedSocket), this};
+					op->reactor->handle(&acceptEvent);
+				}
+				return {};
+			}
 		};
 
 		void continueWriteOp(Unique<WriteOp> op, LinuxEventSource* source)
@@ -217,6 +248,7 @@ namespace core
 			{
 			case Op::KIND_CLOSE:
 			case Op::KIND_READ:
+			case Op::KIND_ACCEPT:
 				source->pushPollIn(key);
 				break;
 			case Op::KIND_WRITE:
@@ -326,6 +358,10 @@ namespace core
 						if (auto err = source->writeReady(unique_static_cast<WriteOp>(std::move(op))))
 							return err;
 						break;
+					case Op::KIND_ACCEPT:
+						if (auto err = source->acceptReady(unique_static_cast<AcceptOp>(std::move(op))))
+							return err;
+						break;
 					default:
 						assert(false);
 						return errf(m_allocator, "unknown event loop event kind, {}"_sv, (int)op->kind);
@@ -379,7 +415,8 @@ namespace core
 
 		HumanError accept(EventSource* source, Reactor* reactor) override
 		{
-			// TODO: implement this function
+			auto op = unique_from<AcceptOp>(m_allocator, reactor);
+			pushPendingOp(std::move(op), (LinuxEventSource*)source);
 			return {};
 		}
 	};
