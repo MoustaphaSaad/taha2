@@ -83,6 +83,21 @@ namespace core
 			}
 		};
 
+		class LinuxSocketEventSource: public LinuxEventSource
+		{
+			Unique<Socket> m_socket;
+		public:
+			LinuxSocketEventSource(Unique<Socket> socket, EventLoop* loop, Allocator* allocator)
+				: LinuxEventSource(loop, allocator),
+				  m_socket(std::move(socket))
+			{}
+
+			~LinuxSocketEventSource() override
+			{
+				m_socket->shutdown(Socket::SHUT_RDWR);
+			}
+		};
+
 		void pushPendingOp(Unique<Op> op, LinuxEventSource* source)
 		{
 			auto key = (Op*)op.get();
@@ -180,7 +195,6 @@ namespace core
 					if (opHandle == nullptr)
 						continue;
 
-
 					auto op = popPendingOp((Op*)opHandle);
 					assert(op != nullptr);
 
@@ -206,8 +220,22 @@ namespace core
 
 		Shared<EventSource> createEventSource(Unique<Socket> socket) override
 		{
-			// TODO: implement this function
-			return nullptr;
+			if (socket == nullptr)
+				return nullptr;
+
+			auto fd = (int)socket->fd();
+			auto res = shared_from<LinuxSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
+
+			epoll_event event{};
+			event.events = EPOLLIN | EPOLLOUT;
+			event.data.ptr = res.get();
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &event);
+			if (ok == -1)
+			{
+				m_log->error("failed to create event source"_sv);
+				return nullptr;
+			}
+			return res;
 		}
 
 		HumanError read(EventSource* source, Reactor* reactor) override
