@@ -272,6 +272,31 @@ namespace core
 			return res;
 		}
 
+		HumanError handleOp(Op* opHandle, LinuxEventSource* source)
+		{
+			if (opHandle == nullptr)
+				return {};
+
+			auto op = popPendingOp((Op*)opHandle);
+			assert(op != nullptr);
+
+			switch (op->kind)
+			{
+			case Op::KIND_CLOSE:
+				m_log->debug("event loop closed"_sv);
+				return {};
+			case Op::KIND_READ:
+				return source->readReady(unique_static_cast<ReadOp>(std::move(op)));
+			case Op::KIND_WRITE:
+				return source->writeReady(unique_static_cast<WriteOp>(std::move(op)));
+			case Op::KIND_ACCEPT:
+				return source->acceptReady(unique_static_cast<AcceptOp>(std::move(op)));
+			default:
+				assert(false);
+				return errf(m_allocator, "unknown event loop event kind, {}"_sv, (int)op->kind);
+			}
+		}
+
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		int m_epoll = 0;
@@ -333,38 +358,18 @@ namespace core
 					auto event = events[i];
 					auto source = (LinuxEventSource*) event.data.ptr;
 
-					Op* opHandle = nullptr;
 					if (event.events | EPOLLIN)
 					{
-						opHandle = source->popPollIn();
+						auto op = source->popPollIn();
+						if (auto err = handleOp(op, source))
+							return err;
 					}
 
-					if (opHandle == nullptr)
-						continue;
-
-					auto op = popPendingOp((Op*)opHandle);
-					assert(op != nullptr);
-
-					switch (op->kind)
+					if (event.events | EPOLLOUT)
 					{
-					case Op::KIND_CLOSE:
-						m_log->debug("event loop closed"_sv);
-						return {};
-					case Op::KIND_READ:
-						if (auto err = source->readReady(unique_static_cast<ReadOp>(std::move(op))))
+						auto op = source->popPollOut();
+						if (auto err = handleOp(op, source))
 							return err;
-						break;
-					case Op::KIND_WRITE:
-						if (auto err = source->writeReady(unique_static_cast<WriteOp>(std::move(op))))
-							return err;
-						break;
-					case Op::KIND_ACCEPT:
-						if (auto err = source->acceptReady(unique_static_cast<AcceptOp>(std::move(op))))
-							return err;
-						break;
-					default:
-						assert(false);
-						return errf(m_allocator, "unknown event loop event kind, {}"_sv, (int)op->kind);
 					}
 				}
 			}
