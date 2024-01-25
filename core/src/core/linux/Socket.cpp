@@ -27,6 +27,16 @@ namespace core
 			  m_protocol(protocol)
 		{}
 
+		~LinuxSocket() override
+		{
+			if (m_handle != -1)
+			{
+				[[maybe_unused]] auto err = ::close(m_handle);
+				assert(err != -1);
+				m_handle = -1;
+			}
+		}
+
 		bool close() override
 		{
 			if (m_handle == -1)

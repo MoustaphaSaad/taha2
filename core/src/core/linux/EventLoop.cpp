@@ -5,6 +5,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 
 namespace core
 {
@@ -74,14 +75,28 @@ namespace core
 			Queue<Op*> m_pollInOps;
 			Queue<Op*> m_pollOutOps;
 		public:
+			enum OP_RESULT
+			{
+				OP_RESULT_OK,
+				OP_RESULT_EAGAIN,
+				OP_RESULT_ECONNRESET,
+				OP_RESULT_PARTIAL_WRITE,
+			};
 			explicit LinuxEventSource(EventLoop* loop, Allocator* allocator)
 				: EventSource(loop),
 				  m_pollInOps(allocator),
 				  m_pollOutOps(allocator)
 			{}
 
+			~LinuxEventSource() override
+			{
+				auto loop = (LinuxEventLoop*)eventLoop();
+				loop->removeSource(this);
+			}
+
 			void pushPollIn(Op* op)
 			{
+				assert(op != nullptr);
 				m_pollInOps.push_back(op);
 			}
 
@@ -117,9 +132,9 @@ namespace core
 				return nullptr;
 			}
 
-			virtual HumanError readReady(Unique<ReadOp> op) = 0;
-			virtual HumanError writeReady(Unique<WriteOp> op) = 0;
-			virtual HumanError acceptReady(Unique<AcceptOp> op) = 0;
+			virtual Result<OP_RESULT> readReady(ReadOp* op) = 0;
+			virtual Result<OP_RESULT> writeReady(WriteOp* op) = 0;
+			virtual Result<OP_RESULT> acceptReady(AcceptOp* op) = 0;
 		};
 
 		class LinuxCloseEventSource: public LinuxEventSource
@@ -149,17 +164,17 @@ namespace core
 				assert(res == sizeof(close));
 			}
 
-			HumanError readReady(Unique<ReadOp> op) override
+			Result<OP_RESULT> readReady(ReadOp*) override
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
 
-			HumanError writeReady(Unique<WriteOp> op) override
+			Result<OP_RESULT> writeReady(WriteOp*) override
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
 
-			HumanError acceptReady(Unique<AcceptOp> op) override
+			Result<OP_RESULT> acceptReady(AcceptOp*) override
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
@@ -182,24 +197,44 @@ namespace core
 				m_socket->shutdown(Socket::SHUT_RDWR);
 			}
 
-			HumanError readReady(Unique<ReadOp> op) override
+			Result<OP_RESULT> readReady(ReadOp* op) override
 			{
 				auto readBytes = ::read(m_socket->fd(), line, sizeof(line));
 				if (readBytes == -1)
+				{
+					if (errno == EAGAIN || errno == EWOULDBLOCK)
+					{
+						return OP_RESULT_EAGAIN;
+					}
+					else if (errno == ECONNRESET)
+					{
+						ReadEvent readEvent{{}, this};
+						op->reactor->handle(&readEvent);
+						return OP_RESULT_ECONNRESET;
+					}
+
 					return errf(m_allocator, "failed to read from socket, ErrorCode({})"_sv, errno);
+				}
 				if (op->reactor)
 				{
 					ReadEvent readEvent{Span<const std::byte>{line, (size_t) readBytes}, this};
 					op->reactor->handle(&readEvent);
 				}
-				return {};
+				return OP_RESULT_OK;
 			}
 
-			HumanError writeReady(Unique<WriteOp> op) override
+			Result<OP_RESULT> writeReady(WriteOp* op) override
 			{
 				auto writtenBytes = ::write(m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
 				if (writtenBytes == -1)
+				{
+					if (errno == EAGAIN || errno == EWOULDBLOCK)
+						return OP_RESULT_EAGAIN;
+					else if (errno == ECONNRESET)
+						return OP_RESULT_ECONNRESET;
+
 					return errf(m_allocator, "failed to write to socket, ErrorCode({})"_sv, errno);
+				}
 				if (op->reactor)
 				{
 					WriteEvent writeEvent{(size_t)writtenBytes, this};
@@ -208,26 +243,35 @@ namespace core
 				op->remainingBytes = op->remainingBytes.slice(writtenBytes, op->remainingBytes.count() - writtenBytes);
 
 				if (op->remainingBytes.count() > 0)
-				{
-					auto loop = (LinuxEventLoop*)eventLoop();
-					loop->continueWriteOp(std::move(op), this);
-				}
-				return {};
+					return OP_RESULT_PARTIAL_WRITE;
+				return OP_RESULT_OK;
 			}
 
-			HumanError acceptReady(Unique<AcceptOp> op) override
+			Result<OP_RESULT> acceptReady(AcceptOp* op) override
 			{
 				auto acceptedSocket = m_socket->accept();
 				if (acceptedSocket == nullptr)
+				{
+					if (errno == EAGAIN || errno == EWOULDBLOCK)
+						return OP_RESULT_EAGAIN;
+					else if (errno == ECONNRESET)
+						return OP_RESULT_ECONNRESET;
+
 					return errf(m_allocator, "failed to accept from socket, ErrorCode({})"_sv, errno);
+				}
 				if (op->reactor)
 				{
 					AcceptEvent acceptEvent{std::move(acceptedSocket), this};
 					op->reactor->handle(&acceptEvent);
 				}
-				return {};
+				return OP_RESULT_OK;
 			}
 		};
+
+		void removeSource(LinuxEventSource* source)
+		{
+			m_sources.remove(source);
+		}
 
 		Shared<LinuxEventSource> getSourceAndRemoveItWhenExpired(LinuxEventSource* source)
 		{
@@ -287,10 +331,10 @@ namespace core
 			return res;
 		}
 
-		HumanError handleOp(Op* opHandle, LinuxEventSource* source)
+		Result<bool> handleOp(Op* opHandle, LinuxEventSource* source)
 		{
 			if (opHandle == nullptr)
-				return {};
+				return false;
 
 			auto op = popPendingOp((Op*)opHandle);
 			assert(op != nullptr);
@@ -299,13 +343,48 @@ namespace core
 			{
 			case Op::KIND_CLOSE:
 				m_log->debug("event loop closed"_sv);
-				return {};
+				m_closeEventSource = nullptr;
+				m_sources.clear();
+				m_scheduledOperations.clear();
+				return true;
 			case Op::KIND_READ:
-				return source->readReady(unique_static_cast<ReadOp>(std::move(op)));
+			{
+				auto readOp = unique_static_cast<ReadOp>(std::move(op));
+				auto opResult = source->readReady(readOp.get());
+				if (opResult.isError()) return opResult.releaseError();
+				auto res = opResult.releaseValue();
+				if (res == LinuxEventSource::OP_RESULT_EAGAIN)
+					pushPendingOp(std::move(readOp), source);
+				else if (res == LinuxEventSource::OP_RESULT_ECONNRESET)
+					m_sources.remove(source);
+				return false;
+			}
 			case Op::KIND_WRITE:
-				return source->writeReady(unique_static_cast<WriteOp>(std::move(op)));
+			{
+				auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+				auto opResult = source->writeReady(writeOp.get());
+				if (opResult.isError()) return opResult.releaseError();
+				auto res = opResult.releaseValue();
+				if (res == LinuxEventSource::OP_RESULT_EAGAIN)
+					pushPendingOp(std::move(writeOp), source);
+				else if (res == LinuxEventSource::OP_RESULT_PARTIAL_WRITE)
+					continueWriteOp(std::move(writeOp), source);
+				else if (res == LinuxEventSource::OP_RESULT_ECONNRESET)
+					m_sources.remove(source);
+				return false;
+			}
 			case Op::KIND_ACCEPT:
-				return source->acceptReady(unique_static_cast<AcceptOp>(std::move(op)));
+			{
+				auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
+				auto opResult = source->acceptReady(acceptOp.get());
+				if (opResult.isError()) return opResult.releaseError();
+				auto res = opResult.releaseValue();
+				if (res == LinuxEventSource::OP_RESULT_EAGAIN)
+					pushPendingOp(std::move(acceptOp), source);
+				else if (res == LinuxEventSource::OP_RESULT_ECONNRESET)
+					m_sources.remove(source);
+				return false;
+			}
 			default:
 				assert(false);
 				return errf(m_allocator, "unknown event loop event kind, {}"_sv, (int)op->kind);
@@ -357,6 +436,7 @@ namespace core
 			epoll_event events[MAX_EVENTS];
 			while (true)
 			{
+				m_log->debug("source: {}"_sv, m_sources.count());
 				auto count = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
 				if (count == -1)
 				{
@@ -385,15 +465,19 @@ namespace core
 					if (event.events | EPOLLIN)
 					{
 						auto op = source->popPollIn();
-						if (auto err = handleOp(op, source.get()))
-							return err;
+						auto shouldCloseResult = handleOp(op, source.get());
+						if (shouldCloseResult.isError()) return shouldCloseResult.releaseError();
+						auto shouldClose = shouldCloseResult.releaseValue();
+						if (shouldClose) return {};
 					}
 
 					if (event.events | EPOLLOUT)
 					{
 						auto op = source->popPollOut();
-						if (auto err = handleOp(op, source.get()))
-							return err;
+						auto shouldCloseResult = handleOp(op, source.get());
+						if (shouldCloseResult.isError()) return shouldCloseResult.releaseError();
+						auto shouldClose = shouldCloseResult.releaseValue();
+						if (shouldClose) return {};
 					}
 				}
 			}
@@ -412,6 +496,19 @@ namespace core
 				return nullptr;
 
 			auto fd = (int)socket->fd();
+			auto flags = fcntl(fd, F_GETFL, 0);
+			if (flags == -1)
+			{
+				m_log->error("failed to get socket flags"_sv);
+				return nullptr;
+			}
+			flags |= O_NONBLOCK;
+			if (fcntl(fd, F_SETFL, flags) != 0)
+			{
+				m_log->error("failed to make socket non-blocking"_sv);
+				return nullptr;
+			}
+
 			auto res = shared_from<LinuxSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
 
 			epoll_event event{};
