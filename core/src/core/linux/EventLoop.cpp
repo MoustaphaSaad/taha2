@@ -152,7 +152,7 @@ namespace core
 			{
 				if (m_eventfd)
 				{
-					[[maybe_unused]] auto res = close(m_eventfd);
+					[[maybe_unused]] auto res = ::close(m_eventfd);
 					assert(res == 0);
 				}
 			}
@@ -443,6 +443,7 @@ namespace core
 					if (errno == EINTR)
 					{
 						// that's an interrupt due to signal, just continue what we are doing
+						return {};
 					}
 					else
 					{
@@ -487,6 +488,7 @@ namespace core
 
 		void stop() override
 		{
+			m_log->debug("stop"_sv);
 			m_closeEventSource->signalClose();
 		}
 
