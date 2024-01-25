@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var addr = flag.String("addr", "172.25.48.1:9010", "http service address")
+var addr = flag.String("addr", "127.0.0.1:9010", "http service address")
 
 var upgrader = websocket.Upgrader{} // use default options
 
@@ -33,7 +33,7 @@ func echo(w http.ResponseWriter, r *http.Request) {
 			log.Println("read:", err)
 			break
 		}
-		log.Printf("recv: %s", message)
+// 		log.Printf("recv: %s", message)
 		err = c.WriteMessage(mt, message)
 		if err != nil {
 			log.Println("write:", err)
@@ -50,7 +50,7 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 	http.HandleFunc("/echo", echo)
-	http.HandleFunc("/", home)
+	http.HandleFunc("/", echo)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
 
