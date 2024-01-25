@@ -7,6 +7,8 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 
+#include <tracy/Tracy.hpp>
+
 namespace core
 {
 	class LinuxEventLoop: public EventLoop
@@ -96,12 +98,14 @@ namespace core
 
 			void pushPollIn(Op* op)
 			{
+				ZoneScoped;
 				assert(op != nullptr);
 				m_pollInOps.push_back(op);
 			}
 
 			Op* popPollIn()
 			{
+				ZoneScoped;
 				if (m_pollInOps.count() > 0)
 				{
 					auto res = m_pollInOps.front();
@@ -113,16 +117,19 @@ namespace core
 
 			void pushPollOut(Op* op)
 			{
+				ZoneScoped;
 				m_pollOutOps.push_back(op);
 			}
 
 			void pushPollOutToFront(Op* op)
 			{
+				ZoneScoped;
 				m_pollOutOps.push_front(op);
 			}
 
 			Op* popPollOut()
 			{
+				ZoneScoped;
 				if (m_pollOutOps.count() > 0)
 				{
 					auto res = m_pollOutOps.front();
@@ -150,6 +157,7 @@ namespace core
 
 			~LinuxCloseEventSource()
 			{
+				ZoneScoped;
 				if (m_eventfd)
 				{
 					[[maybe_unused]] auto res = ::close(m_eventfd);
@@ -159,6 +167,7 @@ namespace core
 
 			void signalClose()
 			{
+				ZoneScoped;
 				int64_t close = 1;
 				[[maybe_unused]] auto res = ::write(m_eventfd, &close, sizeof(close));
 				assert(res == sizeof(close));
@@ -194,11 +203,13 @@ namespace core
 
 			~LinuxSocketEventSource() override
 			{
+				ZoneScoped;
 				m_socket->shutdown(Socket::SHUT_RDWR);
 			}
 
 			Result<OP_RESULT> readReady(ReadOp* op) override
 			{
+				ZoneScoped;
 				auto readBytes = ::read(m_socket->fd(), line, sizeof(line));
 				if (readBytes == -1)
 				{
@@ -225,6 +236,7 @@ namespace core
 
 			Result<OP_RESULT> writeReady(WriteOp* op) override
 			{
+				ZoneScoped;
 				auto writtenBytes = ::write(m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
 				if (writtenBytes == -1)
 				{
@@ -249,6 +261,7 @@ namespace core
 
 			Result<OP_RESULT> acceptReady(AcceptOp* op) override
 			{
+				ZoneScoped;
 				auto acceptedSocket = m_socket->accept();
 				if (acceptedSocket == nullptr)
 				{
@@ -270,11 +283,13 @@ namespace core
 
 		void removeSource(LinuxEventSource* source)
 		{
+			ZoneScoped;
 			m_sources.remove(source);
 		}
 
 		Shared<LinuxEventSource> getSourceAndRemoveItWhenExpired(LinuxEventSource* source)
 		{
+			ZoneScoped;
 			auto it = m_sources.lookup(source);
 			if (it == m_sources.end())
 				return nullptr;
@@ -290,6 +305,7 @@ namespace core
 
 		void continueWriteOp(Unique<WriteOp> op, LinuxEventSource* source)
 		{
+			ZoneScoped;
 			assert(op->remainingBytes.count() > 0);
 
 			auto key = (Op*)op.get();
@@ -301,6 +317,7 @@ namespace core
 
 		void pushPendingOp(Unique<Op> op, LinuxEventSource* source)
 		{
+			ZoneScoped;
 			auto key = (Op*)op.get();
 
 			switch (op->kind)
@@ -323,6 +340,7 @@ namespace core
 
 		Unique<Op> popPendingOp(Op* op)
 		{
+			ZoneScoped;
 			auto it = m_scheduledOperations.lookup(op);
 			if (it == m_scheduledOperations.end())
 				return nullptr;
@@ -333,6 +351,7 @@ namespace core
 
 		Result<bool> handleOp(Op* opHandle, LinuxEventSource* source)
 		{
+			ZoneScoped;
 			if (opHandle == nullptr)
 				return false;
 
@@ -408,6 +427,7 @@ namespace core
 
 		~LinuxEventLoop() override
 		{
+			ZoneScoped;
 			if (m_epoll)
 			{
 				[[maybe_unused]] auto res = close(m_epoll);
@@ -417,6 +437,7 @@ namespace core
 
 		HumanError run() override
 		{
+			ZoneScoped;
 			int closeEvent = eventfd(0, 0);
 			if (closeEvent == -1)
 				return errf(m_allocator, "failed to create close event"_sv);
@@ -488,12 +509,14 @@ namespace core
 
 		void stop() override
 		{
+			ZoneScoped;
 			m_log->debug("stop"_sv);
 			m_closeEventSource->signalClose();
 		}
 
 		Shared<EventSource> createEventSource(Unique<Socket> socket) override
 		{
+			ZoneScoped;
 			if (socket == nullptr)
 				return nullptr;
 
@@ -530,6 +553,7 @@ namespace core
 
 		HumanError read(EventSource* source, Reactor* reactor) override
 		{
+			ZoneScoped;
 			auto op = unique_from<ReadOp>(m_allocator, reactor);
 			pushPendingOp(std::move(op), (LinuxEventSource*)source);
 			return {};
@@ -537,6 +561,7 @@ namespace core
 
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
+			ZoneScoped;
 			Buffer ownedBuffer{m_allocator};
 			ownedBuffer.push(buffer);
 			auto op = unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer));
@@ -546,6 +571,7 @@ namespace core
 
 		HumanError accept(EventSource* source, Reactor* reactor) override
 		{
+			ZoneScoped;
 			auto op = unique_from<AcceptOp>(m_allocator, reactor);
 			pushPendingOp(std::move(op), (LinuxEventSource*)source);
 			return {};
@@ -554,6 +580,7 @@ namespace core
 
 	Result<Unique<EventLoop>> EventLoop::create(Log* log, Allocator* allocator)
 	{
+		ZoneScoped;
 		int epoll_fd = epoll_create1(0);
 		if (epoll_fd == -1)
 			return errf(allocator, "failed to create epoll"_sv);

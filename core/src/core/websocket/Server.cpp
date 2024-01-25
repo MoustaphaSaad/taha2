@@ -330,8 +330,6 @@ namespace core::websocket
 						auto handshake = handshakeResult.releaseValue();
 						m_handshakeBuffer = Buffer{m_allocator};
 
-						m_log->debug("handshake: {}"_sv, handshake.key());
-
 						constexpr static const char* REPLY = "HTTP/1.1 101 Switching Protocols\r\n"
 							"Upgrade: websocket\r\n"
 							"Connection: Upgrade\r\n"
@@ -341,7 +339,6 @@ namespace core::websocket
 						auto sha1 = SHA1::hash(concatKey);
 						auto base64 = Base64::encode(sha1.asBytes(), m_allocator);
 						auto reply = strf(m_allocator, StringView{REPLY, strlen(REPLY)}, base64);
-						m_log->debug("response: {}"_sv, reply);
 						if (auto err = writeRaw(reply, true))
 						{
 							m_log->error("failed to send handshake reply, {}"_sv, err);
@@ -385,7 +382,6 @@ namespace core::websocket
 						if (m_messageParser.hasMessage())
 						{
 							auto msg = m_messageParser.message();
-							m_log->debug("type: {}, payload: {}"_sv, (int)msg.type, StringView{msg.payload});
 							Conn conn{this};
 							if (auto err = onMsg(msg, &conn))
 							{
