@@ -424,6 +424,7 @@ namespace core
 			m_closeEventSource = shared_from<LinuxCloseEventSource>(m_allocator, closeEvent, this, m_allocator);
 			auto closeOp = unique_from<CloseOp>(m_allocator);
 			pushPendingOp(std::move(closeOp), m_closeEventSource.get());
+			m_sources.insert(m_closeEventSource.get(), m_closeEventSource);
 
 			epoll_event signal{};
 			signal.events = EPOLLIN;
@@ -436,7 +437,6 @@ namespace core
 			epoll_event events[MAX_EVENTS];
 			while (true)
 			{
-				m_log->debug("source: {}"_sv, m_sources.count());
 				auto count = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
 				if (count == -1)
 				{

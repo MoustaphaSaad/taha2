@@ -1,5 +1,5 @@
 {
-    "url": "ws://172.25.48.1:9010",
+    "url": "ws://127.0.0.1:9010",
     "outdir": "./reports/clients",
     "cases": ["*"],
     "exclude-cases": [],

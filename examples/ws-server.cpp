@@ -41,7 +41,7 @@ core::HumanError onMsg(const core::websocket::Message& msg, core::websocket::Ser
 int main(int argc, char** argv)
 {
 	// auto url = "ws://172.25.48.1:9010"_sv;
-	auto url = "ws://127.0.0.1:8080"_sv;
+	auto url = "ws://127.0.0.1:9010"_sv;
 	if (argc > 1)
 		url = core::StringView{argv[1]};
 
