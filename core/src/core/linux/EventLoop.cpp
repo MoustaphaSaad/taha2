@@ -19,6 +19,8 @@ namespace core
 			{
 				KIND_NONE,
 				KIND_CLOSE,
+				KIND_ACCEPT,
+				KIND_READ,
 			};
 
 			explicit Op(KIND kind_)
@@ -35,22 +37,41 @@ namespace core
 			{}
 		};
 
+		struct AcceptOp: Op
+		{
+			Reactor* reactor = nullptr;
+
+			AcceptOp(Reactor* reactor_)
+				: Op(KIND_ACCEPT),
+				  reactor(reactor_)
+			{}
+		};
+
+		struct ReadOp: Op
+		{
+			Reactor* reactor = nullptr;
+
+			ReadOp(Reactor* reactor_)
+				: Op(KIND_READ),
+				  reactor(reactor_)
+			{}
+		};
+
 		class LinuxEventSource: public EventSource
 		{
 			Allocator* m_allocator = nullptr;
-			LinuxEventLoop* m_loop = nullptr;
 			Queue<Op*> m_pollInOps;
 		public:
 			explicit LinuxEventSource(LinuxEventLoop* loop, Allocator* allocator)
 				: EventSource(loop),
 				  m_allocator(allocator),
-				  m_loop(loop),
 				  m_pollInOps(allocator)
 			{}
 
 			~LinuxEventSource() override
 			{
-				m_loop->removeSource(this);
+				auto loop = (LinuxEventLoop*)eventLoop();
+				loop->removeSource(this);
 			}
 
 			void pushPollIn(Op* op)
@@ -68,6 +89,15 @@ namespace core
 					return res;
 				}
 				return nullptr;
+			}
+
+			bool hasPollInOps() const { return m_pollInOps.count() > 0; }
+			Op::KIND peekOpKind() const { return m_pollInOps.front()->kind; }
+			Allocator* allocator() const { return m_allocator; }
+
+			virtual HumanError handlePollIn()
+			{
+				return errf(m_allocator, "not implemented"_sv);
 			}
 		};
 
@@ -98,6 +128,76 @@ namespace core
 			}
 		};
 
+		class LinuxSocketEventSource: public LinuxEventSource
+		{
+			Unique<Socket> m_socket;
+		public:
+			LinuxSocketEventSource(Unique<Socket> socket, LinuxEventLoop* loop, Allocator* allocator)
+				: LinuxEventSource(loop, allocator),
+				  m_socket(std::move(socket))
+			{}
+
+			HumanError handlePollIn() override
+			{
+				auto loop = (LinuxEventLoop*)eventLoop();
+
+				static std::byte line[1024] = {};
+				while (hasPollInOps())
+				{
+					auto kind = peekOpKind();
+					switch (kind)
+					{
+					case Op::KIND_ACCEPT:
+					{
+						auto acceptedSocket = m_socket->accept();
+						if (acceptedSocket == nullptr)
+						{
+							if (errno == EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator(), "failed to accept socket, ErrorCode({})"_sv, errno);
+						}
+						auto opHandle = popPollIn();
+						auto op = loop->popPendingOp(opHandle);
+						assert(op != nullptr);
+						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
+						if (acceptOp->reactor)
+						{
+							AcceptEvent acceptEvent{std::move(acceptedSocket), this};
+							acceptOp->reactor->handle(&acceptEvent);
+						}
+						break;
+					}
+					case Op::KIND_READ:
+					{
+						auto readBytes = ::read((int)m_socket->fd(), line, sizeof(line));
+						if (readBytes == -1)
+						{
+							if (errno == EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator(), "failed to read from socket, ErrorCode({})"_sv, errno);
+						}
+						auto opHandle = popPollIn();
+						auto op = loop->popPendingOp(opHandle);
+						assert(op != nullptr);
+						auto readOp = unique_static_cast<ReadOp>(std::move(op));
+						if (readOp->reactor)
+						{
+							ReadEvent readEvent{Span<const std::byte>{line, (size_t)readBytes}, this};
+							readOp->reactor->handle(&readEvent);
+						}
+						break;
+					}
+					default:
+						assert(false);
+						break;
+					}
+				}
+				return {};
+			}
+		};
+
 		void pushSource(const Shared<LinuxEventSource>& source)
 		{
 			auto key = source.get();
@@ -121,6 +221,8 @@ namespace core
 			switch (op->kind)
 			{
 			case Op::KIND_CLOSE:
+			case Op::KIND_ACCEPT:
+			case Op::KIND_READ:
 				source->pushPollIn(key);
 				break;
 			default:
@@ -129,6 +231,16 @@ namespace core
 			}
 
 			m_pendingOps.insert(key, std::move(op));
+		}
+
+		Unique<Op> popPendingOp(Op* op)
+		{
+			auto it = m_pendingOps.lookup(op);
+			if (it == m_pendingOps.end())
+				return nullptr;
+			auto res = std::move(it->value);
+			m_pendingOps.remove(op);
+			return res;
 		}
 
 		Shared<LinuxEventSource> resolveSource(LinuxEventSource* source)
@@ -224,6 +336,8 @@ namespace core
 							m_pendingOps.clear();
 							return {};
 						}
+
+						if (auto err = source->handlePollIn()) return err;
 					}
 				}
 			}
@@ -239,11 +353,44 @@ namespace core
 
 		Shared<EventSource> createEventSource(Unique<Socket> socket) override
 		{
-			return nullptr;
+			ZoneScoped;
+			if (socket == nullptr)
+				return nullptr;
+
+			auto fd = (int)socket->fd();
+			auto flags = fcntl(fd, F_GETFL, 0);
+			if (flags == -1)
+			{
+				m_log->error("failed to get socket flags, ErrorCode({})"_sv, errno);
+				return nullptr;
+			}
+			flags |= O_NONBLOCK;
+			if (fcntl(fd, F_SETFL, flags) != 0)
+			{
+				m_log->error("failed to make socket non-blocking, ErrorCode({})"_sv, errno);
+				return nullptr;
+			}
+
+			auto res = shared_from<LinuxSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
+
+			epoll_event sourceSubscription{};
+			sourceSubscription.events = EPOLLIN | EPOLLOUT | EPOLLET;
+			sourceSubscription.data.ptr = res.get();
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sourceSubscription);
+			if (ok == -1)
+			{
+				m_log->error("failed to create event source, ErrorCode({})"_sv, errno);
+				return nullptr;
+			}
+
+			pushSource(res);
+			return res;
 		}
 		HumanError read(EventSource* source, Reactor* reactor) override
 		{
-			return errf(m_allocator, "not implemented"_sv);
+			ZoneScoped;
+			pushPendingOp(unique_from<ReadOp>(m_allocator, reactor), (LinuxEventSource*)source);
+			return {};
 		}
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
@@ -251,7 +398,9 @@ namespace core
 		}
 		HumanError accept(EventSource* source, Reactor* reactor) override
 		{
-			return errf(m_allocator, "not implemented"_sv);
+			ZoneScoped;
+			pushPendingOp(unique_from<AcceptOp>(m_allocator, reactor), (LinuxEventSource*)source);
+			return {};
 		}
 	};
 
