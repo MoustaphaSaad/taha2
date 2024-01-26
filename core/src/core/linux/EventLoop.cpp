@@ -274,7 +274,7 @@ namespace core
 						auto opHandle = popPollOut();
 						auto writeOpHandle = loop->popPendingOp(opHandle);
 						assert(writeOpHandle != nullptr);
-						auto writeOp = unique_static_cast<AcceptOp>(std::move(writeOpHandle));
+						auto writeOp = unique_static_cast<WriteOp>(std::move(writeOpHandle));
 						if (writeOp->reactor)
 						{
 							WriteEvent writeEvent{(size_t)writtenBytes, this};
@@ -294,13 +294,11 @@ namespace core
 		void pushSource(const Shared<LinuxEventSource>& source)
 		{
 			auto key = source.get();
-			m_log->debug("push source: {}"_sv, (void*)source.get());
 			m_aliveSources.insert(key, source);
 		}
 
 		void removeSource(LinuxEventSource* source)
 		{
-			m_log->debug("remove source: {}"_sv, (void*)source);
 			[[maybe_unused]] auto res = m_aliveSources.remove(source);
 			assert(res == true);
 		}
@@ -434,6 +432,11 @@ namespace core
 						}
 
 						if (auto err = source->handlePollIn()) return err;
+					}
+
+					if (event.events | EPOLLOUT)
+					{
+						if (auto err = source->handlePollOut()) return err;
 					}
 				}
 			}
