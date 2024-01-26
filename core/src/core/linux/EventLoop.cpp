@@ -21,6 +21,7 @@ namespace core
 				KIND_CLOSE,
 				KIND_ACCEPT,
 				KIND_READ,
+				KIND_WRITE,
 			};
 
 			explicit Op(KIND kind_)
@@ -57,15 +58,31 @@ namespace core
 			{}
 		};
 
+		struct WriteOp: Op
+		{
+			Reactor* reactor = nullptr;
+			Buffer buffer;
+			Span<const std::byte> remainingBytes;
+
+			WriteOp(Reactor* reactor_, Buffer&& buffer_)
+				: Op(KIND_WRITE),
+				  reactor(reactor_),
+				  buffer(std::move(buffer_)),
+				  remainingBytes(buffer)
+			{}
+		};
+
 		class LinuxEventSource: public EventSource
 		{
 			Allocator* m_allocator = nullptr;
 			Queue<Op*> m_pollInOps;
+			Queue<Op*> m_pollOutOps;
 		public:
 			explicit LinuxEventSource(LinuxEventLoop* loop, Allocator* allocator)
 				: EventSource(loop),
 				  m_allocator(allocator),
-				  m_pollInOps(allocator)
+				  m_pollInOps(allocator),
+				  m_pollOutOps(allocator)
 			{}
 
 			~LinuxEventSource() override
@@ -91,11 +108,45 @@ namespace core
 				return nullptr;
 			}
 
-			bool hasPollInOps() const { return m_pollInOps.count() > 0; }
-			Op::KIND peekOpKind() const { return m_pollInOps.front()->kind; }
+			Op* peekPollIn()
+			{
+				if (m_pollInOps.count() > 0)
+					return m_pollInOps.front();
+				return nullptr;
+			}
+
+			void pushPollOut(Op* op)
+			{
+				assert(op != nullptr);
+				m_pollOutOps.push_back(op);
+			}
+
+			Op* popPollOut()
+			{
+				if (m_pollOutOps.count() > 0)
+				{
+					auto res = m_pollOutOps.front();
+					m_pollOutOps.pop_front();
+					return res;
+				}
+				return nullptr;
+			}
+
+			Op* peekPollOut()
+			{
+				if (m_pollOutOps.count() > 0)
+					return m_pollOutOps.front();
+				return nullptr;
+			}
+
 			Allocator* allocator() const { return m_allocator; }
 
 			virtual HumanError handlePollIn()
+			{
+				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			virtual HumanError handlePollOut()
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
@@ -139,16 +190,17 @@ namespace core
 
 			HumanError handlePollIn() override
 			{
+				ZoneScoped;
 				auto loop = (LinuxEventLoop*)eventLoop();
 
 				static std::byte line[1024] = {};
-				while (hasPollInOps())
+				while (auto peekOp = peekPollIn())
 				{
-					auto kind = peekOpKind();
-					switch (kind)
+					switch (peekOp->kind)
 					{
 					case Op::KIND_ACCEPT:
 					{
+						ZoneScopedN("accept");
 						auto acceptedSocket = m_socket->accept();
 						if (acceptedSocket == nullptr)
 						{
@@ -170,6 +222,7 @@ namespace core
 					}
 					case Op::KIND_READ:
 					{
+						ZoneScopedN("read");
 						auto readBytes = ::read((int)m_socket->fd(), line, sizeof(line));
 						if (readBytes == -1)
 						{
@@ -186,6 +239,46 @@ namespace core
 						{
 							ReadEvent readEvent{Span<const std::byte>{line, (size_t)readBytes}, this};
 							readOp->reactor->handle(&readEvent);
+						}
+						break;
+					}
+					default:
+						assert(false);
+						break;
+					}
+				}
+				return {};
+			}
+
+			HumanError handlePollOut() override
+			{
+				ZoneScoped;
+				auto loop = (LinuxEventLoop*)eventLoop();
+
+				while (auto peekOp = peekPollOut())
+				{
+					switch (peekOp->kind)
+					{
+					case Op::KIND_WRITE:
+					{
+						ZoneScopedN("write");
+						auto op = (WriteOp*)peekOp;
+						auto writtenBytes = ::write((int)m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
+						if (writtenBytes == -1)
+						{
+							if (errno == EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator(), "failed to write to socket, ErrorCode({})"_sv, errno);
+						}
+						auto opHandle = popPollOut();
+						auto writeOpHandle = loop->popPendingOp(opHandle);
+						assert(writeOpHandle != nullptr);
+						auto writeOp = unique_static_cast<AcceptOp>(std::move(writeOpHandle));
+						if (writeOp->reactor)
+						{
+							WriteEvent writeEvent{(size_t)writtenBytes, this};
+							writeOp->reactor->handle(&writeEvent);
 						}
 						break;
 					}
@@ -224,6 +317,9 @@ namespace core
 			case Op::KIND_ACCEPT:
 			case Op::KIND_READ:
 				source->pushPollIn(key);
+				break;
+			case Op::KIND_WRITE:
+				source->pushPollOut(key);
 				break;
 			default:
 				assert(false);
@@ -394,7 +490,10 @@ namespace core
 		}
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
-			return errf(m_allocator, "not implemented"_sv);
+			Buffer ownedBuffer{m_allocator};
+			ownedBuffer.push(buffer);
+			pushPendingOp(unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer)), (LinuxEventSource*)source);
+			return {};
 		}
 		HumanError accept(EventSource* source, Reactor* reactor) override
 		{
