@@ -60,13 +60,13 @@ namespace core
 					m_allocator->release((void*)m_control->ptr, sizeof(T));
 					m_allocator->free((void*)m_control->ptr, sizeof(T));
 					m_control->ptr = nullptr;
+				}
 
-					if (m_control->weak.fetch_sub(1) == 1)
-					{
-						m_allocator->release(m_control, sizeof(Control));
-						m_allocator->free(m_control, sizeof(Control));
-						m_control = nullptr;
-					}
+				if (m_control->weak.fetch_sub(1) == 1)
+				{
+					m_allocator->release(m_control, sizeof(Control));
+					m_allocator->free(m_control, sizeof(Control));
+					m_control = nullptr;
 				}
 			}
 		}
@@ -435,6 +435,7 @@ namespace core
 				{
 					m_allocator = weak.allocator;
 					m_control = (Shared<T>::Control*)weak.control;
+					m_control->weak.fetch_add(1);
 					return true;
 				}
 
@@ -455,6 +456,15 @@ namespace core
 		Weak<T> m_ptr;
 	public:
 		using SharedFromThisType = SharedFromThis;
+
+		SharedFromThis()
+		{
+			 int x =234;
+		}
+		virtual ~SharedFromThis()
+		{
+			int x = 234;
+		}
 
 		[[nodiscard]] Weak<T> weakFromThis() { return m_ptr; }
 		[[nodiscard]] Weak<const T> weakFromThis() const { return m_ptr; }

@@ -10,26 +10,26 @@ TEST_CASE("basic core::Unique test")
 	REQUIRE(*ptr == 42);
 }
 
-class Foo
+class UniqueFoo
 {
 public:
-	virtual ~Foo() = default;
+	virtual ~UniqueFoo() = default;
 };
 
-class Bar: public Foo
+class UniqueBar: public UniqueFoo
 {};
 
-class Baz
+class UniqueBaz
 {
 public:
-	operator Foo() const { return Foo{}; }
+	operator UniqueFoo() const { return UniqueFoo{}; }
 };
 
 TEST_CASE("pointer to parent class")
 {
 	core::Mallocator allocator;
-	core::Unique<Foo> foo;
-	auto bar = core::unique_from<Bar>(&allocator);
+	core::Unique<UniqueFoo> foo;
+	auto bar = core::unique_from<UniqueBar>(&allocator);
 	foo = std::move(bar);
 
 	// THIS SHOULD ERROR

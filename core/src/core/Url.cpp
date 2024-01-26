@@ -566,14 +566,14 @@ namespace core
 	}
 
 	UrlQuery::UrlQuery(core::Allocator *allocator)
-		: m_keyValues(allocator), m_keyToIndex(allocator)
+		: m_allocator(allocator), m_keyValues(allocator), m_keyToIndex(allocator)
 	{
 	}
 
 	void UrlQuery::add(StringView key, StringView value)
 	{
 		size_t index = m_keyValues.count();
-		m_keyValues.emplace(String{key, m_keyValues.allocator()}, String{value, m_keyValues.allocator()});
+		m_keyValues.emplace(String{key, m_allocator}, String{value, m_allocator});
 		m_keyToIndex.insert(m_keyValues[m_keyValues.count() - 1].key, index);
 	}
 
