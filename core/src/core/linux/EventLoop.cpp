@@ -202,6 +202,7 @@ namespace core
 					{
 						ZoneScopedN("accept");
 						auto acceptedSocket = m_socket->accept();
+						loop->m_log->debug("accept {}"_sv, acceptedSocket != nullptr);
 						if (acceptedSocket == nullptr)
 						{
 							if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -224,6 +225,7 @@ namespace core
 					{
 						ZoneScopedN("read");
 						auto readBytes = ::read((int)m_socket->fd(), line, sizeof(line));
+						loop->m_log->debug("read {}"_sv, readBytes);
 						if (readBytes == -1)
 						{
 							if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -264,6 +266,7 @@ namespace core
 						ZoneScopedN("write");
 						auto op = (WriteOp*)peekOp;
 						auto writtenBytes = ::write((int)m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
+						loop->m_log->debug("write {}"_sv, writtenBytes);
 						if (writtenBytes == -1)
 						{
 							if (errno == EAGAIN || errno == EWOULDBLOCK)

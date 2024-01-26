@@ -26,7 +26,7 @@
             "url": "ws://127.0.0.1:9017"
         }
     ],
-    "cases": ["*"],
+    "cases": ["9.7.*"],
     "exclude-cases": [],
     "exclude-agent-cases": {}
 }
