@@ -74,6 +74,7 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 	auto server = serverResult.releaseValue();
+	SERVER = server.get();
 
 	core::websocket::ServerConfig config{
 		.host = parsedUrl.host(),
