@@ -44,22 +44,39 @@ namespace core::websocket
 			HumanError writeRaw(StringView str, bool waitUntilDone)
 			{
 				auto eventLoop = m_socketSource->eventLoop();
-				auto reactor = waitUntilDone ? this : nullptr;
-				auto err = eventLoop->write(m_socketSource.get(), reactor, Span<const std::byte>{str});
-				if (err) return err;
+				Reactor* reactor = nullptr;
 				if (waitUntilDone)
+				{
 					m_pendingWriteBytes += str.count();
+					reactor = this;
+				}
+				auto err = eventLoop->write(m_socketSource.get(), reactor, Span<const std::byte>{str});
+				if (err)
+				{
+					if (waitUntilDone)
+						m_pendingWriteBytes -= str.count();
+					return err;
+				}
+
 				return {};
 			}
 
 			HumanError writeRaw(Span<const std::byte> bytes, bool waitUntilDone)
 			{
 				auto eventLoop = m_socketSource->eventLoop();
-				auto reactor = waitUntilDone ? this : nullptr;
-				auto err = eventLoop->write(m_socketSource.get(), reactor, bytes);
-				if (err) return err;
+				Reactor* reactor = nullptr;
 				if (waitUntilDone)
+				{
 					m_pendingWriteBytes += bytes.count();
+					reactor = this;
+				}
+				auto err = eventLoop->write(m_socketSource.get(), reactor, bytes);
+				if (err)
+				{
+					if (waitUntilDone)
+						m_pendingWriteBytes -= bytes.count();
+					return err;
+				}
 				return {};
 			}
 

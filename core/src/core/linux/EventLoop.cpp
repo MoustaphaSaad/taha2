@@ -150,6 +150,11 @@ namespace core
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
+
+			virtual Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer)
+			{
+				return buffer;
+			}
 		};
 
 		class LinuxCloseEventSource: public LinuxEventSource
@@ -291,6 +296,31 @@ namespace core
 					}
 				}
 				return {};
+			}
+
+			Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer) override
+			{
+				auto loop = (LinuxEventLoop*)eventLoop();
+
+				if (peekPollOut() != nullptr)
+					return buffer;
+
+				auto remainingBytes = buffer;
+				while (remainingBytes.count() > 0)
+				{
+					auto writtenBytes = ::write((int) m_socket->fd(), remainingBytes.data(), remainingBytes.count());
+					loop->m_log->debug("write {}"_sv, writtenBytes);
+					if (writtenBytes == -1)
+					{
+						if (errno == EAGAIN || errno == EWOULDBLOCK)
+							break;
+						else
+							return errf(allocator(), "failed to write to socket, ErrorCode({})"_sv, errno);
+					}
+					remainingBytes = remainingBytes.slice(writtenBytes, remainingBytes.count() - writtenBytes);
+				}
+
+				return remainingBytes;
 			}
 		};
 
@@ -496,9 +526,26 @@ namespace core
 		}
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
-			Buffer ownedBuffer{m_allocator};
-			ownedBuffer.push(buffer);
-			pushPendingOp(unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer)), (LinuxEventSource*)source);
+			auto linuxSource = (LinuxEventSource*)source;
+			auto remainingBytesResult = linuxSource->tryWrite(buffer);
+			if (remainingBytesResult.isError())
+				return remainingBytesResult.releaseError();
+			auto remainingBytes = remainingBytesResult.releaseValue();
+
+			if (remainingBytes.count() == 0)
+			{
+				if (reactor)
+				{
+					WriteEvent writeEvent{buffer.count(), source};
+					reactor->handle(&writeEvent);
+				}
+			}
+			else
+			{
+				Buffer ownedBuffer{m_allocator};
+				ownedBuffer.push(remainingBytes);
+				pushPendingOp(unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer)), (LinuxEventSource*)source);
+			}
 			return {};
 		}
 		HumanError accept(EventSource* source, Reactor* reactor) override
