@@ -6,6 +6,8 @@
 #include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
 
 #include <tracy/Tracy.hpp>
 
@@ -149,6 +151,11 @@ namespace core
 			virtual HumanError handlePollOut()
 			{
 				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			virtual Result<bool> tryRead(Reactor*)
+			{
+				return false;
 			}
 
 			virtual Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer)
@@ -296,6 +303,31 @@ namespace core
 					}
 				}
 				return {};
+			}
+
+			Result<bool> tryRead(Reactor* reactor) override
+			{
+				auto loop = (LinuxEventLoop*)eventLoop();
+
+				if (peekPollOut() != nullptr)
+					return false;
+
+				std::byte line[1024] = {};
+				auto readBytes = ::read((int)m_socket->fd(), line, sizeof(line));
+				if (readBytes == -1)
+				{
+					if (errno == EAGAIN || errno == EWOULDBLOCK)
+						return false;
+					else
+						return errf(allocator(), "failed to read from socket, ErrorCode({})"_sv, errno);
+				}
+
+				if (reactor)
+				{
+					ReadEvent readEvent{Span<const std::byte>{line, (size_t)readBytes}, this};
+					reactor->handle(&readEvent);
+				}
+				return true;
 			}
 
 			Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer) override
@@ -503,6 +535,13 @@ namespace core
 				return nullptr;
 			}
 
+			int yes = 1;
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) != 0)
+			{
+				m_log->error("failed to set TCP socket no delay, ErrorCode({})"_sv, errno);
+				return nullptr;
+			}
+
 			auto res = shared_from<LinuxSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
 
 			epoll_event sourceSubscription{};
@@ -521,7 +560,14 @@ namespace core
 		HumanError read(EventSource* source, Reactor* reactor) override
 		{
 			ZoneScoped;
-			pushPendingOp(unique_from<ReadOp>(m_allocator, reactor), (LinuxEventSource*)source);
+			auto linuxSource = (LinuxEventSource*)source;
+			auto tryReadResult = linuxSource->tryRead(reactor);
+			if (tryReadResult.isError())
+				return tryReadResult.releaseError();
+			auto readDone = tryReadResult.releaseValue();
+			if (readDone)
+				return {};
+			pushPendingOp(unique_from<ReadOp>(m_allocator, reactor), linuxSource);
 			return {};
 		}
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
