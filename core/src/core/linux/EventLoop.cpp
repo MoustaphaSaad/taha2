@@ -119,6 +119,8 @@ namespace core
 
 			void pushPollOut(Op* op)
 			{
+				auto loop = (LinuxEventLoop*)eventLoop();
+				loop->m_log->debug("pushPullOut({})"_sv, ((WriteOp*)op)->remainingBytes.count());
 				assert(op != nullptr);
 				m_pollOutOps.push_back(op);
 			}
@@ -151,11 +153,6 @@ namespace core
 			virtual HumanError handlePollOut()
 			{
 				return errf(m_allocator, "not implemented"_sv);
-			}
-
-			virtual Result<bool> tryRead(Reactor*)
-			{
-				return false;
 			}
 
 			virtual Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer)
@@ -277,23 +274,31 @@ namespace core
 					{
 						ZoneScopedN("write");
 						auto op = (WriteOp*)peekOp;
-						auto writtenBytes = ::write((int)m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
-						loop->m_log->debug("write {}"_sv, writtenBytes);
-						if (writtenBytes == -1)
+						while (op->remainingBytes.count() > 0)
 						{
-							if (errno == EAGAIN || errno == EWOULDBLOCK)
-								return {};
-							else
-								return errf(allocator(), "failed to write to socket, ErrorCode({})"_sv, errno);
+							auto writtenBytes = ::write((int)m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
+							loop->m_log->debug("write {}"_sv, writtenBytes);
+							if (writtenBytes == -1)
+							{
+								if (errno == EAGAIN || errno == EWOULDBLOCK)
+									break;
+								else
+									return errf(allocator(), "failed to write to socket, ErrorCode({})"_sv, errno);
+							}
+							op->remainingBytes = op->remainingBytes.slice(writtenBytes, op->remainingBytes.count() - writtenBytes);
 						}
-						auto opHandle = popPollOut();
-						auto writeOpHandle = loop->popPendingOp(opHandle);
-						assert(writeOpHandle != nullptr);
-						auto writeOp = unique_static_cast<WriteOp>(std::move(writeOpHandle));
-						if (writeOp->reactor)
+
+						if (op->remainingBytes.count() == 0)
 						{
-							WriteEvent writeEvent{(size_t)writtenBytes, this};
-							writeOp->reactor->handle(&writeEvent);
+							auto opHandle = popPollOut();
+							auto writeOpHandle = loop->popPendingOp(opHandle);
+							assert(writeOpHandle != nullptr);
+							auto writeOp = unique_static_cast<WriteOp>(std::move(writeOpHandle));
+							if (writeOp->reactor)
+							{
+								WriteEvent writeEvent{(size_t) op->buffer.count(), this};
+								writeOp->reactor->handle(&writeEvent);
+							}
 						}
 						break;
 					}
@@ -303,31 +308,6 @@ namespace core
 					}
 				}
 				return {};
-			}
-
-			Result<bool> tryRead(Reactor* reactor) override
-			{
-				auto loop = (LinuxEventLoop*)eventLoop();
-
-				if (peekPollOut() != nullptr)
-					return false;
-
-				std::byte line[1024] = {};
-				auto readBytes = ::read((int)m_socket->fd(), line, sizeof(line));
-				if (readBytes == -1)
-				{
-					if (errno == EAGAIN || errno == EWOULDBLOCK)
-						return false;
-					else
-						return errf(allocator(), "failed to read from socket, ErrorCode({})"_sv, errno);
-				}
-
-				if (reactor)
-				{
-					ReadEvent readEvent{Span<const std::byte>{line, (size_t)readBytes}, this};
-					reactor->handle(&readEvent);
-				}
-				return true;
 			}
 
 			Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer) override
@@ -560,18 +540,15 @@ namespace core
 		HumanError read(EventSource* source, Reactor* reactor) override
 		{
 			ZoneScoped;
-			auto linuxSource = (LinuxEventSource*)source;
-			auto tryReadResult = linuxSource->tryRead(reactor);
-			if (tryReadResult.isError())
-				return tryReadResult.releaseError();
-			auto readDone = tryReadResult.releaseValue();
-			if (readDone)
-				return {};
-			pushPendingOp(unique_from<ReadOp>(m_allocator, reactor), linuxSource);
+			pushPendingOp(unique_from<ReadOp>(m_allocator, reactor), (LinuxEventSource*)source);
 			return {};
 		}
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
+			Buffer ownedBuffer{m_allocator};
+			ownedBuffer.push(buffer);
+			pushPendingOp(unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer)), (LinuxEventSource*)source);
+			return {};
 			auto linuxSource = (LinuxEventSource*)source;
 			auto remainingBytesResult = linuxSource->tryWrite(buffer);
 			if (remainingBytesResult.isError())

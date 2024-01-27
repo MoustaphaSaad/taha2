@@ -134,6 +134,7 @@ namespace core::websocket
 
 				if (m_server->m_handler->onMsg)
 				{
+					m_log->debug("text message: {}"_sv, msg.payload.count());
 					return m_server->m_handler->onMsg(msg, m_server, conn);
 				}
 				return {};
@@ -422,7 +423,7 @@ namespace core::websocket
 					}
 					else
 					{
-						::memcpy(m_messageBuffer.data(), bytes.data(), bytes.count());
+						::memmove(m_messageBuffer.data(), bytes.data(), bytes.count());
 						m_messageBuffer.resize(bytes.count());
 					}
 
