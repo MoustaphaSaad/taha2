@@ -128,11 +128,19 @@ namespace core::websocket
 				return {};
 
 			auto eventLoop = m_socketSource->eventLoop();
-			auto reactor = waitUntilDone ? this : nullptr;
-			auto err = eventLoop->write(m_socketSource.get(), reactor, bytes);
-			if (err) return err;
+			Reactor* reactor = nullptr;
 			if (waitUntilDone)
+			{
 				m_pendingWriteBytes += bytes.count();
+				reactor = this;
+			}
+			auto err = eventLoop->write(m_socketSource.get(), reactor, bytes);
+			if (err)
+			{
+				if (waitUntilDone)
+					m_pendingWriteBytes -= bytes.count();
+				return err;
+			}
 			return {};
 		}
 
@@ -310,7 +318,7 @@ namespace core::websocket
 
 					if (m_readBuffer.count() > handshakeResponse.count())
 					{
-						::memcpy(m_readBuffer.data(), m_readBuffer.data() + handshakeResponse.count(),
+						::memmove(m_readBuffer.data(), m_readBuffer.data() + handshakeResponse.count(),
 								 m_readBuffer.count() - handshakeResponse.count());
 						m_readBuffer.resize(m_readBuffer.count() - handshakeResponse.count());
 						// process the remaining bytes
@@ -404,7 +412,7 @@ namespace core::websocket
 			}
 			else
 			{
-				::memcpy(m_readBuffer.data(), recvBytes.data(), recvBytes.count());
+				::memmove(m_readBuffer.data(), recvBytes.data(), recvBytes.count());
 				m_readBuffer.resize(recvBytes.count());
 			}
 		}
