@@ -27,37 +27,39 @@ TEST_CASE("basic core::Unique test")
 	REQUIRE(weak_ptr.expired() == true);
 }
 
-class Foo: public core::SharedFromThis<Foo>
+class SharedFoo: public core::SharedFromThis<SharedFoo>
 {
 public:
-	virtual ~Foo() = default;
+	virtual ~SharedFoo() = default;
 
-	core::Weak<Foo> getWeakPtr() { return weakFromThis(); }
-	core::Weak<const Foo> getWeakPtr() const { return weakFromThis(); }
-	core::Shared<Foo> getPtr() { return sharedFromThis(); }
-	core::Shared<const Foo> getPtr() const { return sharedFromThis(); }
+	core::Weak<SharedFoo> getWeakPtr() { return weakFromThis(); }
+	core::Weak<const SharedFoo> getWeakPtr() const { return weakFromThis(); }
+	core::Shared<SharedFoo> getPtr() { return sharedFromThis(); }
+	core::Shared<const SharedFoo> getPtr() const { return sharedFromThis(); }
 };
 
-class Bar: public Foo
+class SharedBar: public SharedFoo
 {};
 
-class Baz
+class SharedBaz
 {
 public:
-	operator Foo() const { return Foo{}; }
+	operator SharedFoo() const { return SharedFoo{}; }
 };
 
 TEST_CASE("pointer to parent class")
 {
 	core::Mallocator allocator;
 
-	core::Shared<Foo> foo;
-	auto bar = core::shared_from<Bar>(&allocator);
-	foo = bar;
+	{
+		core::Shared<SharedFoo> foo;
+		auto bar = core::shared_from<SharedBar>(&allocator);
+		foo = bar;
 
-	static_assert(std::is_convertible_v<Bar*, core::SharedFromThis<Foo>*>);
-	auto sharedFoo = foo->getPtr();
-	REQUIRE(sharedFoo == foo);
+		static_assert(std::is_convertible_v<SharedBar *, core::SharedFromThis<SharedFoo> *>);
+		auto sharedFoo = foo->getPtr();
+		REQUIRE(sharedFoo == foo);
+	}
 
 	// std::enable_shared_from_this
 	// THIS SHOULD ERROR

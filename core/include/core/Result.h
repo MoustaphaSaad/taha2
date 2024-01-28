@@ -40,6 +40,64 @@ namespace core
 		static constexpr auto ALIGNMENT = alignof(T) > alignof(E) ? alignof(T) : alignof(E);
 		alignas(ALIGNMENT) unsigned char m_storage[SIZE];
 		STATE m_state = STATE_EMPTY;
+
+		void destroy()
+		{
+			switch(m_state)
+			{
+			case STATE_EMPTY:
+				break;
+			case STATE_VALUE:
+				((T*)m_storage)->~T();
+				break;
+			case STATE_ERROR:
+				((E*)m_storage)->~E();
+				break;
+			default:
+				assert(false);
+				break;
+			}
+			m_state = STATE_EMPTY;
+		}
+
+		void copyFrom(const Result& other)
+		{
+			m_state = other.m_state;
+			switch (m_state)
+			{
+			case STATE_EMPTY:
+				break;
+			case STATE_VALUE:
+				::new (m_storage) T(*(T*)other.m_storage);
+				break;
+			case STATE_ERROR:
+				::new (m_storage) E(*(E*)other.m_storage);
+				break;
+			default:
+				assert(false);
+				break;
+			}
+		}
+
+		void moveFrom(Result&& other)
+		{
+			m_state = other.m_state;
+			switch (m_state)
+			{
+			case STATE_EMPTY:
+				break;
+			case STATE_VALUE:
+				::new (m_storage) T(std::move(*(T*)other.m_storage));
+				break;
+			case STATE_ERROR:
+				::new (m_storage) E(std::move(*(E*)other.m_storage));
+				break;
+			default:
+				assert(false);
+				break;
+			}
+			other.m_state = STATE_EMPTY;
+		}
 	public:
 
 		template<typename U>
@@ -59,6 +117,35 @@ namespace core
 		{
 			::new (m_storage) E(std::move(error));
 			m_state = STATE_ERROR;
+		}
+
+		Result(const Result& value)
+		{
+			copyFrom(value);
+		}
+
+		Result(Result&& value)
+		{
+			moveFrom(std::move(value));
+		}
+
+		Result& operator=(const Result& other)
+		{
+			destroy();
+			copyFrom(other);
+			return *this;
+		}
+
+		Result& operator=(Result&& other)
+		{
+			destroy();
+			moveFrom(std::move(other));
+			return *this;
+		}
+
+		~Result()
+		{
+			destroy();
 		}
 
 		bool isError() const { return m_state == STATE_ERROR; }

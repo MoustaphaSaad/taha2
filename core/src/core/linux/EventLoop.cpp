@@ -6,6 +6,8 @@
 #include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
 
 #include <tracy/Tracy.hpp>
 
@@ -19,9 +21,9 @@ namespace core
 			{
 				KIND_NONE,
 				KIND_CLOSE,
+				KIND_ACCEPT,
 				KIND_READ,
 				KIND_WRITE,
-				KIND_ACCEPT,
 			};
 
 			explicit Op(KIND kind_)
@@ -35,6 +37,16 @@ namespace core
 		{
 			CloseOp()
 				: Op(KIND_CLOSE)
+			{}
+		};
+
+		struct AcceptOp: Op
+		{
+			Reactor* reactor = nullptr;
+
+			AcceptOp(Reactor* reactor_)
+				: Op(KIND_ACCEPT),
+				  reactor(reactor_)
 			{}
 		};
 
@@ -59,33 +71,18 @@ namespace core
 				  reactor(reactor_),
 				  buffer(std::move(buffer_)),
 				  remainingBytes(buffer)
-			{};
-		};
-
-		struct AcceptOp: Op
-		{
-			Reactor* reactor = nullptr;
-
-			AcceptOp(Reactor* reactor_)
-				: Op(KIND_ACCEPT),
-				  reactor(reactor_)
 			{}
 		};
 
 		class LinuxEventSource: public EventSource
 		{
+			Allocator* m_allocator = nullptr;
 			Queue<Op*> m_pollInOps;
 			Queue<Op*> m_pollOutOps;
 		public:
-			enum OP_RESULT
-			{
-				OP_RESULT_OK,
-				OP_RESULT_EAGAIN,
-				OP_RESULT_ECONNRESET,
-				OP_RESULT_PARTIAL_WRITE,
-			};
-			explicit LinuxEventSource(EventLoop* loop, Allocator* allocator)
+			explicit LinuxEventSource(LinuxEventLoop* loop, Allocator* allocator)
 				: EventSource(loop),
+				  m_allocator(allocator),
 				  m_pollInOps(allocator),
 				  m_pollOutOps(allocator)
 			{}
@@ -98,14 +95,12 @@ namespace core
 
 			void pushPollIn(Op* op)
 			{
-				ZoneScoped;
 				assert(op != nullptr);
 				m_pollInOps.push_back(op);
 			}
 
 			Op* popPollIn()
 			{
-				ZoneScoped;
 				if (m_pollInOps.count() > 0)
 				{
 					auto res = m_pollInOps.front();
@@ -115,21 +110,23 @@ namespace core
 				return nullptr;
 			}
 
-			void pushPollOut(Op* op)
+			Op* peekPollIn()
 			{
-				ZoneScoped;
-				m_pollOutOps.push_back(op);
+				if (m_pollInOps.count() > 0)
+					return m_pollInOps.front();
+				return nullptr;
 			}
 
-			void pushPollOutToFront(Op* op)
+			void pushPollOut(Op* op)
 			{
-				ZoneScoped;
-				m_pollOutOps.push_front(op);
+				auto loop = (LinuxEventLoop*)eventLoop();
+				loop->m_log->debug("pushPullOut({})"_sv, ((WriteOp*)op)->remainingBytes.count());
+				assert(op != nullptr);
+				m_pollOutOps.push_back(op);
 			}
 
 			Op* popPollOut()
 			{
-				ZoneScoped;
 				if (m_pollOutOps.count() > 0)
 				{
 					auto res = m_pollOutOps.front();
@@ -139,25 +136,42 @@ namespace core
 				return nullptr;
 			}
 
-			virtual Result<OP_RESULT> readReady(ReadOp* op) = 0;
-			virtual Result<OP_RESULT> writeReady(WriteOp* op) = 0;
-			virtual Result<OP_RESULT> acceptReady(AcceptOp* op) = 0;
+			Op* peekPollOut()
+			{
+				if (m_pollOutOps.count() > 0)
+					return m_pollOutOps.front();
+				return nullptr;
+			}
+
+			Allocator* allocator() const { return m_allocator; }
+
+			virtual HumanError handlePollIn()
+			{
+				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			virtual HumanError handlePollOut()
+			{
+				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			virtual Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer)
+			{
+				return buffer;
+			}
 		};
 
 		class LinuxCloseEventSource: public LinuxEventSource
 		{
-			Allocator* m_allocator = nullptr;
 			int m_eventfd = 0;
 		public:
-			LinuxCloseEventSource(int eventfd, EventLoop* loop, Allocator* allocator)
+			LinuxCloseEventSource(int eventfd, LinuxEventLoop* loop, Allocator* allocator)
 				: LinuxEventSource(loop, allocator),
-				  m_allocator(allocator),
 				  m_eventfd(eventfd)
 			{}
 
-			~LinuxCloseEventSource()
+			~LinuxCloseEventSource() override
 			{
-				ZoneScoped;
 				if (m_eventfd)
 				{
 					[[maybe_unused]] auto res = ::close(m_eventfd);
@@ -172,159 +186,179 @@ namespace core
 				[[maybe_unused]] auto res = ::write(m_eventfd, &close, sizeof(close));
 				assert(res == sizeof(close));
 			}
-
-			Result<OP_RESULT> readReady(ReadOp*) override
-			{
-				return errf(m_allocator, "not implemented"_sv);
-			}
-
-			Result<OP_RESULT> writeReady(WriteOp*) override
-			{
-				return errf(m_allocator, "not implemented"_sv);
-			}
-
-			Result<OP_RESULT> acceptReady(AcceptOp*) override
-			{
-				return errf(m_allocator, "not implemented"_sv);
-			}
 		};
 
 		class LinuxSocketEventSource: public LinuxEventSource
 		{
-			Allocator* m_allocator = nullptr;
 			Unique<Socket> m_socket;
-			std::byte line[2048] = {};
 		public:
-			LinuxSocketEventSource(Unique<Socket> socket, EventLoop* loop, Allocator* allocator)
+			LinuxSocketEventSource(Unique<Socket> socket, LinuxEventLoop* loop, Allocator* allocator)
 				: LinuxEventSource(loop, allocator),
-				  m_allocator(allocator),
 				  m_socket(std::move(socket))
 			{}
 
-			~LinuxSocketEventSource() override
+			HumanError handlePollIn() override
 			{
 				ZoneScoped;
-				m_socket->shutdown(Socket::SHUT_RDWR);
-			}
+				auto loop = (LinuxEventLoop*)eventLoop();
 
-			Result<OP_RESULT> readReady(ReadOp* op) override
-			{
-				ZoneScoped;
-				auto readBytes = ::read(m_socket->fd(), line, sizeof(line));
-				if (readBytes == -1)
+				static std::byte line[1024] = {};
+				while (auto peekOp = peekPollIn())
 				{
-					if (errno == EAGAIN || errno == EWOULDBLOCK)
+					switch (peekOp->kind)
 					{
-						return OP_RESULT_EAGAIN;
-					}
-					else if (errno == ECONNRESET)
+					case Op::KIND_ACCEPT:
 					{
-						ReadEvent readEvent{{}, this};
-						op->reactor->handle(&readEvent);
-						return OP_RESULT_ECONNRESET;
+						ZoneScopedN("accept");
+						auto acceptedSocket = m_socket->accept();
+						loop->m_log->debug("accept {}"_sv, acceptedSocket != nullptr);
+						if (acceptedSocket == nullptr)
+						{
+							if (errno == EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator(), "failed to accept socket, ErrorCode({})"_sv, errno);
+						}
+						auto opHandle = popPollIn();
+						auto op = loop->popPendingOp(opHandle);
+						assert(op != nullptr);
+						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
+						if (acceptOp->reactor)
+						{
+							AcceptEvent acceptEvent{std::move(acceptedSocket), this};
+							acceptOp->reactor->handle(&acceptEvent);
+						}
+						break;
 					}
-
-					return errf(m_allocator, "failed to read from socket, ErrorCode({})"_sv, errno);
+					case Op::KIND_READ:
+					{
+						ZoneScopedN("read");
+						auto readBytes = ::read((int)m_socket->fd(), line, sizeof(line));
+						loop->m_log->debug("read {}"_sv, readBytes);
+						if (readBytes == -1)
+						{
+							if (errno == EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator(), "failed to read from socket, ErrorCode({})"_sv, errno);
+						}
+						auto opHandle = popPollIn();
+						auto op = loop->popPendingOp(opHandle);
+						assert(op != nullptr);
+						auto readOp = unique_static_cast<ReadOp>(std::move(op));
+						if (readOp->reactor)
+						{
+							ReadEvent readEvent{Span<const std::byte>{line, (size_t)readBytes}, this};
+							readOp->reactor->handle(&readEvent);
+						}
+						break;
+					}
+					default:
+						assert(false);
+						break;
+					}
 				}
-				if (op->reactor)
-				{
-					ReadEvent readEvent{Span<const std::byte>{line, (size_t) readBytes}, this};
-					op->reactor->handle(&readEvent);
-				}
-				return OP_RESULT_OK;
+				return {};
 			}
 
-			Result<OP_RESULT> writeReady(WriteOp* op) override
+			HumanError handlePollOut() override
 			{
 				ZoneScoped;
-				auto writtenBytes = ::write(m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
-				if (writtenBytes == -1)
-				{
-					if (errno == EAGAIN || errno == EWOULDBLOCK)
-						return OP_RESULT_EAGAIN;
-					else if (errno == ECONNRESET)
-						return OP_RESULT_ECONNRESET;
+				auto loop = (LinuxEventLoop*)eventLoop();
 
-					return errf(m_allocator, "failed to write to socket, ErrorCode({})"_sv, errno);
-				}
-				if (op->reactor)
+				while (auto peekOp = peekPollOut())
 				{
-					WriteEvent writeEvent{(size_t)writtenBytes, this};
-					op->reactor->handle(&writeEvent);
-				}
-				op->remainingBytes = op->remainingBytes.slice(writtenBytes, op->remainingBytes.count() - writtenBytes);
+					switch (peekOp->kind)
+					{
+					case Op::KIND_WRITE:
+					{
+						ZoneScopedN("write");
+						auto op = (WriteOp*)peekOp;
+						while (op->remainingBytes.count() > 0)
+						{
+							auto writtenBytes = ::write((int)m_socket->fd(), op->remainingBytes.data(), op->remainingBytes.count());
+							loop->m_log->debug("write {}"_sv, writtenBytes);
+							if (writtenBytes == -1)
+							{
+								if (errno == EAGAIN || errno == EWOULDBLOCK)
+									break;
+								else
+									return errf(allocator(), "failed to write to socket, ErrorCode({})"_sv, errno);
+							}
+							op->remainingBytes = op->remainingBytes.slice(writtenBytes, op->remainingBytes.count() - writtenBytes);
+						}
 
-				if (op->remainingBytes.count() > 0)
-					return OP_RESULT_PARTIAL_WRITE;
-				return OP_RESULT_OK;
+						if (op->remainingBytes.count() == 0)
+						{
+							auto opHandle = popPollOut();
+							auto writeOpHandle = loop->popPendingOp(opHandle);
+							assert(writeOpHandle != nullptr);
+							auto writeOp = unique_static_cast<WriteOp>(std::move(writeOpHandle));
+							if (writeOp->reactor)
+							{
+								WriteEvent writeEvent{(size_t) op->buffer.count(), this};
+								writeOp->reactor->handle(&writeEvent);
+							}
+						}
+						break;
+					}
+					default:
+						assert(false);
+						break;
+					}
+				}
+				return {};
 			}
 
-			Result<OP_RESULT> acceptReady(AcceptOp* op) override
+			Result<Span<const std::byte>> tryWrite(Span<const std::byte> buffer) override
 			{
-				ZoneScoped;
-				auto acceptedSocket = m_socket->accept();
-				if (acceptedSocket == nullptr)
-				{
-					if (errno == EAGAIN || errno == EWOULDBLOCK)
-						return OP_RESULT_EAGAIN;
-					else if (errno == ECONNRESET)
-						return OP_RESULT_ECONNRESET;
+				auto loop = (LinuxEventLoop*)eventLoop();
 
-					return errf(m_allocator, "failed to accept from socket, ErrorCode({})"_sv, errno);
-				}
-				if (op->reactor)
+				if (peekPollOut() != nullptr)
+					return buffer;
+
+				auto remainingBytes = buffer;
+				while (remainingBytes.count() > 0)
 				{
-					AcceptEvent acceptEvent{std::move(acceptedSocket), this};
-					op->reactor->handle(&acceptEvent);
+					auto writtenBytes = ::write((int) m_socket->fd(), remainingBytes.data(), remainingBytes.count());
+					loop->m_log->debug("write {}"_sv, writtenBytes);
+					if (writtenBytes == -1)
+					{
+						if (errno == EAGAIN || errno == EWOULDBLOCK)
+							break;
+						else
+							return errf(allocator(), "failed to write to socket, ErrorCode({})"_sv, errno);
+					}
+					remainingBytes = remainingBytes.slice(writtenBytes, remainingBytes.count() - writtenBytes);
 				}
-				return OP_RESULT_OK;
+
+				return remainingBytes;
 			}
 		};
 
+		void pushSource(const Shared<LinuxEventSource>& source)
+		{
+			auto key = source.get();
+			m_aliveSources.insert(key, source);
+		}
+
 		void removeSource(LinuxEventSource* source)
 		{
-			ZoneScoped;
-			m_sources.remove(source);
-		}
-
-		Shared<LinuxEventSource> getSourceAndRemoveItWhenExpired(LinuxEventSource* source)
-		{
-			ZoneScoped;
-			auto it = m_sources.lookup(source);
-			if (it == m_sources.end())
-				return nullptr;
-			auto& weakHandle = it->value;
-			if (weakHandle.expired())
-			{
-				m_sources.remove(source);
-				return nullptr;
-			}
-
-			return weakHandle.lock();
-		}
-
-		void continueWriteOp(Unique<WriteOp> op, LinuxEventSource* source)
-		{
-			ZoneScoped;
-			assert(op->remainingBytes.count() > 0);
-
-			auto key = (Op*)op.get();
-
-			source->pushPollOutToFront(key);
-
-			m_scheduledOperations.insert(key, std::move(op));
+			[[maybe_unused]] auto res = m_aliveSources.remove(source);
+			assert(res == true);
 		}
 
 		void pushPendingOp(Unique<Op> op, LinuxEventSource* source)
 		{
-			ZoneScoped;
-			auto key = (Op*)op.get();
+			assert(op != nullptr);
+			assert(source != nullptr && m_aliveSources.lookup(source) != m_aliveSources.end());
+			auto key = op.get();
 
 			switch (op->kind)
 			{
 			case Op::KIND_CLOSE:
-			case Op::KIND_READ:
 			case Op::KIND_ACCEPT:
+			case Op::KIND_READ:
 				source->pushPollIn(key);
 				break;
 			case Op::KIND_WRITE:
@@ -335,94 +369,43 @@ namespace core
 				break;
 			}
 
-			m_scheduledOperations.insert(key, std::move(op));
+			m_pendingOps.insert(key, std::move(op));
 		}
 
 		Unique<Op> popPendingOp(Op* op)
 		{
-			ZoneScoped;
-			auto it = m_scheduledOperations.lookup(op);
-			if (it == m_scheduledOperations.end())
+			auto it = m_pendingOps.lookup(op);
+			if (it == m_pendingOps.end())
 				return nullptr;
 			auto res = std::move(it->value);
-			m_scheduledOperations.remove(op);
+			m_pendingOps.remove(op);
 			return res;
 		}
 
-		Result<bool> handleOp(Op* opHandle, LinuxEventSource* source)
+		Shared<LinuxEventSource> resolveSource(LinuxEventSource* source)
 		{
-			ZoneScoped;
-			if (opHandle == nullptr)
-				return false;
-
-			auto op = popPendingOp((Op*)opHandle);
-			assert(op != nullptr);
-
-			switch (op->kind)
-			{
-			case Op::KIND_CLOSE:
-				m_log->debug("event loop closed"_sv);
-				m_closeEventSource = nullptr;
-				m_sources.clear();
-				m_scheduledOperations.clear();
-				return true;
-			case Op::KIND_READ:
-			{
-				auto readOp = unique_static_cast<ReadOp>(std::move(op));
-				auto opResult = source->readReady(readOp.get());
-				if (opResult.isError()) return opResult.releaseError();
-				auto res = opResult.releaseValue();
-				if (res == LinuxEventSource::OP_RESULT_EAGAIN)
-					pushPendingOp(std::move(readOp), source);
-				else if (res == LinuxEventSource::OP_RESULT_ECONNRESET)
-					m_sources.remove(source);
-				return false;
-			}
-			case Op::KIND_WRITE:
-			{
-				auto writeOp = unique_static_cast<WriteOp>(std::move(op));
-				auto opResult = source->writeReady(writeOp.get());
-				if (opResult.isError()) return opResult.releaseError();
-				auto res = opResult.releaseValue();
-				if (res == LinuxEventSource::OP_RESULT_EAGAIN)
-					pushPendingOp(std::move(writeOp), source);
-				else if (res == LinuxEventSource::OP_RESULT_PARTIAL_WRITE)
-					continueWriteOp(std::move(writeOp), source);
-				else if (res == LinuxEventSource::OP_RESULT_ECONNRESET)
-					m_sources.remove(source);
-				return false;
-			}
-			case Op::KIND_ACCEPT:
-			{
-				auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
-				auto opResult = source->acceptReady(acceptOp.get());
-				if (opResult.isError()) return opResult.releaseError();
-				auto res = opResult.releaseValue();
-				if (res == LinuxEventSource::OP_RESULT_EAGAIN)
-					pushPendingOp(std::move(acceptOp), source);
-				else if (res == LinuxEventSource::OP_RESULT_ECONNRESET)
-					m_sources.remove(source);
-				return false;
-			}
-			default:
-				assert(false);
-				return errf(m_allocator, "unknown event loop event kind, {}"_sv, (int)op->kind);
-			}
+			auto it = m_aliveSources.lookup(source);
+			if (it == m_aliveSources.end())
+				return nullptr;
+			auto& weakHandle = it->value;
+			if (weakHandle.expired())
+				return nullptr;
+			return weakHandle.lock();
 		}
 
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		int m_epoll = 0;
 		Shared<LinuxCloseEventSource> m_closeEventSource;
-		Map<Op*, Unique<Op>> m_scheduledOperations;
-		Map<LinuxEventSource*, Weak<LinuxEventSource>> m_sources;
+		Map<LinuxEventSource*, Weak<LinuxEventSource>> m_aliveSources;
+		Map<Op*, Unique<Op>> m_pendingOps;
 	public:
 		LinuxEventLoop(int epoll, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
 			  m_log(log),
 			  m_epoll(epoll),
-			  m_scheduledOperations(allocator),
-			  m_sources(allocator)
+			  m_aliveSources(allocator),
+			  m_pendingOps(allocator)
 		{}
 
 		~LinuxEventLoop() override
@@ -430,7 +413,7 @@ namespace core
 			ZoneScoped;
 			if (m_epoll)
 			{
-				[[maybe_unused]] auto res = close(m_epoll);
+				[[maybe_unused]] auto res = ::close(m_epoll);
 				assert(res == 0);
 			}
 		}
@@ -438,75 +421,73 @@ namespace core
 		HumanError run() override
 		{
 			ZoneScoped;
-			int closeEvent = eventfd(0, 0);
-			if (closeEvent == -1)
-				return errf(m_allocator, "failed to create close event"_sv);
 
-			m_closeEventSource = shared_from<LinuxCloseEventSource>(m_allocator, closeEvent, this, m_allocator);
-			auto closeOp = unique_from<CloseOp>(m_allocator);
-			pushPendingOp(std::move(closeOp), m_closeEventSource.get());
-			m_sources.insert(m_closeEventSource.get(), m_closeEventSource);
+			auto closefd = eventfd(0, 0);
+			if (closefd == -1)
+				return errf(m_allocator, "Failed to create close event, ErrorCode({})"_sv, errno);
+			m_closeEventSource = shared_from<LinuxCloseEventSource>(m_allocator, closefd, this, m_allocator);
+			pushSource(m_closeEventSource);
+			pushPendingOp(unique_from<CloseOp>(m_allocator), m_closeEventSource.get());
 
-			epoll_event signal{};
-			signal.events = EPOLLIN;
-			signal.data.ptr = m_closeEventSource.get();
-			int ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, closeEvent, &signal);
+			epoll_event closeSubscription{};
+			closeSubscription.events = EPOLLIN | EPOLLET;
+			closeSubscription.data.ptr = m_closeEventSource.get();
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, closefd, &closeSubscription);
 			if (ok == -1)
-				return errf(m_allocator, "failed to add close event to epoll instance"_sv);
+				return errf(m_allocator, "failed to add close event to epoll instance, ErrorCode({})"_sv, errno);
 
 			constexpr int MAX_EVENTS = 32;
 			epoll_event events[MAX_EVENTS];
 			while (true)
 			{
-				auto count = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
-				if (count == -1)
+				int count = 0;
+
 				{
-					if (errno == EINTR)
+					ZoneScopedN("epoll_wait");
+					count = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
+					if (count == -1)
 					{
-						// that's an interrupt due to signal, just continue what we are doing
-						return {};
-					}
-					else
-					{
+						if (errno == EINTR)
+						{
+							// try again, this can be due to signal handling, like debugger
+							continue;
+						}
 						return errf(m_allocator, "epoll_wait failed, ErrorCode({})"_sv, errno);
 					}
 				}
 
 				for (int i = 0; i < count; ++i)
 				{
-					auto event = events[i];
-					auto sourceHandle = (LinuxEventSource*) event.data.ptr;
+					ZoneScopedN("handleEvent");
 
-					auto source = getSourceAndRemoveItWhenExpired(sourceHandle);
-					if (source == nullptr)
-					{
-						m_log->debug("expired source: {}, sources count: {}"_sv, (void*)sourceHandle, m_sources.count());
-						continue;
-					}
+					auto event = events[i];
+					auto sourceHandle = (LinuxEventSource*)event.data.ptr;
+					auto source = resolveSource(sourceHandle);
+					assert(source != nullptr);
 
 					if (event.events | EPOLLIN)
 					{
-						auto op = source->popPollIn();
-						auto shouldCloseResult = handleOp(op, source.get());
-						if (shouldCloseResult.isError()) return shouldCloseResult.releaseError();
-						auto shouldClose = shouldCloseResult.releaseValue();
-						if (shouldClose) return {};
+						// close event
+						if (source.get() == (LinuxEventSource*)m_closeEventSource.get())
+						{
+							m_log->debug("event loop closed"_sv);
+							m_closeEventSource = nullptr;
+							m_pendingOps.clear();
+							return {};
+						}
+
+						if (auto err = source->handlePollIn()) return err;
 					}
 
 					if (event.events | EPOLLOUT)
 					{
-						auto op = source->popPollOut();
-						auto shouldCloseResult = handleOp(op, source.get());
-						if (shouldCloseResult.isError()) return shouldCloseResult.releaseError();
-						auto shouldClose = shouldCloseResult.releaseValue();
-						if (shouldClose) return {};
+						if (auto err = source->handlePollOut()) return err;
 					}
 				}
 			}
 
-			return {};
+			return errf(m_allocator, "not implemented"_sv);
 		}
-
 		void stop() override
 		{
 			ZoneScoped;
@@ -524,66 +505,86 @@ namespace core
 			auto flags = fcntl(fd, F_GETFL, 0);
 			if (flags == -1)
 			{
-				m_log->error("failed to get socket flags"_sv);
+				m_log->error("failed to get socket flags, ErrorCode({})"_sv, errno);
 				return nullptr;
 			}
 			flags |= O_NONBLOCK;
 			if (fcntl(fd, F_SETFL, flags) != 0)
 			{
-				m_log->error("failed to make socket non-blocking"_sv);
+				m_log->error("failed to make socket non-blocking, ErrorCode({})"_sv, errno);
+				return nullptr;
+			}
+
+			int yes = 1;
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) != 0)
+			{
+				m_log->error("failed to set TCP socket no delay, ErrorCode({})"_sv, errno);
 				return nullptr;
 			}
 
 			auto res = shared_from<LinuxSocketEventSource>(m_allocator, std::move(socket), this, m_allocator);
 
-			epoll_event event{};
-			event.events = EPOLLIN | EPOLLOUT;
-			event.data.ptr = res.get();
-			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &event);
+			epoll_event sourceSubscription{};
+			sourceSubscription.events = EPOLLIN | EPOLLOUT | EPOLLET;
+			sourceSubscription.data.ptr = res.get();
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sourceSubscription);
 			if (ok == -1)
 			{
-				m_log->error("failed to create event source"_sv);
+				m_log->error("failed to create event source, ErrorCode({})"_sv, errno);
 				return nullptr;
 			}
 
-			auto sourceKey = res.get();
-			m_sources.insert(sourceKey, res);
+			pushSource(res);
 			return res;
 		}
-
 		HumanError read(EventSource* source, Reactor* reactor) override
 		{
 			ZoneScoped;
-			auto op = unique_from<ReadOp>(m_allocator, reactor);
-			pushPendingOp(std::move(op), (LinuxEventSource*)source);
+			pushPendingOp(unique_from<ReadOp>(m_allocator, reactor), (LinuxEventSource*)source);
 			return {};
 		}
-
 		HumanError write(EventSource* source, Reactor* reactor, Span<const std::byte> buffer) override
 		{
-			ZoneScoped;
 			Buffer ownedBuffer{m_allocator};
 			ownedBuffer.push(buffer);
-			auto op = unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer));
-			pushPendingOp(std::move(op), (LinuxEventSource*)source);
+			pushPendingOp(unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer)), (LinuxEventSource*)source);
+			return {};
+			auto linuxSource = (LinuxEventSource*)source;
+			auto remainingBytesResult = linuxSource->tryWrite(buffer);
+			if (remainingBytesResult.isError())
+				return remainingBytesResult.releaseError();
+			auto remainingBytes = remainingBytesResult.releaseValue();
+
+			if (remainingBytes.count() == 0)
+			{
+				if (reactor)
+				{
+					WriteEvent writeEvent{buffer.count(), source};
+					reactor->handle(&writeEvent);
+				}
+			}
+			else
+			{
+				Buffer ownedBuffer{m_allocator};
+				ownedBuffer.push(remainingBytes);
+				pushPendingOp(unique_from<WriteOp>(m_allocator, reactor, std::move(ownedBuffer)), (LinuxEventSource*)source);
+			}
 			return {};
 		}
-
 		HumanError accept(EventSource* source, Reactor* reactor) override
 		{
 			ZoneScoped;
-			auto op = unique_from<AcceptOp>(m_allocator, reactor);
-			pushPendingOp(std::move(op), (LinuxEventSource*)source);
+			pushPendingOp(unique_from<AcceptOp>(m_allocator, reactor), (LinuxEventSource*)source);
 			return {};
 		}
 	};
 
-	Result<Unique<EventLoop>> EventLoop::create(Log* log, Allocator* allocator)
+	Result<Unique<EventLoop>> EventLoop::create(Log *log, Allocator *allocator)
 	{
 		ZoneScoped;
-		int epoll_fd = epoll_create1(0);
+		auto epoll_fd = epoll_create1(0);
 		if (epoll_fd == -1)
-			return errf(allocator, "failed to create epoll"_sv);
+			return errf(allocator, "Failed to create epoll, ErrorCode({})"_sv, errno);
 
 		return unique_from<LinuxEventLoop>(allocator, epoll_fd, log, allocator);
 	}

@@ -22,6 +22,7 @@ namespace core
 		};
 
 	private:
+		Allocator* m_allocator = nullptr;
 		Array<KeyValue> m_keyValues;
 		Map<StringView, size_t> m_keyToIndex;
 
