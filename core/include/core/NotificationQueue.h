@@ -4,12 +4,21 @@
 #include "core/Func.h"
 #include "core/Mutex.h"
 #include "core/ConditionVariable.h"
+#include "core/Shared.h"
 
 namespace core
 {
+	class ExecutionQueue;
+
+	struct NotificationQueueEntry
+	{
+		Func<void()> func;
+		Weak<ExecutionQueue> executionQueue;
+	};
+
 	class NotificationQueue
 	{
-		Queue<Func<void()>> m_queue;
+		Queue<NotificationQueueEntry> m_queue;
 		Mutex m_mutex;
 		ConditionVariable m_condition;
 		bool m_done = false;
@@ -29,7 +38,7 @@ namespace core
 			m_condition.notify_all();
 		}
 
-		bool pop(Func<void()>& func)
+		bool pop(NotificationQueueEntry& func)
 		{
 			auto lock = Lock<Mutex>::lock(m_mutex);
 			while (m_queue.count() == 0 && m_done == false)
@@ -41,7 +50,7 @@ namespace core
 			return true;
 		}
 
-		bool try_pop(Func<void()>& func)
+		bool tryPop(NotificationQueueEntry& func)
 		{
 			auto lock = Lock<Mutex>::try_lock(m_mutex);
 			if (lock.is_locked() == false || m_queue.count() == 0)
@@ -51,23 +60,23 @@ namespace core
 			return true;
 		}
 
-		bool try_push(Func<void()>&& func)
+		bool tryPush(Func<void()>&& func, const Weak<ExecutionQueue>& execQueue)
 		{
 			{
 				auto lock = Lock<Mutex>::try_lock(m_mutex);
 				if (lock.is_locked() == false)
 					return false;
-				m_queue.push_back(std::move(func));
+				m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
 			}
 			m_condition.notify_one();
 			return true;
 		}
 
-		void push(Func<void()>&& func)
+		void push(Func<void()>&& func, const Weak<ExecutionQueue>& execQueue)
 		{
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
-				m_queue.push_back(std::move(func));
+				m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
 			}
 			m_condition.notify_one();
 		}

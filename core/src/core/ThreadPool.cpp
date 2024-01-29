@@ -1,4 +1,5 @@
 #include "core/ThreadPool.h"
+#include "core/ExecutionQueue.h"
 
 namespace core
 {
@@ -19,13 +20,21 @@ namespace core
 			{
 				while (true)
 				{
-					Func<void()> func;
+					NotificationQueueEntry entry;
 					for (size_t i = 0; i < m_threads_count; ++i)
-						if (m_queue[(i + n) % m_threads_count].try_pop(func))
+						if (m_queue[(i + n) % m_threads_count].tryPop(entry))
 							break;
-					if (!func && !m_queue[n].pop(func))
+					if (!entry.func && !m_queue[n].pop(entry))
 						break;
-					func();
+					entry.func();
+					if (auto executionQueue = entry.executionQueue.lock())
+					{
+						Func<void()> nextFunc;
+						if (executionQueue->signalFuncExecutionFinishedAndTryPop(nextFunc))
+						{
+							this->runFromExecutionQueue(std::move(nextFunc), executionQueue);
+						}
+					}
 					m_wait_group.done();
 				}
 			});

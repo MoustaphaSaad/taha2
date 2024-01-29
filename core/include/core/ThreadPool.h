@@ -11,6 +11,8 @@
 
 namespace core
 {
+	class ExecutionQueue;
+
 	class ThreadPool
 	{
 		size_t m_threads_count = 0;
@@ -18,6 +20,20 @@ namespace core
 		Array<NotificationQueue> m_queue;
 		WaitGroup m_wait_group;
 		std::atomic<size_t> m_next_queue = 0;
+
+		template<typename TFunc>
+		void pushFunc(TFunc&& func, const Weak<ExecutionQueue>& execQueue)
+		{
+			m_wait_group.add(1);
+
+			constexpr size_t K = 4;
+			auto n = m_next_queue.fetch_add(1);
+			for (size_t i = 0; i < m_threads_count * K; ++i)
+				if (m_queue[(i + n) % m_threads_count].tryPush(std::forward<TFunc>(func), execQueue))
+					return;
+			m_queue[n % m_threads_count].push(std::forward<TFunc>(func), execQueue);
+		}
+
 	public:
 		CORE_EXPORT ThreadPool(Allocator* allocator, size_t threads_count = Thread::hardware_concurrency());
 		CORE_EXPORT ThreadPool(ThreadPool&& other) = default;
@@ -27,14 +43,13 @@ namespace core
 		template<typename TFunc>
 		void run(TFunc&& func)
 		{
-			m_wait_group.add(1);
+			pushFunc(std::forward<TFunc>(func), nullptr);
+		}
 
-			constexpr size_t K = 4;
-			auto n = m_next_queue.fetch_add(1);
-			for (size_t i = 0; i < m_threads_count * K; ++i)
-				if (m_queue[(i + n) % m_threads_count].try_push(std::forward<TFunc>(func)))
-					return;
-			m_queue[n % m_threads_count].push(std::forward<TFunc>(func));
+		template<typename TFunc>
+		void runFromExecutionQueue(TFunc&& func, const Weak<ExecutionQueue>& execQueue)
+		{
+			pushFunc(std::forward<TFunc>(func), execQueue);
 		}
 
 		void flush()
