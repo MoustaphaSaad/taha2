@@ -56,5 +56,5 @@ TEST_CASE("core::ThreadPool ExecutionQueue")
 	pool.flush();
 
 	for (int i = 0; i < EXECUTION_QUEUES_COUNT; ++i)
-		assert(count[i] == 1000);
+		REQUIRE(count[i] == 1000);
 }
