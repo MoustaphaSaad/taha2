@@ -46,6 +46,7 @@ CPMDeclarePackage(libressl
     "LIBRESSL_SKIP_INSTALL ON"
     "LIBRESSL_APPS OFF"
     "LIBRESSL_TESTS OFF"
+    "ENABLE_ASM ${ENABLE_ASM}"
 )
 
 CPMDeclarePackage(tracy

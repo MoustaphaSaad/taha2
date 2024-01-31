@@ -11,7 +11,7 @@ void signalHandler(int signal)
 {
 	if (signal == SIGINT)
 	{
-		LISTEN_SOCKET->shutdown(core::Socket::SHUT_RDWR);
+		LISTEN_SOCKET->shutdown(core::Socket::SHUTDOWN_RDWR);
 	}
 }
 
@@ -66,7 +66,7 @@ int main()
 	}
 
 	for (auto& socket: sockets)
-		socket->shutdown(core::Socket::SHUT_RD);
+		socket->shutdown(core::Socket::SHUTDOWN_RD);
 
 	for (auto& thread: threads)
 		thread.join();

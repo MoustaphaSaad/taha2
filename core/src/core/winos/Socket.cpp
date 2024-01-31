@@ -138,18 +138,18 @@ namespace core
 			return unique_from<WinOSSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
 		}
 
-		bool shutdown(SHUT how) override
+		bool shutdown(SHUTDOWN how) override
 		{
 			int osHow = 0;
 			switch (how)
 			{
-			case SHUT_RD:
+			case SHUTDOWN_RD:
 				osHow = SD_RECEIVE;
 				break;
-			case SHUT_WR:
+			case SHUTDOWN_WR:
 				osHow = SD_SEND;
 				break;
-			case SHUT_RDWR:
+			case SHUTDOWN_RDWR:
 				osHow = SD_BOTH;
 				break;
 			default:

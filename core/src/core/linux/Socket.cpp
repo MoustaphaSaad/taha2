@@ -125,19 +125,19 @@ namespace core
 			return unique_from<LinuxSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
 		}
 
-		bool shutdown(SHUT how) override
+		bool shutdown(SHUTDOWN how) override
 		{
 			int osHow = 0;
 			switch (how)
 			{
-			case SHUT_RD:
-				osHow = ::SHUT_RD;
+			case SHUTDOWN_RD:
+				osHow = SHUT_RD;
 				break;
-			case SHUT_WR:
-				osHow = ::SHUT_WR;
+			case SHUTDOWN_WR:
+				osHow = SHUT_WR;
 				break;
-			case SHUT_RDWR:
-				osHow = ::SHUT_RDWR;
+			case SHUTDOWN_RDWR:
+				osHow = SHUT_RDWR;
 				break;
 			default:
 				return false;

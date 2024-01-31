@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <unistd.h>
 
 #include <tracy/Tracy.hpp>
 

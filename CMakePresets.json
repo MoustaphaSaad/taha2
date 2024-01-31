@@ -156,6 +156,39 @@
 				"CMAKE_BUILD_TYPE": "Debug",
 				"THREAD_SANITIZER": "ON"
 			}
+		},
+		{
+			"name": "emscripten-base",
+			"hidden": true,
+			"generator": "Unix Makefiles",
+			"cacheVariables": {
+				"TRACY_ENABLE": "OFF",
+				"BUILD_SHARED_LIBS": "OFF",
+				"ENABLE_ASM": "OFF",
+				"CMAKE_C_FLAGS": "-D __linux__"
+			},
+			"environment": {
+				"CC": "emcc",
+				"CXX": "em++"
+			}
+		},
+		{
+			"name": "emscripten-debug",
+			"inherits": "emscripten-base",
+			"displayName": "emscripten Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "emscripten-release",
+			"inherits": "emscripten-base",
+			"displayName": "emscripten Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release"
+			}
 		}
 	]
 }
