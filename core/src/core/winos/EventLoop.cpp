@@ -124,7 +124,7 @@ namespace core
 
 			~WinOSSocketEventSource() override
 			{
-				m_socket->shutdown(Socket::SHUT_RDWR);
+				m_socket->shutdown(Socket::SHUTDOWN_RDWR);
 			}
 
 			Result<Unique<Op>> scheduleWriteOp(WinOSEventLoop* loop, Unique<WriteOp> op)
