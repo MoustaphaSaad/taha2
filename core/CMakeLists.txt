@@ -37,6 +37,7 @@ target_sources(core PRIVATE
 	include/core/Rand.h
 	include/core/EventLoop.h
 	include/core/ExecutionQueue.h
+	include/core/ReactorLoop.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
@@ -76,6 +77,7 @@ if (WIN32)
 			src/core/winos/Socket.cpp
 			src/core/winos/Rand.cpp
 			src/core/winos/EventLoop.cpp
+			src/core/winos/ReactorLoop.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
