@@ -9,6 +9,20 @@
 
 namespace core
 {
+	class ReactorEvent
+	{
+	public:
+		virtual ~ReactorEvent() = default;
+	};
+
+	class Reactor
+	{
+	public:
+		virtual ~Reactor() = default;
+
+		virtual void handle(ReactorEvent* event) = 0;
+	};
+
 	class ReactorLoop
 	{
 	public:
