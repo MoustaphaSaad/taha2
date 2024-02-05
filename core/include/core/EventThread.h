@@ -12,5 +12,10 @@ namespace core
 	{
 	public:
 		CORE_EXPORT static Result<Unique<EventThreadPool>> create(Log* log, Allocator* allocator);
+
+		virtual ~EventThreadPool() = default;
+
+		virtual HumanError run() = 0;
+		virtual void stop() = 0;
 	};
 }
