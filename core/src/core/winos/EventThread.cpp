@@ -35,6 +35,7 @@ namespace core
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		Map<OVERLAPPED*, Unique<Op>> m_scheduledOps;
+		Map<EventThread*, Unique<EventThread>> m_threads;
 
 		void pushPendingOp(Unique<Op> op)
 		{
@@ -51,12 +52,25 @@ namespace core
 			m_scheduledOps.remove(op);
 			return res;
 		}
+
+		void addThread(Unique<EventThread> thread) override
+		{
+			auto handle = thread.get();
+			m_threads.insert(handle, std::move(thread));
+		}
+
+		Allocator* allocator() override
+		{
+			return m_allocator;
+		}
+
 	public:
 		WinOSThreadPool(HANDLE completionPort, Log* log, Allocator* allocator)
 			: m_allocator(allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
-			  m_scheduledOps(allocator)
+			  m_scheduledOps(allocator),
+			  m_threads(allocator)
 		{}
 
 		HumanError run() override

@@ -8,6 +8,23 @@
 
 namespace core
 {
+	class Event2
+	{
+	public:
+		virtual ~Event2() = default;
+	};
+
+	class StartEvent: public Event2
+	{};
+
+	class EventThread
+	{
+	public:
+		virtual ~EventThread() = default;
+
+		virtual void handle(Event2* event) = 0;
+	};
+
 	class EventThreadPool
 	{
 	public:
@@ -17,5 +34,16 @@ namespace core
 
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
+
+		template<typename T, typename ... TArgs>
+		T* startThread(TArgs&& ... args)
+		{
+			auto thread = unique_from<T>(allocator(), std::forward<TArgs>(args)...);
+			return thread.get();
+		}
+	private:
+		virtual void addThread(Unique<EventThread> thread) = 0;
+
+		virtual Allocator* allocator() = 0;
 	};
 }
