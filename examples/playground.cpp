@@ -15,6 +15,27 @@ void signalHandler(int signal)
 	}
 }
 
+class MyThread: public core::EventThread
+{
+	core::Log* m_log = nullptr;
+public:
+	explicit MyThread(core::Log* log)
+		: m_log(log)
+	{}
+
+	void handle(core::Event2* event) override
+	{
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
+		{
+			m_log->info("start"_sv);
+		}
+		else
+		{
+			m_log->info("unknown event"_sv);
+		}
+	}
+};
+
 int main()
 {
 	signal(SIGINT, signalHandler);
@@ -30,6 +51,8 @@ int main()
 	}
 	auto pool = poolRes.releaseValue();
 	POOL = pool.get();
+
+	pool->startThread<MyThread>(&log);
 
 	auto err = pool->run();
 	if (err)

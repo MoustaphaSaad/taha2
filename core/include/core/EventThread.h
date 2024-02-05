@@ -35,11 +35,15 @@ namespace core
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 
+		virtual HumanError sendEvent(Unique<Event2> event, EventThread* thread) = 0;
+
 		template<typename T, typename ... TArgs>
 		T* startThread(TArgs&& ... args)
 		{
 			auto thread = unique_from<T>(allocator(), std::forward<TArgs>(args)...);
-			return thread.get();
+			auto res = thread.get();
+			addThread(std::move(thread));
+			return res;
 		}
 	private:
 		virtual void addThread(Unique<EventThread> thread) = 0;

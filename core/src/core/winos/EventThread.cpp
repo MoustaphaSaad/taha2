@@ -13,6 +13,7 @@ namespace core
 			{
 				KIND_NONE,
 				KIND_CLOSE,
+				KIND_SEND_EVENT,
 			};
 
 			explicit Op(KIND kind_)
@@ -29,6 +30,18 @@ namespace core
 			CloseOp()
 				: Op(KIND_CLOSE)
 			{}
+		};
+
+		struct SendEventOp: Op
+		{
+			SendEventOp(Unique<Event2> event_, EventThread* thread_)
+				: Op(KIND_SEND_EVENT),
+				  event(std::move(event_)),
+				  thread(thread_)
+			{}
+
+			Unique<Event2> event;
+			EventThread* thread = nullptr;
 		};
 
 		Allocator* m_allocator = nullptr;
@@ -57,6 +70,10 @@ namespace core
 		{
 			auto handle = thread.get();
 			m_threads.insert(handle, std::move(thread));
+
+			auto startEvent = unique_from<StartEvent>(m_allocator);
+			[[maybe_unused]] auto err = sendEvent(std::move(startEvent), handle);
+			assert(!err);
 		}
 
 		Allocator* allocator() override
@@ -102,7 +119,14 @@ namespace core
 					case Op::KIND_CLOSE:
 					{
 						m_scheduledOps.clear();
+						m_threads.clear();
 						return {};
+					}
+					case Op::KIND_SEND_EVENT:
+					{
+						auto sendEventOp = unique_static_cast<SendEventOp>(std::move(op));
+						sendEventOp->thread->handle(sendEventOp->event.get());
+						break;
 					}
 					default:
 					{
@@ -120,6 +144,16 @@ namespace core
 			[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (LPOVERLAPPED)op.get());
 			assert(SUCCEEDED(res));
 			pushPendingOp(std::move(op));
+		}
+
+		HumanError sendEvent(Unique<Event2> event, EventThread* thread) override
+		{
+			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
+			auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (LPOVERLAPPED)op.get());
+			if (FAILED(res))
+				return errf(m_allocator, "failed to send event to thread"_sv);
+			pushPendingOp(std::move(op));
+			return {};
 		}
 	};
 
