@@ -44,7 +44,6 @@ namespace core
 			EventThread* thread = nullptr;
 		};
 
-		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		Map<OVERLAPPED*, Unique<Op>> m_scheduledOps;
@@ -76,14 +75,9 @@ namespace core
 			assert(!err);
 		}
 
-		Allocator* allocator() override
-		{
-			return m_allocator;
-		}
-
 	public:
 		WinOSThreadPool(HANDLE completionPort, Log* log, Allocator* allocator)
-			: m_allocator(allocator),
+			: EventThreadPool(allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
 			  m_scheduledOps(allocator),
