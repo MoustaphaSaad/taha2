@@ -1,5 +1,6 @@
 #include "core/EventThread.h"
 #include "core/Hash.h"
+#include "core/Mutex.h"
 
 #include <Windows.h>
 
@@ -44,26 +45,64 @@ namespace core
 			EventThread* thread = nullptr;
 		};
 
+		class OpSet
+		{
+			Mutex m_mutex;
+			Map<OVERLAPPED*, Unique<Op>> m_ops;
+			bool m_open = true;
+		public:
+			explicit OpSet(Allocator* allocator)
+				: m_ops(allocator),
+				  m_mutex(allocator)
+			{}
+
+			bool tryPush(Unique<Op> op)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+
+				if (m_open == false)
+					return false;
+
+				auto handle = (OVERLAPPED*)op.get();
+				m_ops.insert(handle, std::move(op));
+				return true;
+			}
+
+			Unique<Op> pop(OVERLAPPED* op)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+
+				auto it = m_ops.lookup(op);
+				if (it == m_ops.end())
+					return nullptr;
+				auto res = std::move(it->value);
+				m_ops.remove(op);
+				return res;
+			}
+
+			void close()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_open = false;
+			}
+
+			void open()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_open = true;
+			}
+
+			void clear()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_ops.clear();
+			}
+		};
+
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
-		Map<OVERLAPPED*, Unique<Op>> m_scheduledOps;
+		OpSet m_ops;
 		Map<EventThread*, Unique<EventThread>> m_threads;
-
-		void pushPendingOp(Unique<Op> op)
-		{
-			auto handle = (OVERLAPPED*)op.get();
-			m_scheduledOps.insert(handle, std::move(op));
-		}
-
-		Unique<Op> popPendingOp(OVERLAPPED* op)
-		{
-			auto it = m_scheduledOps.lookup(op);
-			if (it == m_scheduledOps.end())
-				return nullptr;
-			auto res = std::move(it->value);
-			m_scheduledOps.remove(op);
-			return res;
-		}
 
 		void addThread(Unique<EventThread> thread) override
 		{
@@ -75,17 +114,33 @@ namespace core
 			assert(!err);
 		}
 
+	protected:
+		HumanError sendEvent(Unique<Event2> event, EventThread* thread) override
+		{
+			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
+			auto overlapped = (LPOVERLAPPED)op.get();
+			if (m_ops.tryPush(std::move(op)))
+			{
+				auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, overlapped);
+				if (FAILED(res))
+					return errf(m_allocator, "failed to send event to thread"_sv);
+			}
+			return {};
+		}
+
 	public:
 		WinOSThreadPool(HANDLE completionPort, Log* log, Allocator* allocator)
 			: EventThreadPool(allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
-			  m_scheduledOps(allocator),
+			  m_ops(allocator),
 			  m_threads(allocator)
 		{}
 
 		HumanError run() override
 		{
+			m_ops.open();
+
 			while (true)
 			{
 				constexpr int MAX_ENTRIES = 128;
@@ -103,17 +158,15 @@ namespace core
 				for (size_t i = 0; i < numEntries; ++i)
 				{
 					auto overlapped = entries[i].lpOverlapped;
-					auto overlappedOp = (Op*)overlapped;
 
-					auto op = popPendingOp(overlapped);
+					auto op = m_ops.pop(overlapped);
 					assert(op != nullptr);
 
 					switch (op->kind)
 					{
 					case Op::KIND_CLOSE:
 					{
-						m_scheduledOps.clear();
-						m_threads.clear();
+						m_ops.clear();
 						return {};
 					}
 					case Op::KIND_SEND_EVENT:
@@ -135,19 +188,13 @@ namespace core
 		void stop() override
 		{
 			auto op = unique_from<CloseOp>(m_allocator);
-			[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (LPOVERLAPPED)op.get());
-			assert(SUCCEEDED(res));
-			pushPendingOp(std::move(op));
-		}
-
-		HumanError sendEvent(Unique<Event2> event, EventThread* thread) override
-		{
-			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
-			auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (LPOVERLAPPED)op.get());
-			if (FAILED(res))
-				return errf(m_allocator, "failed to send event to thread"_sv);
-			pushPendingOp(std::move(op));
-			return {};
+			auto overlapped = (LPOVERLAPPED)op.get();
+			if (m_ops.tryPush(std::move(op)))
+			{
+				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, overlapped);
+				assert(SUCCEEDED(res));
+			}
+			m_ops.close();
 		}
 	};
 

@@ -2,16 +2,18 @@
 #include <core/Log.h>
 #include <core/Thread.h>
 #include <core/EventThread.h>
+#include <core/ThreadPool.h>
 
 #include <signal.h>
 
-core::EventThreadPool* POOL = nullptr;
+core::EventThreadPool* POOL[2];
 
 void signalHandler(int signal)
 {
 	if (signal == SIGINT)
 	{
-		POOL->stop();
+		POOL[0]->stop();
+		POOL[1]->stop();
 	}
 }
 
@@ -51,7 +53,7 @@ public:
 		if (auto pingEvent = dynamic_cast<PingEvent*>(event))
 		{
 			m_log->info("ping received"_sv);
-			(void)eventThreadPool()->sendEvent(core::unique_from<PongEvent>(m_allocator, this), pingEvent->pingThread);
+			(void)pingEvent->pingThread->sendEvent(core::unique_from<PongEvent>(m_allocator, this));
 		}
 		else
 		{
@@ -86,7 +88,7 @@ public:
 
 	void sendPing(core::EventThread* thread)
 	{
-		(void)eventThreadPool()->sendEvent(core::unique_from<PingEvent>(m_allocator, this), thread);
+		(void)thread->sendEvent(core::unique_from<PingEvent>(m_allocator, this));
 	}
 };
 
@@ -96,26 +98,53 @@ int main()
 
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
+	core::ThreadPool threadPool{&allocator, 3};
 
-	auto poolRes = core::EventThreadPool::create(&log, &allocator);
-	if (poolRes.isError())
+	auto pool1Res = core::EventThreadPool::create(&log, &allocator);
+	if (pool1Res.isError())
 	{
-		log.critical("failed to create event thread pool, {}"_sv, poolRes.releaseError());
+		log.critical("failed to create event thread pool, {}"_sv, pool1Res.releaseError());
 		return EXIT_FAILURE;
 	}
-	auto pool = poolRes.releaseValue();
-	POOL = pool.get();
+	auto pool1 = pool1Res.releaseValue();
+	POOL[0] = pool1.get();
 
-	auto pingThread = pool->startThread<PingThread>(pool.get(), &log, &allocator);
-	auto pongThread = pool->startThread<PongThread>(pool.get(), &log, &allocator);
+	auto pool2Res = core::EventThreadPool::create(&log, &allocator);
+	if (pool2Res.isError())
+	{
+		log.critical("failed to create event thread pool, {}"_sv, pool2Res.releaseError());
+		return EXIT_FAILURE;
+	}
+	auto pool2 = pool2Res.releaseValue();
+	POOL[1] = pool2.get();
+
+	auto pingThread = pool1->startThread<PingThread>(pool1.get(), &log, &allocator);
+	auto pongThread = pool2->startThread<PongThread>(pool2.get(), &log, &allocator);
 
 	pingThread->sendPing(pongThread);
 
-	auto err = pool->run();
-	if (err)
-	{
-		log.critical("event thread pool error, {}"_sv, err);
-		return EXIT_FAILURE;
-	}
+	threadPool.run([pool = pool1.get(), &log]{
+		auto err = pool->run();
+		if (err)
+		{
+			log.critical("event thread pool error, {}"_sv, err);
+		}
+	});
+
+	threadPool.run([pool = pool2.get(), &log]{
+		auto err = pool->run();
+		if (err)
+		{
+			log.critical("event thread pool error, {}"_sv, err);
+		}
+	});
+
+	threadPool.run([]{
+		std::this_thread::sleep_for(std::chrono::seconds(5));
+		POOL[0]->stop();
+		POOL[1]->stop();
+	});
+
+	threadPool.flush();
 	return EXIT_SUCCESS;
 }

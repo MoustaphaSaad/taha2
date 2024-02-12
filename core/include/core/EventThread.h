@@ -32,12 +32,16 @@ namespace core
 		virtual void handle(Event2* event) = 0;
 
 		EventThreadPool* eventThreadPool() const { return m_eventThreadPool; }
+		HumanError sendEvent(Unique<Event2> event);
 	};
 
 	class EventThreadPool
 	{
+		friend class EventThread;
 	protected:
 		Allocator* m_allocator = nullptr;
+
+		virtual HumanError sendEvent(Unique<Event2> event, EventThread* thread) = 0;
 
 	public:
 		CORE_EXPORT static Result<Unique<EventThreadPool>> create(Log* log, Allocator* allocator);
@@ -51,8 +55,6 @@ namespace core
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 
-		virtual HumanError sendEvent(Unique<Event2> event, EventThread* thread) = 0;
-
 		template<typename T, typename ... TArgs>
 		T* startThread(TArgs&& ... args)
 		{
@@ -64,4 +66,9 @@ namespace core
 	private:
 		virtual void addThread(Unique<EventThread> thread) = 0;
 	};
+
+	HumanError EventThread::sendEvent(Unique<core::Event2> event)
+	{
+		return m_eventThreadPool->sendEvent(std::move(event), this);
+	}
 }
