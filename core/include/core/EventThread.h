@@ -19,7 +19,7 @@ namespace core
 
 	class EventThreadPool;
 
-	class EventThread
+	class EventThread: public SharedFromThis<EventThread>
 	{
 		EventThreadPool* m_eventThreadPool = nullptr;
 	public:
@@ -56,15 +56,14 @@ namespace core
 		virtual void stop() = 0;
 
 		template<typename T, typename ... TArgs>
-		T* startThread(TArgs&& ... args)
+		Shared<T> startThread(TArgs&& ... args)
 		{
-			auto thread = unique_from<T>(m_allocator, std::forward<TArgs>(args)...);
-			auto res = thread.get();
-			addThread(std::move(thread));
-			return res;
+			auto thread = shared_from<T>(m_allocator, std::forward<TArgs>(args)...);
+			addThread(thread);
+			return thread;
 		}
 	private:
-		virtual void addThread(Unique<EventThread> thread) = 0;
+		virtual void addThread(const Shared<EventThread>& thread) = 0;
 	};
 
 	HumanError EventThread::sendEvent(Unique<core::Event2> event)

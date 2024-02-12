@@ -173,25 +173,12 @@ namespace core
 			unref();
 		}
 
-		const T& operator*() const
+		T& operator*() const
 		{
 			return *m_control->ptr;
 		}
 
-		T& operator*()
-		{
-			return *m_control->ptr;
-		}
-
-		const T* operator->() const
-		{
-			if (m_control)
-				return m_control->ptr;
-			else
-				return nullptr;
-		}
-
-		T* operator->()
+		T* operator->() const
 		{
 			if (m_control)
 				return m_control->ptr;

@@ -102,12 +102,12 @@ namespace core
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		OpSet m_ops;
-		Map<EventThread*, Unique<EventThread>> m_threads;
+		Map<EventThread*, Shared<EventThread>> m_threads;
 
-		void addThread(Unique<EventThread> thread) override
+		void addThread(const Shared<EventThread>& thread) override
 		{
 			auto handle = thread.get();
-			m_threads.insert(handle, std::move(thread));
+			m_threads.insert(handle, thread);
 
 			auto startEvent = unique_from<StartEvent>(m_allocator);
 			[[maybe_unused]] auto err = sendEvent(std::move(startEvent), handle);
@@ -167,6 +167,7 @@ namespace core
 					case Op::KIND_CLOSE:
 					{
 						m_ops.clear();
+						m_threads.clear();
 						return {};
 					}
 					case Op::KIND_SEND_EVENT:

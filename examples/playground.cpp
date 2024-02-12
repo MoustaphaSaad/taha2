@@ -20,9 +20,9 @@ void signalHandler(int signal)
 class PingEvent: public core::Event2
 {
 public:
-	core::EventThread* pingThread = nullptr;
+	core::Shared<core::EventThread> pingThread = nullptr;
 
-	explicit PingEvent(core::EventThread* thread)
+	explicit PingEvent(const core::Shared<core::EventThread>& thread)
 		: pingThread(thread)
 	{}
 };
@@ -30,9 +30,9 @@ public:
 class PongEvent: public core::Event2
 {
 public:
-	core::EventThread* pongThread = nullptr;
+	core::Shared<core::EventThread> pongThread = nullptr;
 
-	explicit PongEvent(core::EventThread* thread)
+	explicit PongEvent(const core::Shared<core::EventThread>& thread)
 		: pongThread(thread)
 	{}
 };
@@ -53,7 +53,7 @@ public:
 		if (auto pingEvent = dynamic_cast<PingEvent*>(event))
 		{
 			m_log->info("ping received"_sv);
-			(void)pingEvent->pingThread->sendEvent(core::unique_from<PongEvent>(m_allocator, this));
+			(void)pingEvent->pingThread->sendEvent(core::unique_from<PongEvent>(m_allocator, sharedFromThis()));
 		}
 		else
 		{
@@ -86,9 +86,9 @@ public:
 		}
 	}
 
-	void sendPing(core::EventThread* thread)
+	void sendPing(const core::Shared<core::EventThread>& thread)
 	{
-		(void)thread->sendEvent(core::unique_from<PingEvent>(m_allocator, this));
+		(void)thread->sendEvent(core::unique_from<PingEvent>(m_allocator, sharedFromThis()));
 	}
 };
 
@@ -146,5 +146,6 @@ int main()
 	});
 
 	threadPool.flush();
+	log.info("success"_sv);
 	return EXIT_SUCCESS;
 }
