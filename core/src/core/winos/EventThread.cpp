@@ -20,6 +20,7 @@ namespace core
 				KIND_SEND_EVENT,
 				KIND_ACCEPT,
 				KIND_READ,
+				KIND_WRITE,
 			};
 
 			explicit Op(KIND kind_, HANDLE handle_)
@@ -78,6 +79,22 @@ namespace core
 			{
 				wsaBuf.buf = (CHAR*)buffer;
 				wsaBuf.len = (ULONG)sizeof(buffer);
+			}
+		};
+
+		struct WriteOp : Op
+		{
+			Buffer buffer;
+			WSABUF wsaBuf{};
+			Weak<EventThread> thread;
+
+			WriteOp(const Shared<EventThread> &thread_, Buffer&& buffer_, HANDLE handle_)
+				: Op(KIND_WRITE, handle_),
+				  buffer(buffer_),
+				  thread(thread_)
+			{
+				wsaBuf.buf = (CHAR*)buffer.data();
+				wsaBuf.len = (ULONG)buffer.count();
 			}
 		};
 
@@ -284,6 +301,26 @@ namespace core
 						}
 						break;
 					}
+					case Op::KIND_WRITE:
+					{
+						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+						auto thread = writeOp->thread.lock();
+						if (m_threadPool)
+						{
+							auto func = Func<void()>{m_allocator, [readOp = std::move(writeOp), thread, bytesTransferred]
+							{
+								WriteEvent2 event{bytesTransferred};
+								thread->handle(&event);
+							}};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							WriteEvent2 event{bytesTransferred};
+							thread->handle(&event);
+						}
+						break;
+					}
 					default:
 					{
 						assert(false);
@@ -365,7 +402,35 @@ namespace core
 				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
 				{
 					auto error = WSAGetLastError();
-					return errf(m_allocator, "failed to schedule accept operation: ErrorCode({})"_sv, error);
+					return errf(m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
+				}
+			}
+			return {};
+		}
+
+		HumanError write(const Unique<Socket>& socket, const Shared<EventThread>& thread, Span<const std::byte> bytes) override
+		{
+			Buffer buffer{m_allocator};
+			buffer.push(bytes);
+			auto op = unique_from<WriteOp>(m_allocator, thread, std::move(buffer), (HANDLE)socket->fd());
+			auto wsaBuf = &op->wsaBuf;
+			auto overlapped = (OVERLAPPED *)op.get();
+
+			if (m_ops.tryPush(std::move(op)))
+			{
+				auto res = WSASend(
+					(SOCKET)socket->fd(),
+					wsaBuf,
+					1,
+					NULL,
+					0,
+					overlapped,
+					NULL
+				);
+				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
+				{
+					auto error = WSAGetLastError();
+					return errf(m_allocator, "failed to schedule write operation: ErrorCode({})"_sv, error);
 				}
 			}
 			return {};

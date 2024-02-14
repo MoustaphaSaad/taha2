@@ -41,6 +41,17 @@ namespace core
 		Span<std::byte> bytes() const { return m_bytes; }
 	};
 
+	class WriteEvent2: public Event2
+	{
+		size_t m_writtenSize = 0;
+	public:
+		explicit WriteEvent2(size_t writtenSize)
+			: m_writtenSize(writtenSize)
+		{}
+
+		size_t writtenSize() const { return m_writtenSize; }
+	};
+
 	class EventThreadPool;
 
 	class EventThread: public SharedFromThis<EventThread>
@@ -80,6 +91,7 @@ namespace core
 		virtual HumanError registerSocket(const Unique<Socket>& socket) = 0;
 		virtual HumanError accept(const Unique<Socket>& socket, const Shared<EventThread>& thread) = 0;
 		virtual HumanError read(const Unique<Socket>& socket, const Shared<EventThread>& thread) = 0;
+		virtual HumanError write(const Unique<Socket>& socket, const Shared<EventThread>& thread, Span<const std::byte> buffer) = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)
