@@ -224,6 +224,14 @@ namespace core
 			}
 			m_ops.close();
 		}
+
+		HumanError registerSocket(const Unique<Socket>& socket) override
+		{
+			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
+			if (newPort != m_completionPort)
+				return errf(m_allocator, "failed to register socket to IOCP instance"_sv);
+			return {};
+		}
 	};
 
 	Result<Unique<EventThreadPool>> EventThreadPool::create(ThreadPool* threadPool, Log *log, Allocator *allocator)

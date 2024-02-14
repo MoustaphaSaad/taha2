@@ -6,6 +6,7 @@
 #include "core/Log.h"
 #include "core/Allocator.h"
 #include "core/ExecutionQueue.h"
+#include "core/Socket.h"
 
 namespace core
 {
@@ -54,6 +55,7 @@ namespace core
 
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
+		virtual HumanError registerSocket(const Unique<Socket>& socket) = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)
