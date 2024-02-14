@@ -3,6 +3,9 @@
 #include "core/Mutex.h"
 
 #include <Windows.h>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <Mswsock.h>
 
 namespace core
 {
@@ -104,6 +107,7 @@ namespace core
 		OpSet m_ops;
 		Map<EventThread*, Shared<EventThread>> m_threads;
 		ThreadPool* m_threadPool = nullptr;
+		LPFN_ACCEPTEX m_acceptEx = nullptr;
 
 		void addThread(const Shared<EventThread>& thread) override
 		{
@@ -130,14 +134,24 @@ namespace core
 		}
 
 	public:
-		WinOSThreadPool(ThreadPool* threadPool, HANDLE completionPort, Log* log, Allocator* allocator)
+		WinOSThreadPool(ThreadPool* threadPool, HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log* log, Allocator* allocator)
 			: EventThreadPool(allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
 			  m_ops(allocator),
 			  m_threads(allocator),
-			  m_threadPool(threadPool)
+			  m_threadPool(threadPool),
+			  m_acceptEx(acceptEx)
 		{}
+
+		~WinOSThreadPool() override
+		{
+			if (m_completionPort != INVALID_HANDLE_VALUE)
+			{
+				[[maybe_unused]] auto res = CloseHandle(m_completionPort);
+				assert(SUCCEEDED(res));
+			}
+		}
 
 		HumanError run() override
 		{
@@ -218,7 +232,27 @@ namespace core
 		if (completionPort == NULL)
 			return errf(allocator, "failed to create completion port"_sv);
 
-		auto res = unique_from<WinOSThreadPool>(allocator, threadPool, completionPort, log, allocator);
-		return res;
+		auto dummySocket = ::WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+		if (dummySocket == INVALID_SOCKET)
+			return errf(allocator, "failed to create dummy socket"_sv);
+
+		GUID guidAcceptEx = WSAID_ACCEPTEX;
+		LPFN_ACCEPTEX acceptEx = nullptr;
+		DWORD bytesReturned = 0;
+		auto res = WSAIoctl(
+			dummySocket,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			&guidAcceptEx,
+			sizeof(guidAcceptEx),
+			&acceptEx,
+			sizeof(acceptEx),
+			&bytesReturned,
+			NULL,
+			NULL
+		);
+		if (res == SOCKET_ERROR)
+			return errf(allocator, "failed to get AcceptEx function pointer, ErrorCode({})"_sv, res);
+
+		return unique_from<WinOSThreadPool>(allocator, threadPool, completionPort, acceptEx, log, allocator);
 	}
 }
