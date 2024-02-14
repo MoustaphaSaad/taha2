@@ -103,6 +103,7 @@ namespace core
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		OpSet m_ops;
 		Map<EventThread*, Shared<EventThread>> m_threads;
+		ThreadPool* m_threadPool = nullptr;
 
 		void addThread(const Shared<EventThread>& thread) override
 		{
@@ -129,12 +130,13 @@ namespace core
 		}
 
 	public:
-		WinOSThreadPool(HANDLE completionPort, Log* log, Allocator* allocator)
+		WinOSThreadPool(ThreadPool* threadPool, HANDLE completionPort, Log* log, Allocator* allocator)
 			: EventThreadPool(allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
 			  m_ops(allocator),
-			  m_threads(allocator)
+			  m_threads(allocator),
+			  m_threadPool(threadPool)
 		{}
 
 		HumanError run() override
@@ -173,7 +175,18 @@ namespace core
 					case Op::KIND_SEND_EVENT:
 					{
 						auto sendEventOp = unique_static_cast<SendEventOp>(std::move(op));
-						sendEventOp->thread->handle(sendEventOp->event.get());
+						if (m_threadPool)
+						{
+							auto thread = sendEventOp->thread->sharedFromThis();
+							auto func = Func<void()>{[event = std::move(sendEventOp->event), thread]{
+								thread->handle(event.get());
+							}};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							sendEventOp->thread->handle(sendEventOp->event.get());
+						}
 						break;
 					}
 					default:
@@ -199,13 +212,13 @@ namespace core
 		}
 	};
 
-	Result<Unique<EventThreadPool>> EventThreadPool::create(Log *log, Allocator *allocator)
+	Result<Unique<EventThreadPool>> EventThreadPool::create(ThreadPool* threadPool, Log *log, Allocator *allocator)
 	{
 		auto completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 		if (completionPort == NULL)
 			return errf(allocator, "failed to create completion port"_sv);
 
-		auto res = unique_from<WinOSThreadPool>(allocator, completionPort, log, allocator);
+		auto res = unique_from<WinOSThreadPool>(allocator, threadPool, completionPort, log, allocator);
 		return res;
 	}
 }

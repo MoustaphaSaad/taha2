@@ -5,6 +5,7 @@
 #include "core/Unique.h"
 #include "core/Log.h"
 #include "core/Allocator.h"
+#include "core/ExecutionQueue.h"
 
 namespace core
 {
@@ -22,16 +23,15 @@ namespace core
 	class EventThread: public SharedFromThis<EventThread>
 	{
 		EventThreadPool* m_eventThreadPool = nullptr;
+		core::Shared<ExecutionQueue> m_queue;
 	public:
-		EventThread(EventThreadPool* pool)
-			: m_eventThreadPool(pool)
-		{}
-
+		EventThread(EventThreadPool* pool);
 		virtual ~EventThread() = default;
 
 		virtual void handle(Event2* event) = 0;
 
 		EventThreadPool* eventThreadPool() const { return m_eventThreadPool; }
+		ExecutionQueue* executionQueue() const { return m_queue.get(); }
 		HumanError sendEvent(Unique<Event2> event);
 	};
 
@@ -44,7 +44,7 @@ namespace core
 		virtual HumanError sendEvent(Unique<Event2> event, EventThread* thread) = 0;
 
 	public:
-		CORE_EXPORT static Result<Unique<EventThreadPool>> create(Log* log, Allocator* allocator);
+		CORE_EXPORT static Result<Unique<EventThreadPool>> create(ThreadPool* threadPool, Log* log, Allocator* allocator);
 
 		explicit EventThreadPool(Allocator* allocator)
 			: m_allocator(allocator)
@@ -65,6 +65,12 @@ namespace core
 	private:
 		virtual void addThread(const Shared<EventThread>& thread) = 0;
 	};
+
+	EventThread::EventThread(EventThreadPool* pool)
+		: m_eventThreadPool(pool)
+	{
+		m_queue = ExecutionQueue::create(pool->m_allocator);
+	}
 
 	HumanError EventThread::sendEvent(Unique<core::Event2> event)
 	{

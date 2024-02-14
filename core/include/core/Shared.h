@@ -445,13 +445,9 @@ namespace core
 		using SharedFromThisType = SharedFromThis;
 
 		SharedFromThis()
-		{
-			 int x =234;
-		}
+		{}
 		virtual ~SharedFromThis()
-		{
-			int x = 234;
-		}
+		{}
 
 		[[nodiscard]] Weak<T> weakFromThis() { return m_ptr; }
 		[[nodiscard]] Weak<const T> weakFromThis() const { return m_ptr; }
