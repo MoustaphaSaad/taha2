@@ -12,3 +12,6 @@ target_link_libraries(echo-server core)
 
 add_executable(threaded-echo-server threaded-echo-server.cpp)
 target_link_libraries(threaded-echo-server core)
+
+add_executable(ping-pong ping-pong.cpp)
+target_link_libraries(ping-pong core)
