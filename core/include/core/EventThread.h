@@ -19,6 +19,17 @@ namespace core
 	class StartEvent: public Event2
 	{};
 
+	class AcceptEvent2: public Event2
+	{
+		Unique<Socket> m_socket;
+	public:
+		explicit AcceptEvent2(Unique<Socket> socket)
+			: m_socket(std::move(socket))
+		{}
+
+		Unique<Socket> releaseSocket() { return std::move(m_socket); }
+	};
+
 	class EventThreadPool;
 
 	class EventThread: public SharedFromThis<EventThread>
@@ -56,6 +67,7 @@ namespace core
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 		virtual HumanError registerSocket(const Unique<Socket>& socket) = 0;
+		virtual HumanError accept(const Unique<Socket>& socket, const Shared<EventThread>& thread) = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)

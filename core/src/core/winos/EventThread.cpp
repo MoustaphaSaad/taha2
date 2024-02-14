@@ -18,6 +18,7 @@ namespace core
 				KIND_NONE,
 				KIND_CLOSE,
 				KIND_SEND_EVENT,
+				KIND_ACCEPT,
 			};
 
 			explicit Op(KIND kind_)
@@ -46,6 +47,19 @@ namespace core
 
 			Unique<Event2> event;
 			EventThread* thread = nullptr;
+		};
+
+		struct AcceptOp: Op
+		{
+			Unique<Socket> socket;
+			std::byte buffer[2 * sizeof(SOCKADDR_IN) + 16] = {};
+			Weak<EventThread> thread;
+
+			AcceptOp(Unique<Socket> socket_, const Shared<EventThread>& thread_)
+				: Op(KIND_ACCEPT),
+				  socket(std::move(socket_)),
+				  thread(thread_)
+			{}
 		};
 
 		class OpSet
@@ -203,6 +217,25 @@ namespace core
 						}
 						break;
 					}
+					case Op::KIND_ACCEPT:
+					{
+						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
+						auto thread = acceptOp->thread.lock();
+						if (m_threadPool)
+						{
+							auto event = unique_from<AcceptEvent2>(m_allocator, std::move(acceptOp->socket));
+							auto func = Func<void()>{[event = std::move(event), thread]{
+								thread->handle(event.get());
+							}};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							AcceptEvent2 event{std::move(acceptOp->socket)};
+							thread->handle(&event);
+						}
+						break;
+					}
 					default:
 					{
 						assert(false);
@@ -230,6 +263,34 @@ namespace core
 			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
 			if (newPort != m_completionPort)
 				return errf(m_allocator, "failed to register socket to IOCP instance"_sv);
+			return {};
+		}
+
+		HumanError accept(const Unique<Socket>& socket, const Shared<EventThread>& thread) override
+		{
+			// TODO: get the family and type from the accepting socket
+			auto acceptedSocket = Socket::open(m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
+			auto acceptedSocketHandle = acceptedSocket->fd();
+			auto op = unique_from<AcceptOp>(m_allocator, std::move(acceptedSocket), thread);
+
+			if (m_ops.tryPush(std::move(op)))
+			{
+				auto res = m_acceptEx(
+					(SOCKET) socket->fd(), // listen socket
+					(SOCKET) acceptedSocketHandle, // accept socket
+					op->buffer, // pointer to a buffer that receives the first block of data sent on new connection
+					0, // number of bytes for receive data (it doesn't include server and client address)
+					sizeof(SOCKADDR_IN) + 16, // local address length
+					sizeof(SOCKADDR_IN) + 16, // remote address length
+					NULL, // bytes received in case of sync completion
+					(OVERLAPPED *) op.get() // overlapped structure
+				);
+				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
+				{
+					auto error = WSAGetLastError();
+					return errf(m_allocator, "failed to schedule accept operation: ErrorCode({})"_sv, error);
+				}
+			}
 			return {};
 		}
 	};
