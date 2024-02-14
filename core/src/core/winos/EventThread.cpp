@@ -11,7 +11,7 @@ namespace core
 {
 	class WinOSThreadPool: public EventThreadPool
 	{
-		struct Op: OVERLAPPED
+		struct Op : OVERLAPPED
 		{
 			enum KIND
 			{
@@ -19,58 +19,77 @@ namespace core
 				KIND_CLOSE,
 				KIND_SEND_EVENT,
 				KIND_ACCEPT,
+				KIND_READ,
 			};
 
-			explicit Op(KIND kind_)
-				: kind(kind_)
+			explicit Op(KIND kind_, HANDLE handle_)
+				: kind(kind_),
+				  handle(handle_)
 			{}
 
 			virtual ~Op() = default;
 
 			KIND kind = KIND_NONE;
+			HANDLE handle = INVALID_HANDLE_VALUE;
 		};
 
-		struct CloseOp: Op
+		struct CloseOp : Op
 		{
 			CloseOp()
-				: Op(KIND_CLOSE)
+				: Op(KIND_CLOSE, INVALID_HANDLE_VALUE)
 			{}
 		};
 
-		struct SendEventOp: Op
+		struct SendEventOp : Op
 		{
-			SendEventOp(Unique<Event2> event_, EventThread* thread_)
-				: Op(KIND_SEND_EVENT),
+			SendEventOp(Unique<Event2> event_, EventThread *thread_)
+				: Op(KIND_SEND_EVENT, INVALID_HANDLE_VALUE),
 				  event(std::move(event_)),
 				  thread(thread_)
 			{}
 
 			Unique<Event2> event;
-			EventThread* thread = nullptr;
+			EventThread *thread = nullptr;
 		};
 
-		struct AcceptOp: Op
+		struct AcceptOp : Op
 		{
 			Unique<Socket> socket;
 			std::byte buffer[2 * sizeof(SOCKADDR_IN) + 16] = {};
 			Weak<EventThread> thread;
 
-			AcceptOp(Unique<Socket> socket_, const Shared<EventThread>& thread_)
-				: Op(KIND_ACCEPT),
+			AcceptOp(Unique<Socket> socket_, const Shared<EventThread> &thread_, HANDLE handle_)
+				: Op(KIND_ACCEPT, handle_),
 				  socket(std::move(socket_)),
 				  thread(thread_)
 			{}
 		};
 
+		struct ReadOp : Op
+		{
+			std::byte buffer[1024] = {};
+			DWORD flags = 0;
+			WSABUF wsaBuf{};
+			Weak<EventThread> thread;
+
+			ReadOp(const Shared<EventThread> &thread_, HANDLE handle_)
+				: Op(KIND_READ, handle_),
+				  thread(thread_)
+			{
+				wsaBuf.buf = (CHAR*)buffer;
+				wsaBuf.len = (ULONG)sizeof(buffer);
+			}
+		};
+
 		class OpSet
 		{
 			Mutex m_mutex;
-			Map<OVERLAPPED*, Unique<Op>> m_ops;
+			Map<OVERLAPPED *, Unique<Op>> m_ops;
 			bool m_open = true;
 		public:
-			explicit OpSet(Allocator* allocator)
-				: m_ops(allocator),
-				  m_mutex(allocator)
+			explicit OpSet(Allocator *allocator)
+					: m_ops(allocator),
+					  m_mutex(allocator)
 			{}
 
 			bool tryPush(Unique<Op> op)
@@ -80,12 +99,12 @@ namespace core
 				if (m_open == false)
 					return false;
 
-				auto handle = (OVERLAPPED*)op.get();
+				auto handle = (OVERLAPPED *) op.get();
 				m_ops.insert(handle, std::move(op));
 				return true;
 			}
 
-			Unique<Op> pop(OVERLAPPED* op)
+			Unique<Op> pop(OVERLAPPED *op)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 
@@ -116,14 +135,14 @@ namespace core
 			}
 		};
 
-		Log* m_log = nullptr;
+		Log *m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		OpSet m_ops;
-		Map<EventThread*, Shared<EventThread>> m_threads;
-		ThreadPool* m_threadPool = nullptr;
+		Map<EventThread *, Shared<EventThread>> m_threads;
+		ThreadPool *m_threadPool = nullptr;
 		LPFN_ACCEPTEX m_acceptEx = nullptr;
 
-		void addThread(const Shared<EventThread>& thread) override
+		void addThread(const Shared<EventThread> &thread) override
 		{
 			auto handle = thread.get();
 			m_threads.insert(handle, thread);
@@ -134,10 +153,10 @@ namespace core
 		}
 
 	protected:
-		HumanError sendEvent(Unique<Event2> event, EventThread* thread) override
+		HumanError sendEvent(Unique<Event2> event, EventThread *thread) override
 		{
 			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
-			auto overlapped = (LPOVERLAPPED)op.get();
+			auto overlapped = (LPOVERLAPPED) op.get();
 			if (m_ops.tryPush(std::move(op)))
 			{
 				auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, overlapped);
@@ -148,14 +167,15 @@ namespace core
 		}
 
 	public:
-		WinOSThreadPool(ThreadPool* threadPool, HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log* log, Allocator* allocator)
-			: EventThreadPool(allocator),
-			  m_log(log),
-			  m_completionPort(completionPort),
-			  m_ops(allocator),
-			  m_threads(allocator),
-			  m_threadPool(threadPool),
-			  m_acceptEx(acceptEx)
+		WinOSThreadPool(ThreadPool *threadPool, HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log *log,
+						Allocator *allocator)
+				: EventThreadPool(allocator),
+				  m_log(log),
+				  m_completionPort(completionPort),
+				  m_ops(allocator),
+				  m_threads(allocator),
+				  m_threadPool(threadPool),
+				  m_acceptEx(acceptEx)
 		{}
 
 		~WinOSThreadPool() override
@@ -177,7 +197,8 @@ namespace core
 				OVERLAPPED_ENTRY entries[MAX_ENTRIES];
 				ULONG numEntries = 0;
 				{
-					auto res = GetQueuedCompletionStatusEx(m_completionPort, entries, MAX_ENTRIES, &numEntries, INFINITE, false);
+					auto res = GetQueuedCompletionStatusEx(m_completionPort, entries, MAX_ENTRIES, &numEntries,
+														   INFINITE, false);
 					if (res == FALSE)
 					{
 						auto error = GetLastError();
@@ -188,9 +209,14 @@ namespace core
 				for (size_t i = 0; i < numEntries; ++i)
 				{
 					auto overlapped = entries[i].lpOverlapped;
+					auto overlappedOp = (Op*)overlapped;
 
 					auto op = m_ops.pop(overlapped);
 					assert(op != nullptr);
+
+					DWORD bytesTransferred = 0;
+					if (op->handle != INVALID_HANDLE_VALUE)
+						GetOverlappedResult(op->handle, overlapped, &bytesTransferred, FALSE);
 
 					switch (op->kind)
 					{
@@ -206,9 +232,10 @@ namespace core
 						if (m_threadPool)
 						{
 							auto thread = sendEventOp->thread->sharedFromThis();
-							auto func = Func<void()>{[event = std::move(sendEventOp->event), thread]{
-								thread->handle(event.get());
-							}};
+							auto func = Func<void()>{[event = std::move(sendEventOp->event), thread]
+													 {
+														 thread->handle(event.get());
+													 }};
 							thread->executionQueue()->push(m_threadPool, std::move(func));
 						}
 						else
@@ -223,9 +250,10 @@ namespace core
 						auto thread = acceptOp->thread.lock();
 						if (m_threadPool)
 						{
-							auto event = unique_from<AcceptEvent2>(m_allocator, std::move(acceptOp->socket));
-							auto func = Func<void()>{[event = std::move(event), thread]{
-								thread->handle(event.get());
+							auto func = Func<void()>{[acceptOp = std::move(acceptOp), thread]
+							{
+								AcceptEvent2 event{std::move(acceptOp->socket)};
+								thread->handle(&event);
 							}};
 							thread->executionQueue()->push(m_threadPool, std::move(func));
 						}
@@ -236,10 +264,30 @@ namespace core
 						}
 						break;
 					}
+					case Op::KIND_READ:
+					{
+						auto readOp = unique_static_cast<ReadOp>(std::move(op));
+						auto thread = readOp->thread.lock();
+						if (m_threadPool)
+						{
+							auto func = Func<void()>{m_allocator, [readOp = std::move(readOp), thread, bytesTransferred]
+							{
+								ReadEvent2 event{Span<std::byte>{readOp->buffer, bytesTransferred}};
+								thread->handle(&event);
+							}};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							ReadEvent2 event{Span<std::byte>{readOp->buffer, bytesTransferred}};
+							thread->handle(&event);
+						}
+						break;
+					}
 					default:
 					{
 						assert(false);
-						return errf(m_allocator, "unknown internal op kind, {}"_sv, (int)op->kind);
+						return errf(m_allocator, "unknown internal op kind, {}"_sv, (int) op->kind);
 					}
 					}
 				}
@@ -249,7 +297,7 @@ namespace core
 		void stop() override
 		{
 			auto op = unique_from<CloseOp>(m_allocator);
-			auto overlapped = (LPOVERLAPPED)op.get();
+			auto overlapped = (LPOVERLAPPED) op.get();
 			if (m_ops.tryPush(std::move(op)))
 			{
 				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, overlapped);
@@ -258,32 +306,61 @@ namespace core
 			m_ops.close();
 		}
 
-		HumanError registerSocket(const Unique<Socket>& socket) override
+		HumanError registerSocket(const Unique<Socket> &socket) override
 		{
-			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
+			auto newPort = CreateIoCompletionPort((HANDLE) socket->fd(), m_completionPort, NULL, 0);
 			if (newPort != m_completionPort)
 				return errf(m_allocator, "failed to register socket to IOCP instance"_sv);
 			return {};
 		}
 
-		HumanError accept(const Unique<Socket>& socket, const Shared<EventThread>& thread) override
+		HumanError accept(const Unique<Socket> &socket, const Shared<EventThread> &thread) override
 		{
 			// TODO: get the family and type from the accepting socket
 			auto acceptedSocket = Socket::open(m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 			auto acceptedSocketHandle = acceptedSocket->fd();
-			auto op = unique_from<AcceptOp>(m_allocator, std::move(acceptedSocket), thread);
+			auto op = unique_from<AcceptOp>(m_allocator, std::move(acceptedSocket), thread, (HANDLE)socket->fd());
+			auto overlapped = (OVERLAPPED *)op.get();
+			auto buffer = (PVOID)op->buffer;
 
 			if (m_ops.tryPush(std::move(op)))
 			{
 				auto res = m_acceptEx(
-					(SOCKET) socket->fd(), // listen socket
-					(SOCKET) acceptedSocketHandle, // accept socket
-					op->buffer, // pointer to a buffer that receives the first block of data sent on new connection
-					0, // number of bytes for receive data (it doesn't include server and client address)
-					sizeof(SOCKADDR_IN) + 16, // local address length
-					sizeof(SOCKADDR_IN) + 16, // remote address length
-					NULL, // bytes received in case of sync completion
-					(OVERLAPPED *) op.get() // overlapped structure
+						(SOCKET) socket->fd(), // listen socket
+						(SOCKET) acceptedSocketHandle, // accept socket
+						buffer, // pointer to a buffer that receives the first block of data sent on new connection
+						0, // number of bytes for receive data (it doesn't include server and client address)
+						sizeof(SOCKADDR_IN) + 16, // local address length
+						sizeof(SOCKADDR_IN) + 16, // remote address length
+						NULL, // bytes received in case of sync completion
+						overlapped // overlapped structure
+				);
+				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
+				{
+					auto error = WSAGetLastError();
+					return errf(m_allocator, "failed to schedule accept operation: ErrorCode({})"_sv, error);
+				}
+			}
+			return {};
+		}
+
+		HumanError read(const Unique<Socket> &socket, const Shared<EventThread> &thread) override
+		{
+			auto op = unique_from<ReadOp>(m_allocator, thread, (HANDLE)socket->fd());
+			auto wsaBuf = &op->wsaBuf;
+			auto flags = &op->flags;
+			auto overlapped = (OVERLAPPED *)op.get();
+
+			if (m_ops.tryPush(std::move(op)))
+			{
+				auto res = WSARecv(
+					(SOCKET)socket->fd(),
+					wsaBuf,
+					1,
+					NULL,
+					flags,
+					overlapped,
+					NULL
 				);
 				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
 				{

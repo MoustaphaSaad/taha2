@@ -30,6 +30,17 @@ namespace core
 		Unique<Socket> releaseSocket() { return std::move(m_socket); }
 	};
 
+	class ReadEvent2: public Event2
+	{
+		Span<std::byte> m_bytes;
+	public:
+		explicit ReadEvent2(Span<std::byte> bytes)
+			: m_bytes(bytes)
+		{}
+
+		Span<std::byte> bytes() const { return m_bytes; }
+	};
+
 	class EventThreadPool;
 
 	class EventThread: public SharedFromThis<EventThread>
@@ -68,6 +79,7 @@ namespace core
 		virtual void stop() = 0;
 		virtual HumanError registerSocket(const Unique<Socket>& socket) = 0;
 		virtual HumanError accept(const Unique<Socket>& socket, const Shared<EventThread>& thread) = 0;
+		virtual HumanError read(const Unique<Socket>& socket, const Shared<EventThread>& thread) = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)
