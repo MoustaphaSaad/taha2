@@ -4,6 +4,8 @@
 #include <core/EventThread.h>
 #include <core/ThreadPool.h>
 
+#include <tracy/Tracy.hpp>
+
 #include <signal.h>
 
 core::EventThreadPool* POOL;
@@ -16,78 +18,60 @@ void signalHandler(int signal)
 	}
 }
 
-class PingEvent: public core::Event2
+class EchoThread: public core::EventThread
 {
+	core::Unique<core::Socket> m_socket;
 public:
-	core::Shared<core::EventThread> pingThread = nullptr;
-
-	explicit PingEvent(const core::Shared<core::EventThread>& thread)
-		: pingThread(thread)
-	{}
-};
-
-class PongEvent: public core::Event2
-{
-public:
-	core::Shared<core::EventThread> pongThread = nullptr;
-
-	explicit PongEvent(const core::Shared<core::EventThread>& thread)
-		: pongThread(thread)
-	{}
-};
-
-class PongThread: public core::EventThread
-{
-	core::Allocator* m_allocator = nullptr;
-	core::Log* m_log = nullptr;
-public:
-	explicit PongThread(core::EventThreadPool* eventThreadPool, core::Log* log, core::Allocator* allocator)
+	EchoThread(core::EventThreadPool* eventThreadPool, core::Unique<core::Socket> socket)
 		: core::EventThread(eventThreadPool),
-		  m_allocator(allocator),
-		  m_log(log)
+		  m_socket(std::move(socket))
 	{}
 
 	void handle(core::Event2* event) override
 	{
-		if (auto pingEvent = dynamic_cast<PingEvent*>(event))
+		auto eventLoop = eventThreadPool();
+
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
 		{
-			m_log->info("ping received"_sv);
-			(void)pingEvent->pingThread->sendEvent(core::unique_from<PongEvent>(m_allocator, sharedFromThis()));
+			ZoneScopedN("EchoThread::StartEvent");
+			(void)eventLoop->read(m_socket, sharedFromThis());
 		}
-		else
+		else if (auto readEvent = dynamic_cast<core::ReadEvent2*>(event))
 		{
-			m_log->info("unknown event"_sv);
+			ZoneScopedN("EchoThread::ReadEvent");
+			(void)eventLoop->write(m_socket, sharedFromThis(), readEvent->bytes());
+			(void)eventLoop->read(m_socket, sharedFromThis());
 		}
 	}
 };
 
-class PingThread: public core::EventThread
+
+class AcceptThread: public core::EventThread
 {
-	core::Allocator* m_allocator = nullptr;
-	core::Log* m_log = nullptr;
+	core::Unique<core::Socket> m_socket;
 public:
-	explicit PingThread(core::EventThreadPool* eventThreadPool, core::Log* log, core::Allocator* allocator)
+	AcceptThread(core::EventThreadPool* eventThreadPool, core::Unique<core::Socket> socket)
 		: core::EventThread(eventThreadPool),
-		  m_allocator(allocator),
-		  m_log(log)
+		  m_socket(std::move(socket))
 	{}
 
 	void handle(core::Event2* event) override
 	{
-		if (auto pongEvent = dynamic_cast<PongEvent*>(event))
-		{
-			m_log->info("pong received"_sv);
-			sendPing(pongEvent->pongThread);
-		}
-		else
-		{
-			m_log->info("unknown event"_sv);
-		}
-	}
+		auto eventLoop = eventThreadPool();
 
-	void sendPing(const core::Shared<core::EventThread>& thread)
-	{
-		(void)thread->sendEvent(core::unique_from<PingEvent>(m_allocator, sharedFromThis()));
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
+		{
+			ZoneScopedN("AcceptThread::StartEvent");
+			(void)eventLoop->accept(m_socket, sharedFromThis());
+		}
+		else if (auto acceptEvent = dynamic_cast<core::AcceptEvent2*>(event))
+		{
+			ZoneScopedN("AcceptThread::AcceptEvent");
+			auto conn = acceptEvent->releaseSocket();
+			(void)eventLoop->registerSocket(conn);
+			eventLoop->startThread<EchoThread>(eventLoop, std::move(conn));
+			(void)eventLoop->accept(m_socket, sharedFromThis());
+		}
 	}
 };
 
@@ -97,7 +81,7 @@ int main()
 
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
-	core::ThreadPool threadPool{&allocator, 3};
+	core::ThreadPool threadPool{&allocator};
 
 	auto poolRes = core::EventThreadPool::create(&threadPool, &log, &allocator);
 	if (poolRes.isError())
@@ -108,12 +92,19 @@ int main()
 	auto pool = poolRes.releaseValue();
 	POOL = pool.get();
 
-	auto pingThread = pool->startThread<PingThread>(pool.get(), &log, &allocator);
-	auto pongThread = pool->startThread<PongThread>(pool.get(), &log, &allocator);
+	auto acceptSocket = core::Socket::open(&allocator, core::Socket::FAMILY_IPV4, core::Socket::TYPE_TCP);
+	acceptSocket->bind("localhost"_sv, "8080"_sv);
+	acceptSocket->listen();
+	auto err = pool->registerSocket(acceptSocket);
+	if (err)
+	{
+		log.critical("failed to register accept socket, {}"_sv, err);
+		return EXIT_FAILURE;
+	}
 
-	pingThread->sendPing(pongThread);
+	auto acceptThread = pool->startThread<AcceptThread>(pool.get(), std::move(acceptSocket));
 
-	auto err = pool->run();
+	err = pool->run();
 	if (err)
 	{
 		log.critical("send thread pool error, {}"_sv, err);

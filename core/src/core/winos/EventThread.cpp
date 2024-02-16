@@ -7,6 +7,8 @@
 #include <WS2tcpip.h>
 #include <Mswsock.h>
 
+#include <tracy/Tracy.hpp>
+
 namespace core
 {
 	class WinOSThreadPool: public EventThreadPool
@@ -26,7 +28,9 @@ namespace core
 			explicit Op(KIND kind_, HANDLE handle_)
 				: kind(kind_),
 				  handle(handle_)
-			{}
+			{
+				::memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
+			}
 
 			virtual ~Op() = default;
 
@@ -161,6 +165,7 @@ namespace core
 
 		void addThread(const Shared<EventThread> &thread) override
 		{
+			ZoneScoped;
 			auto handle = thread.get();
 			m_threads.insert(handle, thread);
 
@@ -169,9 +174,141 @@ namespace core
 			assert(!err);
 		}
 
+		HumanError driveEventLoop()
+		{
+			while (true)
+			{
+				constexpr int MAX_ENTRIES = 128;
+				OVERLAPPED_ENTRY entries[MAX_ENTRIES];
+				ULONG numEntries = 0;
+				{
+					ZoneScopedN("EventThreadPool::GetQueuedCompletionStatusEx");
+					auto res = GetQueuedCompletionStatusEx(m_completionPort, entries, MAX_ENTRIES, &numEntries,
+														   INFINITE, false);
+					if (res == FALSE)
+					{
+						auto error = GetLastError();
+						return errf(m_allocator, "Failed to get queued completion status: ErrorCode({})"_sv, error);
+					}
+				}
+
+				for (size_t i = 0; i < numEntries; ++i)
+				{
+					auto overlapped = entries[i].lpOverlapped;
+					auto overlappedOp = (Op*)overlapped;
+
+					auto op = m_ops.pop(overlapped);
+					assert(op != nullptr);
+
+					DWORD bytesTransferred = 0;
+					if (op->handle != INVALID_HANDLE_VALUE)
+						GetOverlappedResult(op->handle, overlapped, &bytesTransferred, FALSE);
+
+					switch (op->kind)
+					{
+					case Op::KIND_CLOSE:
+					{
+						ZoneScopedN("EventThreadPool::Close");
+						m_ops.clear();
+						m_threads.clear();
+						return {};
+					}
+					case Op::KIND_SEND_EVENT:
+					{
+						ZoneScopedN("EventThreadPool::SendEvent");
+						auto sendEventOp = unique_static_cast<SendEventOp>(std::move(op));
+						if (m_threadPool)
+						{
+							auto thread = sendEventOp->thread->sharedFromThis();
+							auto func = Func<void()>{[event = std::move(sendEventOp->event), thread]
+													 {
+														 thread->handle(event.get());
+													 }};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							sendEventOp->thread->handle(sendEventOp->event.get());
+						}
+						break;
+					}
+					case Op::KIND_ACCEPT:
+					{
+						ZoneScopedN("EventThreadPool::Accept");
+						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
+						auto thread = acceptOp->thread.lock();
+						if (m_threadPool)
+						{
+							auto func = Func<void()>{[acceptOp = std::move(acceptOp), thread]
+							{
+								AcceptEvent2 event{std::move(acceptOp->socket)};
+								thread->handle(&event);
+							}};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							AcceptEvent2 event{std::move(acceptOp->socket)};
+							thread->handle(&event);
+						}
+						break;
+					}
+					case Op::KIND_READ:
+					{
+						ZoneScopedN("EventThreadPool::Read");
+						auto readOp = unique_static_cast<ReadOp>(std::move(op));
+						auto thread = readOp->thread.lock();
+						if (m_threadPool)
+						{
+							auto func = Func<void()>{m_allocator, [readOp = std::move(readOp), thread, bytesTransferred]
+							{
+								ReadEvent2 event{Span<const std::byte>{readOp->buffer, bytesTransferred}};
+								thread->handle(&event);
+							}};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							ReadEvent2 event{Span<const std::byte>{readOp->buffer, bytesTransferred}};
+							thread->handle(&event);
+						}
+						break;
+					}
+					case Op::KIND_WRITE:
+					{
+						ZoneScopedN("EventThreadPool::Write");
+						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+						auto thread = writeOp->thread.lock();
+						if (m_threadPool)
+						{
+							auto func = Func<void()>{m_allocator, [readOp = std::move(writeOp), thread, bytesTransferred]
+							{
+								WriteEvent2 event{bytesTransferred};
+								thread->handle(&event);
+							}};
+							thread->executionQueue()->push(m_threadPool, std::move(func));
+						}
+						else
+						{
+							WriteEvent2 event{bytesTransferred};
+							thread->handle(&event);
+						}
+						break;
+					}
+					default:
+					{
+						assert(false);
+						return errf(m_allocator, "unknown internal op kind, {}"_sv, (int) op->kind);
+					}
+					}
+				}
+			}
+		}
+
 	protected:
 		HumanError sendEvent(Unique<Event2> event, EventThread *thread) override
 		{
+			ZoneScoped;
 			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
 			auto overlapped = (LPOVERLAPPED) op.get();
 			if (m_ops.tryPush(std::move(op)))
@@ -208,143 +345,30 @@ namespace core
 		{
 			m_ops.open();
 
-			while (true)
-			{
-				constexpr int MAX_ENTRIES = 128;
-				OVERLAPPED_ENTRY entries[MAX_ENTRIES];
-				ULONG numEntries = 0;
-				{
-					auto res = GetQueuedCompletionStatusEx(m_completionPort, entries, MAX_ENTRIES, &numEntries,
-														   INFINITE, false);
-					if (res == FALSE)
-					{
-						auto error = GetLastError();
-						return errf(m_allocator, "Failed to get queued completion status: ErrorCode({})"_sv, error);
-					}
-				}
-
-				for (size_t i = 0; i < numEntries; ++i)
-				{
-					auto overlapped = entries[i].lpOverlapped;
-					auto overlappedOp = (Op*)overlapped;
-
-					auto op = m_ops.pop(overlapped);
-					assert(op != nullptr);
-
-					DWORD bytesTransferred = 0;
-					if (op->handle != INVALID_HANDLE_VALUE)
-						GetOverlappedResult(op->handle, overlapped, &bytesTransferred, FALSE);
-
-					switch (op->kind)
-					{
-					case Op::KIND_CLOSE:
-					{
-						m_ops.clear();
-						m_threads.clear();
-						return {};
-					}
-					case Op::KIND_SEND_EVENT:
-					{
-						auto sendEventOp = unique_static_cast<SendEventOp>(std::move(op));
-						if (m_threadPool)
-						{
-							auto thread = sendEventOp->thread->sharedFromThis();
-							auto func = Func<void()>{[event = std::move(sendEventOp->event), thread]
-													 {
-														 thread->handle(event.get());
-													 }};
-							thread->executionQueue()->push(m_threadPool, std::move(func));
-						}
-						else
-						{
-							sendEventOp->thread->handle(sendEventOp->event.get());
-						}
-						break;
-					}
-					case Op::KIND_ACCEPT:
-					{
-						auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
-						auto thread = acceptOp->thread.lock();
-						if (m_threadPool)
-						{
-							auto func = Func<void()>{[acceptOp = std::move(acceptOp), thread]
-							{
-								AcceptEvent2 event{std::move(acceptOp->socket)};
-								thread->handle(&event);
-							}};
-							thread->executionQueue()->push(m_threadPool, std::move(func));
-						}
-						else
-						{
-							AcceptEvent2 event{std::move(acceptOp->socket)};
-							thread->handle(&event);
-						}
-						break;
-					}
-					case Op::KIND_READ:
-					{
-						auto readOp = unique_static_cast<ReadOp>(std::move(op));
-						auto thread = readOp->thread.lock();
-						if (m_threadPool)
-						{
-							auto func = Func<void()>{m_allocator, [readOp = std::move(readOp), thread, bytesTransferred]
-							{
-								ReadEvent2 event{Span<std::byte>{readOp->buffer, bytesTransferred}};
-								thread->handle(&event);
-							}};
-							thread->executionQueue()->push(m_threadPool, std::move(func));
-						}
-						else
-						{
-							ReadEvent2 event{Span<std::byte>{readOp->buffer, bytesTransferred}};
-							thread->handle(&event);
-						}
-						break;
-					}
-					case Op::KIND_WRITE:
-					{
-						auto writeOp = unique_static_cast<WriteOp>(std::move(op));
-						auto thread = writeOp->thread.lock();
-						if (m_threadPool)
-						{
-							auto func = Func<void()>{m_allocator, [readOp = std::move(writeOp), thread, bytesTransferred]
-							{
-								WriteEvent2 event{bytesTransferred};
-								thread->handle(&event);
-							}};
-							thread->executionQueue()->push(m_threadPool, std::move(func));
-						}
-						else
-						{
-							WriteEvent2 event{bytesTransferred};
-							thread->handle(&event);
-						}
-						break;
-					}
-					default:
-					{
-						assert(false);
-						return errf(m_allocator, "unknown internal op kind, {}"_sv, (int) op->kind);
-					}
-					}
-				}
-			}
+			// m_threadPool->run([this]{(void)driveEventLoop();});
+			// m_threadPool->run([this]{(void)driveEventLoop();});
+			return driveEventLoop();
 		}
 
 		void stop() override
 		{
-			auto op = unique_from<CloseOp>(m_allocator);
-			auto overlapped = (LPOVERLAPPED) op.get();
-			if (m_ops.tryPush(std::move(op)))
+			ZoneScoped;
+			for (int i = 0; i < 1; ++i)
 			{
-				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, overlapped);
-				assert(SUCCEEDED(res));
+				auto op = unique_from<CloseOp>(m_allocator);
+				auto overlapped = (LPOVERLAPPED) op.get();
+				if (m_ops.tryPush(std::move(op)))
+				{
+					[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, overlapped);
+					assert(SUCCEEDED(res));
+				}
 			}
 			m_ops.close();
 		}
 
 		HumanError registerSocket(const Unique<Socket> &socket) override
 		{
+			ZoneScoped;
 			auto newPort = CreateIoCompletionPort((HANDLE) socket->fd(), m_completionPort, NULL, 0);
 			if (newPort != m_completionPort)
 				return errf(m_allocator, "failed to register socket to IOCP instance"_sv);
@@ -353,6 +377,7 @@ namespace core
 
 		HumanError accept(const Unique<Socket> &socket, const Shared<EventThread> &thread) override
 		{
+			ZoneScoped;
 			// TODO: get the family and type from the accepting socket
 			auto acceptedSocket = Socket::open(m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 			auto acceptedSocketHandle = acceptedSocket->fd();
@@ -383,6 +408,7 @@ namespace core
 
 		HumanError read(const Unique<Socket> &socket, const Shared<EventThread> &thread) override
 		{
+			ZoneScoped;
 			auto op = unique_from<ReadOp>(m_allocator, thread, (HANDLE)socket->fd());
 			auto wsaBuf = &op->wsaBuf;
 			auto flags = &op->flags;
@@ -410,6 +436,7 @@ namespace core
 
 		HumanError write(const Unique<Socket>& socket, const Shared<EventThread>& thread, Span<const std::byte> bytes) override
 		{
+			ZoneScoped;
 			Buffer buffer{m_allocator};
 			buffer.push(bytes);
 			auto op = unique_from<WriteOp>(m_allocator, thread, std::move(buffer), (HANDLE)socket->fd());

@@ -32,13 +32,13 @@ namespace core
 
 	class ReadEvent2: public Event2
 	{
-		Span<std::byte> m_bytes;
+		Span<const std::byte> m_bytes;
 	public:
-		explicit ReadEvent2(Span<std::byte> bytes)
+		explicit ReadEvent2(Span<const std::byte> bytes)
 			: m_bytes(bytes)
 		{}
 
-		Span<std::byte> bytes() const { return m_bytes; }
+		Span<const std::byte> bytes() const { return m_bytes; }
 	};
 
 	class WriteEvent2: public Event2
