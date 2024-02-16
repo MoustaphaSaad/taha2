@@ -47,14 +47,14 @@ namespace core
 
 		struct SendEventOp : Op
 		{
-			SendEventOp(Unique<Event2> event_, EventThread *thread_)
+			SendEventOp(Unique<Event2> event_, const Shared<EventThread>& thread_)
 				: Op(KIND_SEND_EVENT, INVALID_HANDLE_VALUE),
 				  event(std::move(event_)),
 				  thread(thread_)
 			{}
 
 			Unique<Event2> event;
-			EventThread *thread = nullptr;
+			Weak<EventThread> thread;
 		};
 
 		struct AcceptOp : Op
@@ -161,7 +161,10 @@ namespace core
 		OpSet m_ops;
 		Map<EventThread *, Shared<EventThread>> m_threads;
 		ThreadPool *m_threadPool = nullptr;
+		Array<Thread> m_driverThreads;
 		LPFN_ACCEPTEX m_acceptEx = nullptr;
+		size_t m_driverThreadsCount = 1;
+		std::atomic<int> m_runningDriverThreads = 0;
 
 		void addThread(const Shared<EventThread> &thread) override
 		{
@@ -170,12 +173,13 @@ namespace core
 			m_threads.insert(handle, thread);
 
 			auto startEvent = unique_from<StartEvent>(m_allocator);
-			[[maybe_unused]] auto err = sendEvent(std::move(startEvent), handle);
+			[[maybe_unused]] auto err = sendEvent(std::move(startEvent), thread);
 			assert(!err);
 		}
 
 		HumanError driveEventLoop()
 		{
+			m_runningDriverThreads.fetch_add(1);
 			while (true)
 			{
 				constexpr int MAX_ENTRIES = 128;
@@ -183,7 +187,10 @@ namespace core
 				ULONG numEntries = 0;
 				{
 					ZoneScopedN("EventThreadPool::GetQueuedCompletionStatusEx");
-					auto res = GetQueuedCompletionStatusEx(m_completionPort, entries, MAX_ENTRIES, &numEntries,
+					auto entriesSize = MAX_ENTRIES;
+					if (m_driverThreadsCount > 1)
+						entriesSize = 1;
+					auto res = GetQueuedCompletionStatusEx(m_completionPort, entries, entriesSize, &numEntries,
 														   INFINITE, false);
 					if (res == FALSE)
 					{
@@ -209,26 +216,29 @@ namespace core
 					case Op::KIND_CLOSE:
 					{
 						ZoneScopedN("EventThreadPool::Close");
-						m_ops.clear();
-						m_threads.clear();
+						if (m_runningDriverThreads.fetch_sub(1) == 1)
+						{
+							m_ops.clear();
+							m_threads.clear();
+						}
 						return {};
 					}
 					case Op::KIND_SEND_EVENT:
 					{
 						ZoneScopedN("EventThreadPool::SendEvent");
 						auto sendEventOp = unique_static_cast<SendEventOp>(std::move(op));
+						auto thread = sendEventOp->thread.lock();
 						if (m_threadPool)
 						{
-							auto thread = sendEventOp->thread->sharedFromThis();
-							auto func = Func<void()>{[event = std::move(sendEventOp->event), thread]
-													 {
-														 thread->handle(event.get());
-													 }};
+							auto func = Func<void()>{m_allocator, [event = std::move(sendEventOp->event), thread]
+							{
+								thread->handle(event.get());
+							}};
 							thread->executionQueue()->push(m_threadPool, std::move(func));
 						}
 						else
 						{
-							sendEventOp->thread->handle(sendEventOp->event.get());
+							thread->handle(sendEventOp->event.get());
 						}
 						break;
 					}
@@ -239,7 +249,7 @@ namespace core
 						auto thread = acceptOp->thread.lock();
 						if (m_threadPool)
 						{
-							auto func = Func<void()>{[acceptOp = std::move(acceptOp), thread]
+							auto func = Func<void()>{m_allocator, [acceptOp = std::move(acceptOp), thread]
 							{
 								AcceptEvent2 event{std::move(acceptOp->socket)};
 								thread->handle(&event);
@@ -306,7 +316,7 @@ namespace core
 		}
 
 	protected:
-		HumanError sendEvent(Unique<Event2> event, EventThread *thread) override
+		HumanError sendEvent(Unique<Event2> event, const Shared<EventThread>& thread) override
 		{
 			ZoneScoped;
 			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
@@ -321,7 +331,7 @@ namespace core
 		}
 
 	public:
-		WinOSThreadPool(ThreadPool *threadPool, HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log *log,
+		WinOSThreadPool(size_t driverThreadsCount, ThreadPool *threadPool, HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log *log,
 						Allocator *allocator)
 				: EventThreadPool(allocator),
 				  m_log(log),
@@ -329,11 +339,16 @@ namespace core
 				  m_ops(allocator),
 				  m_threads(allocator),
 				  m_threadPool(threadPool),
-				  m_acceptEx(acceptEx)
+				  m_driverThreads(allocator),
+				  m_acceptEx(acceptEx),
+				  m_driverThreadsCount(driverThreadsCount)
 		{}
 
 		~WinOSThreadPool() override
 		{
+			for (auto& thread: m_driverThreads)
+				thread.join();
+
 			if (m_completionPort != INVALID_HANDLE_VALUE)
 			{
 				[[maybe_unused]] auto res = CloseHandle(m_completionPort);
@@ -345,15 +360,27 @@ namespace core
 		{
 			m_ops.open();
 
-			// m_threadPool->run([this]{(void)driveEventLoop();});
-			// m_threadPool->run([this]{(void)driveEventLoop();});
-			return driveEventLoop();
+			assert(m_driverThreadsCount < 128);
+			HumanError errors[128];
+			for (size_t i = 1; i < m_driverThreadsCount; ++i)
+			{
+				m_driverThreads.push(Thread{m_allocator, [this, &errors, i]{
+					errors[i] = driveEventLoop();
+				}});
+			}
+			errors[0] = driveEventLoop();
+
+			for (size_t i = 0; i < m_driverThreadsCount; ++i)
+				if (errors[i])
+					return errors[i];
+
+			return {};
 		}
 
 		void stop() override
 		{
 			ZoneScoped;
-			for (int i = 0; i < 1; ++i)
+			for (int i = 0; i < m_driverThreadsCount; ++i)
 			{
 				auto op = unique_from<CloseOp>(m_allocator);
 				auto overlapped = (LPOVERLAPPED) op.get();
@@ -364,6 +391,9 @@ namespace core
 				}
 			}
 			m_ops.close();
+			for (auto& thread: m_driverThreads)
+				thread.join();
+			m_driverThreads.clear();
 		}
 
 		HumanError registerSocket(const Unique<Socket> &socket) override
@@ -491,6 +521,15 @@ namespace core
 		if (res == SOCKET_ERROR)
 			return errf(allocator, "failed to get AcceptEx function pointer, ErrorCode({})"_sv, res);
 
-		return unique_from<WinOSThreadPool>(allocator, threadPool, completionPort, acceptEx, log, allocator);
+		size_t driverThreadsCount = 1;
+		if (threadPool)
+		{
+			// spawn a driver thread per 10 worker thread
+			constexpr auto WORKER_THREAD_PER_DRIVER_THREAD = 10;
+			auto threadsCountRoundedUp = ((threadPool->threadsCount() + WORKER_THREAD_PER_DRIVER_THREAD - 1) / WORKER_THREAD_PER_DRIVER_THREAD) * WORKER_THREAD_PER_DRIVER_THREAD;
+			driverThreadsCount = threadsCountRoundedUp / WORKER_THREAD_PER_DRIVER_THREAD;
+		}
+
+		return unique_from<WinOSThreadPool>(allocator, driverThreadsCount, threadPool, completionPort, acceptEx, log, allocator);
 	}
 }

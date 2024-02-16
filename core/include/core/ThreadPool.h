@@ -56,5 +56,7 @@ namespace core
 		{
 			m_wait_group.wait();
 		}
+
+		size_t threadsCount() const { return m_threads_count; }
 	};
 }

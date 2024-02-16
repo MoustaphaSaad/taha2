@@ -4,6 +4,8 @@
 #include <core/EventThread.h>
 #include <core/ThreadPool.h>
 
+#include <tracy/Tracy.hpp>
+
 #include <signal.h>
 
 core::EventThreadPool* POOL;
@@ -51,8 +53,12 @@ public:
 	{
 		if (auto pingEvent = dynamic_cast<PingEvent*>(event))
 		{
+			ZoneScopedN("PongThread::PingEvent");
 			m_log->info("ping received"_sv);
-			(void)pingEvent->pingThread->sendEvent(core::unique_from<PongEvent>(m_allocator, sharedFromThis()));
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			auto err = pingEvent->pingThread->sendEvent(core::unique_from<PongEvent>(m_allocator, sharedFromThis()));
+			if (err)
+				m_log->critical("{}"_sv, err);
 		}
 		else
 		{
@@ -76,6 +82,7 @@ public:
 	{
 		if (auto pongEvent = dynamic_cast<PongEvent*>(event))
 		{
+			ZoneScopedN("PingThread::PongEvent");
 			m_log->info("pong received"_sv);
 			sendPing(pongEvent->pongThread);
 		}
@@ -87,7 +94,10 @@ public:
 
 	void sendPing(const core::Shared<core::EventThread>& thread)
 	{
-		(void)thread->sendEvent(core::unique_from<PingEvent>(m_allocator, sharedFromThis()));
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		auto err = thread->sendEvent(core::unique_from<PingEvent>(m_allocator, sharedFromThis()));
+		if (err)
+			m_log->critical("{}"_sv, err);
 	}
 };
 

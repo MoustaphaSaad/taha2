@@ -112,6 +112,9 @@ namespace core
 			return *this;
 		}
 
+		Func(const Func&) = delete;
+		Func& operator=(const Func&) = delete;
+
 		~Func() { m_concept->dtor(&m_model); }
 
 		TReturn operator()(TArgs ... args)

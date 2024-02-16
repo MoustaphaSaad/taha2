@@ -75,7 +75,7 @@ namespace core
 	protected:
 		Allocator* m_allocator = nullptr;
 
-		virtual HumanError sendEvent(Unique<Event2> event, EventThread* thread) = 0;
+		virtual HumanError sendEvent(Unique<Event2> event, const Shared<EventThread>& thread) = 0;
 
 	public:
 		CORE_EXPORT static Result<Unique<EventThreadPool>> create(ThreadPool* threadPool, Log* log, Allocator* allocator);
@@ -112,6 +112,6 @@ namespace core
 
 	HumanError EventThread::sendEvent(Unique<core::Event2> event)
 	{
-		return m_eventThreadPool->sendEvent(std::move(event), this);
+		return m_eventThreadPool->sendEvent(std::move(event), sharedFromThis());
 	}
 }
