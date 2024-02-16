@@ -60,7 +60,7 @@ namespace core
 		struct AcceptOp : Op
 		{
 			Unique<Socket> socket;
-			std::byte buffer[2 * sizeof(SOCKADDR_IN) + 16] = {};
+			std::byte buffer[2 * (sizeof(SOCKADDR_IN) + 16)] = {};
 			Weak<EventThread> thread;
 
 			AcceptOp(Unique<Socket> socket_, const Shared<EventThread> &thread_, HANDLE handle_)
@@ -230,10 +230,10 @@ namespace core
 						auto thread = sendEventOp->thread.lock();
 						if (m_threadPool)
 						{
-							auto func = Func<void()>{m_allocator, [event = std::move(sendEventOp->event), thread]
+							auto func = [event = std::move(sendEventOp->event), thread]
 							{
 								thread->handle(event.get());
-							}};
+							};
 							thread->executionQueue()->push(m_threadPool, std::move(func));
 						}
 						else
@@ -249,11 +249,11 @@ namespace core
 						auto thread = acceptOp->thread.lock();
 						if (m_threadPool)
 						{
-							auto func = Func<void()>{m_allocator, [acceptOp = std::move(acceptOp), thread]
+							auto func = [acceptOp = std::move(acceptOp), thread]
 							{
 								AcceptEvent2 event{std::move(acceptOp->socket)};
 								thread->handle(&event);
-							}};
+							};
 							thread->executionQueue()->push(m_threadPool, std::move(func));
 						}
 						else
