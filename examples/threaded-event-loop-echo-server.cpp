@@ -39,6 +39,12 @@ public:
 		else if (auto readEvent = dynamic_cast<core::ReadEvent2*>(event))
 		{
 			ZoneScopedN("EchoThread::ReadEvent");
+			if (readEvent->bytes().count() == 0)
+			{
+				stop();
+				return;
+			}
+
 			(void)eventLoop->write(m_socket, sharedFromThis(), readEvent->bytes());
 			(void)eventLoop->read(m_socket, sharedFromThis());
 		}

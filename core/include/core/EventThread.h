@@ -67,6 +67,7 @@ namespace core
 		EventThreadPool* eventThreadPool() const { return m_eventThreadPool; }
 		ExecutionQueue* executionQueue() const { return m_queue.get(); }
 		HumanError sendEvent(Unique<Event2> event);
+		void stop();
 	};
 
 	class EventThreadPool
@@ -92,6 +93,7 @@ namespace core
 		virtual HumanError accept(const Unique<Socket>& socket, const Shared<EventThread>& thread) = 0;
 		virtual HumanError read(const Unique<Socket>& socket, const Shared<EventThread>& thread) = 0;
 		virtual HumanError write(const Unique<Socket>& socket, const Shared<EventThread>& thread, Span<const std::byte> buffer) = 0;
+		virtual void stopThread(const Shared<EventThread>& thread) = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)
@@ -113,5 +115,10 @@ namespace core
 	HumanError EventThread::sendEvent(Unique<core::Event2> event)
 	{
 		return m_eventThreadPool->sendEvent(std::move(event), sharedFromThis());
+	}
+
+	void EventThread::stop()
+	{
+		return m_eventThreadPool->stopThread(sharedFromThis());
 	}
 }

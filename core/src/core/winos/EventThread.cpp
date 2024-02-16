@@ -23,6 +23,7 @@ namespace core
 				KIND_ACCEPT,
 				KIND_READ,
 				KIND_WRITE,
+				KIND_STOP_THREAD,
 			};
 
 			explicit Op(KIND kind_, HANDLE handle_)
@@ -102,6 +103,16 @@ namespace core
 			}
 		};
 
+		struct StopThreadOp : Op
+		{
+			Weak<EventThread> thread;
+
+			explicit StopThreadOp(const Shared<EventThread> &thread_)
+				: Op(KIND_STOP_THREAD, INVALID_HANDLE_VALUE),
+				  thread(thread_)
+			{}
+		};
+
 		class OpSet
 		{
 			Mutex m_mutex;
@@ -156,10 +167,40 @@ namespace core
 			}
 		};
 
+		class ThreadSet
+		{
+			Mutex m_mutex;
+			Map<EventThread *, Shared<EventThread>> m_threads;
+		public:
+			explicit ThreadSet(Allocator* allocator)
+				: m_mutex(allocator),
+				  m_threads(allocator)
+			{}
+
+			void push(const Shared<EventThread>& thread)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto handle = thread.get();
+				m_threads.insert(handle, thread);
+			}
+
+			void pop(EventThread* handle)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_threads.remove(handle);
+			}
+
+			void clear()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_threads.clear();
+			}
+		};
+
 		Log *m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		OpSet m_ops;
-		Map<EventThread *, Shared<EventThread>> m_threads;
+		ThreadSet m_threads;
 		ThreadPool *m_threadPool = nullptr;
 		Array<Thread> m_driverThreads;
 		LPFN_ACCEPTEX m_acceptEx = nullptr;
@@ -169,8 +210,7 @@ namespace core
 		void addThread(const Shared<EventThread> &thread) override
 		{
 			ZoneScoped;
-			auto handle = thread.get();
-			m_threads.insert(handle, thread);
+			m_threads.push(thread);
 
 			auto startEvent = unique_from<StartEvent>(m_allocator);
 			[[maybe_unused]] auto err = sendEvent(std::move(startEvent), thread);
@@ -230,10 +270,10 @@ namespace core
 						auto thread = sendEventOp->thread.lock();
 						if (m_threadPool)
 						{
-							auto func = [event = std::move(sendEventOp->event), thread]
+							auto func = Func<void()>{m_allocator, [event = std::move(sendEventOp->event), thread]
 							{
 								thread->handle(event.get());
-							};
+							}};
 							thread->executionQueue()->push(m_threadPool, std::move(func));
 						}
 						else
@@ -249,11 +289,11 @@ namespace core
 						auto thread = acceptOp->thread.lock();
 						if (m_threadPool)
 						{
-							auto func = [acceptOp = std::move(acceptOp), thread]
+							auto func = Func<void()>{m_allocator, [acceptOp = std::move(acceptOp), thread]
 							{
 								AcceptEvent2 event{std::move(acceptOp->socket)};
 								thread->handle(&event);
-							};
+							}};
 							thread->executionQueue()->push(m_threadPool, std::move(func));
 						}
 						else
@@ -303,6 +343,14 @@ namespace core
 							WriteEvent2 event{bytesTransferred};
 							thread->handle(&event);
 						}
+						break;
+					}
+					case Op::KIND_STOP_THREAD:
+					{
+						ZoneScopedN("EventThreadPool::StopThread");
+						auto stopThreadOp = unique_static_cast<StopThreadOp>(std::move(op));
+						if (auto thread = stopThreadOp->thread.lock())
+							m_threads.pop(thread.get());
 						break;
 					}
 					default:
@@ -491,6 +539,19 @@ namespace core
 				}
 			}
 			return {};
+		}
+
+		void stopThread(const Shared<EventThread>& thread) override
+		{
+			ZoneScoped;
+			auto op = unique_from<StopThreadOp>(m_allocator, thread);
+			auto overlapped = (OVERLAPPED *)op.get();
+
+			if (m_ops.tryPush(std::move(op)))
+			{
+				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, overlapped);
+				assert(SUCCEEDED(res));
+			}
 		}
 	};
 
