@@ -1,6 +1,9 @@
 #include "core/EventThread.h"
 
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
+
+#include <tracy/Tracy.hpp>
 
 namespace core
 {
@@ -8,6 +11,7 @@ namespace core
 	{
 		Log* m_log = nullptr;
 		int m_epoll = -1;
+		int m_closefd = -1;
 		ThreadPool* m_threadPool = nullptr;
 
 		void addThread(const Shared<EventThread>& thread) override
@@ -29,15 +33,76 @@ namespace core
 			  m_threadPool(threadPool)
 		{}
 
+		~LinuxThreadPool() override
+		{
+			if (m_closefd != -1)
+			{
+				[[maybe_unused]] auto res = ::close(m_closefd);
+				assert(res == 0);
+				m_closefd = -1;
+			}
+
+			if (m_epoll == -1)
+			{
+				[[maybe_unused]] auto res = ::close(m_epoll);
+				assert(res == 0);
+				m_epoll = -1;
+			}
+		}
+
 		HumanError run() override
 		{
-			assert(false && "NOT IMPLEMENTED");
+			m_closefd = eventfd(0, 0);
+			if (m_closefd == -1)
+				return errf(m_allocator, "failed to create close event, ErrorCode({})"_sv, errno);
+
+			epoll_event closeEvent{};
+			closeEvent.events = EPOLLIN | EPOLLONESHOT;
+			closeEvent.data.fd = m_closefd;
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_closefd, &closeEvent);
+			if (ok == -1)
+				return errf(m_allocator, "failed to add close event to epoll, ErrorCode({})"_sv, errno);
+
+			constexpr int MAX_EVENTS = 128;
+			epoll_event events[MAX_EVENTS];
+			while (true)
+			{
+				int numEntries = 0;
+				{
+					ZoneScopedN("EventThreadPool::epoll_wait");
+					numEntries = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
+					if (numEntries == -1)
+					{
+						if (errno == EINTR)
+						{
+							// try again, this can be due to signal handling, like debugger
+							continue;
+						}
+						return errf(m_allocator, "epoll_wait failed, ErrorCode({})"_sv, errno);
+					}
+				}
+
+				for (int i = 0; i < numEntries; ++i)
+				{
+					auto event = events[i];
+					if (event.data.fd == m_closefd)
+					{
+						m_log->debug("event loop closed"_sv);
+						[[maybe_unused]] auto res = ::close(m_closefd);
+						assert(res == 0);
+						m_closefd = -1;
+						return {};
+					}
+				}
+			}
 			return {};
 		}
 
 		void stop() override
 		{
-			assert(false && "NOT IMPLEMENTED");
+			int64_t close = 1;
+			[[maybe_unused]] auto res = ::write(m_closefd, &close, sizeof(close));
+			assert(res == sizeof(close));
 		}
 
 		HumanError registerSocket(const Unique<Socket>& socket) override

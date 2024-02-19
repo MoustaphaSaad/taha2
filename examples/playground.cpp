@@ -1,27 +1,48 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
-#include <core/ExecutionQueue.h>
+#include <core/Thread.h>
+#include <core/EventThread.h>
 #include <core/ThreadPool.h>
+
+#include <tracy/Tracy.hpp>
+
+#include <signal.h>
+
+core::EventThreadPool* POOL;
+
+void signalHandler(int signal)
+{
+	if (signal == SIGINT)
+	{
+		POOL->stop();
+	}
+}
 
 int main()
 {
-	core::FastLeak allocator;
+	signal(SIGINT, signalHandler);
+
+	core::FastLeak allocator{};
 	core::Log log{&allocator};
 	core::ThreadPool threadPool{&allocator};
-	auto q = core::ExecutionQueue::create(&allocator);
 
-	for (int i = 0; i < 100; ++i)
+	auto poolRes = core::EventThreadPool::create(&threadPool, &log, &allocator);
+	if (poolRes.isError())
 	{
-		auto a = core::unique_from<int>(&allocator, 34);
-		auto b = core::shared_from<int>(&allocator, *a);
+		log.critical("failed to create event thread pool, {}"_sv, poolRes.releaseError());
+		return EXIT_FAILURE;
+	}
+	auto pool = poolRes.releaseValue();
+	POOL = pool.get();
 
-		q->push(&threadPool, [a = std::move(a), b]{
-			assert(*a == *b);
-		});
+	auto err = pool->run();
+	if (err)
+	{
+		log.critical("send thread pool error, {}"_sv, err);
+		return EXIT_FAILURE;
 	}
 
 	threadPool.flush();
-
-	log.info("Done"_sv);
-	return 0;
+	log.info("success"_sv);
+	return EXIT_SUCCESS;
 }
