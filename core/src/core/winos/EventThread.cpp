@@ -27,10 +27,10 @@ namespace core
 			};
 
 			explicit Op(KIND kind_, HANDLE handle_)
-				: kind(kind_),
-				  handle(handle_)
+					: kind(kind_),
+					  handle(handle_)
 			{
-				::memset((OVERLAPPED*)this, 0, sizeof(OVERLAPPED));
+				::memset((OVERLAPPED *) this, 0, sizeof(OVERLAPPED));
 			}
 
 			virtual ~Op() = default;
@@ -42,16 +42,16 @@ namespace core
 		struct CloseOp : Op
 		{
 			CloseOp()
-				: Op(KIND_CLOSE, INVALID_HANDLE_VALUE)
+					: Op(KIND_CLOSE, INVALID_HANDLE_VALUE)
 			{}
 		};
 
 		struct SendEventOp : Op
 		{
-			SendEventOp(Unique<Event2> event_, const Shared<EventThread>& thread_)
-				: Op(KIND_SEND_EVENT, INVALID_HANDLE_VALUE),
-				  event(std::move(event_)),
-				  thread(thread_)
+			SendEventOp(Unique<Event2> event_, const Shared<EventThread> &thread_)
+					: Op(KIND_SEND_EVENT, INVALID_HANDLE_VALUE),
+					  event(std::move(event_)),
+					  thread(thread_)
 			{}
 
 			Unique<Event2> event;
@@ -65,9 +65,9 @@ namespace core
 			Weak<EventThread> thread;
 
 			AcceptOp(Unique<Socket> socket_, const Shared<EventThread> &thread_, HANDLE handle_)
-				: Op(KIND_ACCEPT, handle_),
-				  socket(std::move(socket_)),
-				  thread(thread_)
+					: Op(KIND_ACCEPT, handle_),
+					  socket(std::move(socket_)),
+					  thread(thread_)
 			{}
 		};
 
@@ -79,11 +79,11 @@ namespace core
 			Weak<EventThread> thread;
 
 			ReadOp(const Shared<EventThread> &thread_, HANDLE handle_)
-				: Op(KIND_READ, handle_),
-				  thread(thread_)
+					: Op(KIND_READ, handle_),
+					  thread(thread_)
 			{
-				wsaBuf.buf = (CHAR*)buffer;
-				wsaBuf.len = (ULONG)sizeof(buffer);
+				wsaBuf.buf = (CHAR *) buffer;
+				wsaBuf.len = (ULONG) sizeof(buffer);
 			}
 		};
 
@@ -93,13 +93,13 @@ namespace core
 			WSABUF wsaBuf{};
 			Weak<EventThread> thread;
 
-			WriteOp(const Shared<EventThread> &thread_, Buffer&& buffer_, HANDLE handle_)
-				: Op(KIND_WRITE, handle_),
-				  buffer(buffer_),
-				  thread(thread_)
+			WriteOp(const Shared<EventThread> &thread_, Buffer &&buffer_, HANDLE handle_)
+					: Op(KIND_WRITE, handle_),
+					  buffer(buffer_),
+					  thread(thread_)
 			{
-				wsaBuf.buf = (CHAR*)buffer.data();
-				wsaBuf.len = (ULONG)buffer.count();
+				wsaBuf.buf = (CHAR *) buffer.data();
+				wsaBuf.len = (ULONG) buffer.count();
 			}
 		};
 
@@ -108,8 +108,8 @@ namespace core
 			Weak<EventThread> thread;
 
 			explicit StopThreadOp(const Shared<EventThread> &thread_)
-				: Op(KIND_STOP_THREAD, INVALID_HANDLE_VALUE),
-				  thread(thread_)
+					: Op(KIND_STOP_THREAD, INVALID_HANDLE_VALUE),
+					  thread(thread_)
 			{}
 		};
 
@@ -172,19 +172,19 @@ namespace core
 			Mutex m_mutex;
 			Map<EventThread *, Shared<EventThread>> m_threads;
 		public:
-			explicit ThreadSet(Allocator* allocator)
-				: m_mutex(allocator),
-				  m_threads(allocator)
+			explicit ThreadSet(Allocator *allocator)
+					: m_mutex(allocator),
+					  m_threads(allocator)
 			{}
 
-			void push(const Shared<EventThread>& thread)
+			void push(const Shared<EventThread> &thread)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				auto handle = thread.get();
 				m_threads.insert(handle, thread);
 			}
 
-			void pop(EventThread* handle)
+			void pop(EventThread *handle)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				m_threads.remove(handle);
@@ -194,6 +194,115 @@ namespace core
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				m_threads.clear();
+			}
+		};
+
+		class WinOSEventSocket : public EventSource2
+		{
+			WinOSThreadPool* m_eventThreadPool = nullptr;
+			Unique<Socket> m_socket;
+		public:
+			explicit WinOSEventSocket(Unique<Socket> socket, WinOSThreadPool* eventThreadPool)
+				: m_socket(std::move(socket)),
+				  m_eventThreadPool(eventThreadPool)
+			{}
+
+			HumanError accept(const Shared<EventThread>& thread) override
+			{
+				ZoneScoped;
+				auto& allocator = m_eventThreadPool->m_allocator;
+				auto& ops = m_eventThreadPool->m_ops;
+				auto acceptEx = m_eventThreadPool->m_acceptEx;
+
+				// TODO: get the family and type from the accepting socket
+				auto acceptedSocket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
+				auto acceptedSocketHandle = acceptedSocket->fd();
+				auto op = unique_from<AcceptOp>(allocator, std::move(acceptedSocket), thread, (HANDLE)m_socket->fd());
+				auto overlapped = (OVERLAPPED *)op.get();
+				auto buffer = (PVOID)op->buffer;
+
+				if (ops.tryPush(std::move(op)))
+				{
+					auto res = acceptEx(
+							(SOCKET) m_socket->fd(), // listen socket
+							(SOCKET) acceptedSocketHandle, // accept socket
+							buffer, // pointer to a buffer that receives the first block of data sent on new connection
+							0, // number of bytes for receive data (it doesn't include server and client address)
+							sizeof(SOCKADDR_IN) + 16, // local address length
+							sizeof(SOCKADDR_IN) + 16, // remote address length
+							NULL, // bytes received in case of sync completion
+							overlapped // overlapped structure
+					);
+					if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
+					{
+						auto error = WSAGetLastError();
+						return errf(allocator, "failed to schedule accept operation: ErrorCode({})"_sv, error);
+					}
+				}
+				return {};
+			}
+
+			HumanError read(const Shared<EventThread>& thread) override
+			{
+				ZoneScoped;
+				auto& allocator = m_eventThreadPool->m_allocator;
+				auto& ops = m_eventThreadPool->m_ops;
+
+				auto op = unique_from<ReadOp>(allocator, thread, (HANDLE)m_socket->fd());
+				auto wsaBuf = &op->wsaBuf;
+				auto flags = &op->flags;
+				auto overlapped = (OVERLAPPED *)op.get();
+
+				if (ops.tryPush(std::move(op)))
+				{
+					auto res = WSARecv(
+						(SOCKET)m_socket->fd(),
+						wsaBuf,
+						1,
+						NULL,
+						flags,
+						overlapped,
+						NULL
+					);
+					if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
+					{
+						auto error = WSAGetLastError();
+						return errf(allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
+					}
+				}
+				return {};
+			}
+
+			HumanError write(Span<const std::byte> bytes, const Shared<EventThread>& thread) override
+			{
+				ZoneScoped;
+				auto& allocator = m_eventThreadPool->m_allocator;
+				auto& ops = m_eventThreadPool->m_ops;
+
+				Buffer buffer{allocator};
+				buffer.push(bytes);
+				auto op = unique_from<WriteOp>(allocator, thread, std::move(buffer), (HANDLE)m_socket->fd());
+				auto wsaBuf = &op->wsaBuf;
+				auto overlapped = (OVERLAPPED *)op.get();
+
+				if (ops.tryPush(std::move(op)))
+				{
+					auto res = WSASend(
+						(SOCKET)m_socket->fd(),
+						wsaBuf,
+						1,
+						NULL,
+						0,
+						overlapped,
+						NULL
+					);
+					if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
+					{
+						auto error = WSAGetLastError();
+						return errf(allocator, "failed to schedule write operation: ErrorCode({})"_sv, error);
+					}
+				}
+				return {};
 			}
 		};
 
@@ -444,101 +553,14 @@ namespace core
 			m_driverThreads.clear();
 		}
 
-		HumanError registerSocket(const Unique<Socket> &socket) override
+		Result<EventSocket> registerSocket(Unique<Socket> socket) override
 		{
 			ZoneScoped;
 			auto newPort = CreateIoCompletionPort((HANDLE) socket->fd(), m_completionPort, NULL, 0);
 			if (newPort != m_completionPort)
 				return errf(m_allocator, "failed to register socket to IOCP instance"_sv);
-			return {};
-		}
-
-		HumanError accept(const Unique<Socket> &socket, const Shared<EventThread> &thread) override
-		{
-			ZoneScoped;
-			// TODO: get the family and type from the accepting socket
-			auto acceptedSocket = Socket::open(m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
-			auto acceptedSocketHandle = acceptedSocket->fd();
-			auto op = unique_from<AcceptOp>(m_allocator, std::move(acceptedSocket), thread, (HANDLE)socket->fd());
-			auto overlapped = (OVERLAPPED *)op.get();
-			auto buffer = (PVOID)op->buffer;
-
-			if (m_ops.tryPush(std::move(op)))
-			{
-				auto res = m_acceptEx(
-						(SOCKET) socket->fd(), // listen socket
-						(SOCKET) acceptedSocketHandle, // accept socket
-						buffer, // pointer to a buffer that receives the first block of data sent on new connection
-						0, // number of bytes for receive data (it doesn't include server and client address)
-						sizeof(SOCKADDR_IN) + 16, // local address length
-						sizeof(SOCKADDR_IN) + 16, // remote address length
-						NULL, // bytes received in case of sync completion
-						overlapped // overlapped structure
-				);
-				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
-				{
-					auto error = WSAGetLastError();
-					return errf(m_allocator, "failed to schedule accept operation: ErrorCode({})"_sv, error);
-				}
-			}
-			return {};
-		}
-
-		HumanError read(const Unique<Socket> &socket, const Shared<EventThread> &thread) override
-		{
-			ZoneScoped;
-			auto op = unique_from<ReadOp>(m_allocator, thread, (HANDLE)socket->fd());
-			auto wsaBuf = &op->wsaBuf;
-			auto flags = &op->flags;
-			auto overlapped = (OVERLAPPED *)op.get();
-
-			if (m_ops.tryPush(std::move(op)))
-			{
-				auto res = WSARecv(
-					(SOCKET)socket->fd(),
-					wsaBuf,
-					1,
-					NULL,
-					flags,
-					overlapped,
-					NULL
-				);
-				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
-				{
-					auto error = WSAGetLastError();
-					return errf(m_allocator, "failed to schedule read operation: ErrorCode({})"_sv, error);
-				}
-			}
-			return {};
-		}
-
-		HumanError write(const Unique<Socket>& socket, const Shared<EventThread>& thread, Span<const std::byte> bytes) override
-		{
-			ZoneScoped;
-			Buffer buffer{m_allocator};
-			buffer.push(bytes);
-			auto op = unique_from<WriteOp>(m_allocator, thread, std::move(buffer), (HANDLE)socket->fd());
-			auto wsaBuf = &op->wsaBuf;
-			auto overlapped = (OVERLAPPED *)op.get();
-
-			if (m_ops.tryPush(std::move(op)))
-			{
-				auto res = WSASend(
-					(SOCKET)socket->fd(),
-					wsaBuf,
-					1,
-					NULL,
-					0,
-					overlapped,
-					NULL
-				);
-				if (res == FALSE && WSAGetLastError() != ERROR_IO_PENDING)
-				{
-					auto error = WSAGetLastError();
-					return errf(m_allocator, "failed to schedule write operation: ErrorCode({})"_sv, error);
-				}
-			}
-			return {};
+			auto source = shared_from<WinOSEventSocket>(m_allocator, std::move(socket), this);
+			return EventSocket{source};
 		}
 
 		void stopThread(const Shared<EventThread>& thread) override
