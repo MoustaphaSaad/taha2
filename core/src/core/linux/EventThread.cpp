@@ -155,6 +155,18 @@ namespace core
 			{
 				return errf(m_allocator, "not implemented"_sv);
 			}
+
+			virtual HumanError handlePollIn()
+			{
+				assert(false);
+				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			virtual HumanError handlePollOut()
+			{
+				assert(false);
+				return errf(m_allocator, "not implemented"_sv);
+			}
 		};
 
 		class LinuxCloseEventSource: public LinuxEventSource
@@ -246,6 +258,101 @@ namespace core
 				auto op = unique_from<WriteOp>(allocator, std::move(buffer), thread);
 				pushPollOut(std::move(op));
 				return {};
+			}
+
+			HumanError handlePollIn() override
+			{
+				auto& allocator = m_eventThreadPool->m_allocator;
+				auto& threadPool = m_eventThreadPool->m_threadPool;
+
+				auto op = popPollIn();
+				switch (op->kind)
+				{
+				case Op::KIND_ACCEPT:
+				{
+					ZoneScopedN("accept");
+					auto acceptOp = unique_static_cast<AcceptOp>(std::move(op));
+					auto thread = acceptOp->thread.lock();
+					auto acceptedSocket = m_socket->accept();
+					if (threadPool)
+					{
+						auto func = [acceptedSocket = std::move(acceptedSocket), thread]() mutable {
+							AcceptEvent2 acceptEvent{std::move(acceptedSocket)};
+							thread->handle(&acceptEvent);
+						};
+						thread->executionQueue()->push(threadPool, std::move(func));
+					}
+					else
+					{
+						AcceptEvent2 acceptEvent{std::move(acceptedSocket)};
+						thread->handle(&acceptEvent);
+					}
+					return {};
+				}
+				case Op::KIND_READ:
+				{
+					ZoneScopedN("read");
+					auto readOp = unique_static_cast<ReadOp>(std::move(op));
+					auto thread = readOp->thread.lock();
+					std::byte line[1024];
+					auto readSize = m_socket->read(line, sizeof(line));
+					if (threadPool)
+					{
+						Buffer buffer{allocator};
+						buffer.push(line, readSize);
+						auto func = Func<void()>{allocator, [buffer = std::move(buffer), thread] {
+							ReadEvent2 readEvent{Span<const std::byte>{buffer}};
+							thread->handle(&readEvent);
+						}};
+						thread->executionQueue()->push(threadPool, std::move(func));
+					}
+					else
+					{
+						ReadEvent2 readEvent{Span<const std::byte>{line, readSize}};
+						thread->handle(&readEvent);
+					}
+					return {};
+				}
+				default:
+					assert(false);
+					return errf(allocator, "unknown op"_sv);
+				}
+			}
+
+			virtual HumanError handlePollOut()
+			{
+				auto& allocator = m_eventThreadPool->m_allocator;
+				auto& threadPool = m_eventThreadPool->m_threadPool;
+
+				auto op = popPollOut();
+				switch (op->kind)
+				{
+				case Op::KIND_WRITE:
+				{
+					ZoneScopedN("write");
+					auto writeOp = unique_static_cast<WriteOp>(std::move(op));
+					auto thread = writeOp->thread.lock();
+					auto writtenSize = m_socket->write(writeOp->remainingBytes.data(), writeOp->remainingBytes.count());
+					assert(writtenSize == writeOp->remainingBytes.count());
+					if (threadPool)
+					{
+						auto func = [writtenSize, thread] {
+							WriteEvent2 writeEvent{writtenSize};
+							thread->handle(&writeEvent);
+						};
+						thread->executionQueue()->push(threadPool, std::move(func));
+					}
+					else
+					{
+						WriteEvent2 writeEvent{writtenSize};
+						thread->handle(&writeEvent);
+					}
+					return {};
+				}
+				default:
+					assert(false);
+					return errf(allocator, "unknown op"_sv);
+				}
 			}
 		};
 
@@ -479,6 +586,16 @@ namespace core
 								m_closeEventSource = nullptr;
 								return {};
 							}
+							else
+							{
+								if (auto err = source->handlePollIn())
+									return err;
+							}
+						}
+						else if (event.events | EPOLLOUT)
+						{
+							if (auto err = source->handlePollOut())
+								return err;
 						}
 					}
 					else if (auto op = m_ops.pop((Op*)event.data.ptr))
@@ -525,7 +642,6 @@ namespace core
 
 		Result<EventSocket> registerSocket(Unique<Socket> socket) override
 		{
-			// TODO: add socket to epoll instance
 			auto res = shared_from<LinuxEventSocket>(m_allocator, std::move(socket), this);
 			return EventSocket{res};
 		}
