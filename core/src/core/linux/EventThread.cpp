@@ -17,6 +17,7 @@ namespace core
 				KIND_NONE,
 				KIND_CLOSE,
 				KIND_SEND_EVENT,
+				KIND_ACCEPT,
 			};
 
 			explicit Op(KIND kind_)
@@ -55,6 +56,16 @@ namespace core
 
 			int eventfd = -1;
 			Unique<Event2> event;
+			Weak<EventThread> thread;
+		};
+
+		struct AcceptOp: Op
+		{
+			AcceptOp(const Weak<EventThread>& thread_)
+				: Op(KIND_ACCEPT),
+				  thread(thread_)
+			{}
+
 			Weak<EventThread> thread;
 		};
 
@@ -147,19 +158,32 @@ namespace core
 			}
 		};
 
-		class LinuxEventSocket: public EventSource2
+		class LinuxEventSocket: public LinuxEventSource
 		{
 			LinuxThreadPool* m_eventThreadPool = nullptr;
 			Unique<Socket> m_socket;
 		public:
 			LinuxEventSocket(Unique<Socket> socket, LinuxThreadPool* eventThreadPool)
-				: m_eventThreadPool(eventThreadPool),
+				: LinuxEventSource(eventThreadPool->m_allocator),
+				  m_eventThreadPool(eventThreadPool),
 				  m_socket(std::move(socket))
 			{}
 
 			HumanError accept(const Shared<EventThread>& thread) override
 			{
-				return errf(m_eventThreadPool->m_allocator, "not implemented"_sv);
+				auto& epoll = m_eventThreadPool->m_epoll;
+				auto& allocator = m_eventThreadPool->m_allocator;
+
+				epoll_event sub{};
+				sub.events = EPOLLIN | EPOLLONESHOT;
+				sub.data.ptr = this;
+				auto ok = epoll_ctl(epoll, EPOLL_CTL_ADD, m_socket->fd(), &sub);
+				if (ok == -1)
+					return errf(allocator, "failed to schedule accept call, ErrorCode({})"_sv, errno);
+
+				auto op = unique_from<AcceptOp>(allocator, thread);
+				pushPollIn(std::move(op));
+				return {};
 			}
 
 			HumanError read(const Shared<EventThread>& thread) override
