@@ -148,6 +148,16 @@
 			}
 		},
 		{
+			"name": "ubsan-ninja-debug",
+			"inherits": "ninja-base",
+			"displayName": "Undefined Behavior Sanitizer Ninja Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"UNDEFINED_SANITIZER": "ON"
+			}
+		},
+		{
 			"name": "tsan-ninja-debug",
 			"inherits": "ninja-base",
 			"displayName": "Thread Sanitizer Ninja Debug",

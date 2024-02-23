@@ -31,10 +31,8 @@ namespace core
 
 		void done()
 		{
-			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
-				m_done = true;
-			}
+			auto lock = Lock<Mutex>::lock(m_mutex);
+			m_done = true;
 			m_condition.notify_all();
 		}
 
@@ -62,22 +60,18 @@ namespace core
 
 		bool tryPush(Func<void()>&& func, const Weak<ExecutionQueue>& execQueue)
 		{
-			{
-				auto lock = Lock<Mutex>::try_lock(m_mutex);
-				if (lock.is_locked() == false)
-					return false;
-				m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
-			}
+			auto lock = Lock<Mutex>::try_lock(m_mutex);
+			if (lock.is_locked() == false)
+				return false;
+			m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
 			m_condition.notify_one();
 			return true;
 		}
 
 		void push(Func<void()>&& func, const Weak<ExecutionQueue>& execQueue)
 		{
-			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
-				m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
-			}
+			auto lock = Lock<Mutex>::lock(m_mutex);
+			m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
 			m_condition.notify_one();
 		}
 	};

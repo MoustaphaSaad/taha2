@@ -415,9 +415,9 @@ namespace core
 							auto thread = sendEventOp->thread.lock();
 							if (m_threadPool)
 							{
-								auto func = Func<void()>{m_allocator, [event = std::move(sendEventOp->event), thread]{
+								auto func = [event = std::move(sendEventOp->event), thread]{
 									thread->handle(event.get());
-								}};
+								};
 								thread->executionQueue()->push(m_threadPool, std::move(func));
 							}
 							else
