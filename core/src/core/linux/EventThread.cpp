@@ -16,11 +16,14 @@ namespace core
 			{
 				KIND_NONE,
 				KIND_CLOSE,
+				KIND_SEND_EVENT,
 			};
 
 			explicit Op(KIND kind_)
 				: kind(kind_)
 			{}
+
+			virtual ~Op() = default;
 
 			KIND kind;
 		};
@@ -30,6 +33,29 @@ namespace core
 			CloseOp()
 				: Op(KIND_CLOSE)
 			{}
+		};
+
+		struct SendEventOp: Op
+		{
+			SendEventOp(int eventfd_, Unique<Event2> event_, const Shared<EventThread>& thread_)
+				: Op(KIND_SEND_EVENT),
+				  eventfd(eventfd_),
+				  event(std::move(event_)),
+				  thread(thread_)
+			{}
+
+			~SendEventOp() override
+			{
+				if (eventfd != -1)
+				{
+					[[maybe_unused]] auto res = ::close(eventfd);
+					assert(res == 0);
+				}
+			}
+
+			int eventfd = -1;
+			Unique<Event2> event;
+			Weak<EventThread> thread;
 		};
 
 		class LinuxEventSource: public EventSource2
@@ -180,20 +206,130 @@ namespace core
 			}
 		};
 
+		class ThreadSet
+		{
+			Mutex m_mutex;
+			Map<EventThread*, Shared<EventThread>> m_threads;
+		public:
+			explicit ThreadSet(Allocator* allocator)
+				: m_mutex(allocator),
+				  m_threads(allocator)
+			{}
+
+			void push(const Shared<EventThread>& thread)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto handle = thread.get();
+				m_threads.insert(handle, thread);
+			}
+
+			void pop(EventThread* handle)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_threads.remove(handle);
+			}
+
+			void clear()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_threads.clear();
+			}
+		};
+
+		class OpSet
+		{
+			Mutex m_mutex;
+			Map<Op*, Unique<Op>> m_ops;
+			bool m_open = true;
+		public:
+			explicit OpSet(Allocator *allocator)
+					: m_ops(allocator),
+					  m_mutex(allocator)
+			{}
+
+			bool tryPush(Unique<Op> op)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+
+				if (m_open == false)
+					return false;
+
+				auto handle = (Op*) op.get();
+				m_ops.insert(handle, std::move(op));
+				return true;
+			}
+
+			Unique<Op> pop(Op* op)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+
+				auto it = m_ops.lookup(op);
+				if (it == m_ops.end())
+					return nullptr;
+				auto res = std::move(it->value);
+				m_ops.remove(op);
+				return res;
+			}
+
+			void close()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_open = false;
+			}
+
+			void open()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_open = true;
+			}
+
+			void clear()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_ops.clear();
+			}
+		};
+
 		Log* m_log = nullptr;
 		int m_epoll = -1;
 		Shared<LinuxCloseEventSource> m_closeEventSource;
 		SourceSet m_sources;
+		ThreadSet m_threads;
+		OpSet m_ops;
 		ThreadPool* m_threadPool = nullptr;
 
 		void addThread(const Shared<EventThread>& thread) override
 		{
-			assert(false && "NOT IMPLEMENTED");
+			ZoneScoped;
+			m_threads.push(thread);
+
+			auto startEvent = unique_from<StartEvent>(m_allocator);
+			[[maybe_unused]] auto err = sendEvent(std::move(startEvent), thread);
+			assert(!err);
 		}
+
 	protected:
 		HumanError sendEvent(Unique<Event2> event, const Shared<EventThread>& thread) override
 		{
-			assert(false && "NOT IMPLEMENTED");
+			ZoneScoped;
+			auto fd = eventfd(0, 0);
+			if (fd == -1)
+				return errf(m_allocator, "failed to create eventfd, ErrorCode({})"_sv, errno);
+			auto op = unique_from<SendEventOp>(m_allocator, fd, std::move(event), thread);
+
+			epoll_event closeEvent{};
+			closeEvent.events = EPOLLIN | EPOLLONESHOT;
+			closeEvent.data.ptr = op.get();
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &closeEvent);
+			if (ok == -1)
+				return errf(m_allocator, "failed to add close event to epoll, ErrorCode({})"_sv, errno);
+
+			if (m_ops.tryPush(std::move(op)))
+			{
+				int64_t v = 1;
+				[[maybe_unused]] auto res = ::write(fd, &v, sizeof(v));
+				assert(res == sizeof(v));
+			}
 			return {};
 		}
 
@@ -203,6 +339,8 @@ namespace core
 			  m_log(log),
 			  m_epoll(epoll),
 			  m_sources(allocator),
+			  m_threads(allocator),
+			  m_ops(allocator),
 			  m_threadPool(threadPool)
 		{}
 
@@ -254,19 +392,48 @@ namespace core
 				for (int i = 0; i < numEntries; ++i)
 				{
 					auto event = events[i];
-					auto sourceHandle = (LinuxEventSource*)event.data.ptr;
-					auto source = m_sources.popSource(sourceHandle);
-					assert(source != nullptr);
-
-					if (event.events | EPOLLIN)
+					if (auto source = m_sources.popSource((LinuxEventSource*)event.data.ptr))
 					{
-						// close event
-						if (source.get() == (LinuxEventSource*)m_closeEventSource.get())
+						if (event.events | EPOLLIN)
 						{
-							m_log->debug("event loop closed"_sv);
-							m_closeEventSource = nullptr;
-							return {};
+							// close event
+							if (source.get() == (LinuxEventSource *) m_closeEventSource.get())
+							{
+								m_log->debug("event loop closed"_sv);
+								m_closeEventSource = nullptr;
+								return {};
+							}
 						}
+					}
+					else if (auto op = m_ops.pop((Op*)event.data.ptr))
+					{
+						switch (op->kind)
+						{
+						case Op::KIND_SEND_EVENT:
+						{
+							auto sendEventOp = unique_static_cast<SendEventOp>(std::move(op));
+							auto thread = sendEventOp->thread.lock();
+							if (m_threadPool)
+							{
+								auto func = Func<void()>{m_allocator, [event = std::move(sendEventOp->event), thread]{
+									thread->handle(event.get());
+								}};
+								thread->executionQueue()->push(m_threadPool, std::move(func));
+							}
+							else
+							{
+								thread->handle(sendEventOp->event.get());
+							}
+							break;
+						}
+						default:
+							assert(false);
+							break;
+						}
+					}
+					else
+					{
+						assert(false);
 					}
 				}
 			}
