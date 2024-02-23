@@ -18,6 +18,7 @@ namespace core
 				KIND_CLOSE,
 				KIND_SEND_EVENT,
 				KIND_ACCEPT,
+				KIND_READ,
 			};
 
 			explicit Op(KIND kind_)
@@ -63,6 +64,16 @@ namespace core
 		{
 			AcceptOp(const Weak<EventThread>& thread_)
 				: Op(KIND_ACCEPT),
+				  thread(thread_)
+			{}
+
+			Weak<EventThread> thread;
+		};
+
+		struct ReadOp: Op
+		{
+			ReadOp(const Weak<EventThread>& thread_)
+				: Op(KIND_READ),
 				  thread(thread_)
 			{}
 
@@ -188,7 +199,19 @@ namespace core
 
 			HumanError read(const Shared<EventThread>& thread) override
 			{
-				return errf(m_eventThreadPool->m_allocator, "not implemented"_sv);
+				auto& epoll = m_eventThreadPool->m_epoll;
+				auto& allocator = m_eventThreadPool->m_allocator;
+
+				epoll_event sub{};
+				sub.events = EPOLLIN | EPOLLONESHOT;
+				sub.data.ptr = this;
+				auto ok = epoll_ctl(epoll, EPOLL_CTL_ADD, m_socket->fd(), &sub);
+				if (ok == -1)
+					return errf(allocator, "failed to schedule read call, ErrorCode({})"_sv, errno);
+
+				auto op = unique_from<ReadOp>(allocator, thread);
+				pushPollIn(std::move(op));
+				return {};
 			}
 
 			HumanError write(Span<const std::byte> buffer, const Shared<EventThread>& thread) override
