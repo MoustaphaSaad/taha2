@@ -14,6 +14,32 @@ namespace core
 		int m_closefd = -1;
 		ThreadPool* m_threadPool = nullptr;
 
+		class LinuxEventSocket: public EventSource2
+		{
+			LinuxThreadPool* m_eventThreadPool = nullptr;
+			Unique<Socket> m_socket;
+		public:
+			LinuxEventSocket(Unique<Socket> socket, LinuxThreadPool* eventThreadPool)
+				: m_eventThreadPool(eventThreadPool),
+				  m_socket(std::move(socket))
+			{}
+
+			HumanError accept(const Shared<EventThread>& thread) override
+			{
+				return errf(m_eventThreadPool->m_allocator, "not implemented"_sv);
+			}
+
+			HumanError read(const Shared<EventThread>& thread) override
+			{
+				return errf(m_eventThreadPool->m_allocator, "not implemented"_sv);
+			}
+
+			HumanError write(Span<const std::byte> buffer, const Shared<EventThread>& thread) override
+			{
+				return errf(m_eventThreadPool->m_allocator, "not implemented"_sv);
+			}
+		};
+
 		void addThread(const Shared<EventThread>& thread) override
 		{
 			assert(false && "NOT IMPLEMENTED");
@@ -105,28 +131,11 @@ namespace core
 			assert(res == sizeof(close));
 		}
 
-		HumanError registerSocket(const Unique<Socket>& socket) override
+		Result<EventSocket> registerSocket(Unique<Socket> socket) override
 		{
-			assert(false && "NOT IMPLEMENTED");
-			return {};
-		}
-
-		HumanError accept(const Unique<Socket>& socket, const Shared<EventThread>& thread) override
-		{
-			assert(false && "NOT IMPLEMENTED");
-			return {};
-		}
-
-		HumanError read(const Unique<Socket>& socket, const Shared<EventThread>& thread) override
-		{
-			assert(false && "NOT IMPLEMENTED");
-			return {};
-		}
-
-		HumanError write(const Unique<Socket>& socket, const Shared<EventThread>& thread, Span<const std::byte> buffer) override
-		{
-			assert(false && "NOT IMPLEMENTED");
-			return {};
+			// TODO: add socket to epoll instance
+			auto res = shared_from<LinuxEventSocket>(m_allocator, std::move(socket), this);
+			return EventSocket{res};
 		}
 
 		void stopThread(const Shared<EventThread>& thread) override
