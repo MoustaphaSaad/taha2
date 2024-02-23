@@ -19,6 +19,7 @@ namespace core
 				KIND_SEND_EVENT,
 				KIND_ACCEPT,
 				KIND_READ,
+				KIND_WRITE,
 			};
 
 			explicit Op(KIND kind_)
@@ -78,6 +79,20 @@ namespace core
 			{}
 
 			Weak<EventThread> thread;
+		};
+
+		struct WriteOp: Op
+		{
+			WriteOp(Buffer&& buffer_, const Weak<EventThread>& thread_)
+				: Op(KIND_READ),
+				  thread(thread_),
+				  buffer(std::move(buffer_)),
+				  remainingBytes(buffer)
+			{}
+
+			Weak<EventThread> thread;
+			Buffer buffer;
+			Span<const std::byte> remainingBytes;
 		};
 
 		class LinuxEventSource: public EventSource2
@@ -214,9 +229,23 @@ namespace core
 				return {};
 			}
 
-			HumanError write(Span<const std::byte> buffer, const Shared<EventThread>& thread) override
+			HumanError write(Span<const std::byte> bytes, const Shared<EventThread>& thread) override
 			{
-				return errf(m_eventThreadPool->m_allocator, "not implemented"_sv);
+				auto& epoll = m_eventThreadPool->m_epoll;
+				auto& allocator = m_eventThreadPool->m_allocator;
+
+				epoll_event sub{};
+				sub.events = EPOLLOUT | EPOLLONESHOT;
+				sub.data.ptr = this;
+				auto ok = epoll_ctl(epoll, EPOLL_CTL_ADD, m_socket->fd(), &sub);
+				if (ok == -1)
+					return errf(allocator, "failed to schedule read call, ErrorCode({})"_sv, errno);
+
+				Buffer buffer{allocator};
+				buffer.push(bytes);
+				auto op = unique_from<WriteOp>(allocator, std::move(buffer), thread);
+				pushPollOut(std::move(op));
+				return {};
 			}
 		};
 
