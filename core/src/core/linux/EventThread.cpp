@@ -20,6 +20,7 @@ namespace core
 				KIND_ACCEPT,
 				KIND_READ,
 				KIND_WRITE,
+				KIND_STOP_THREAD,
 			};
 
 			explicit Op(KIND kind_)
@@ -63,7 +64,7 @@ namespace core
 
 		struct AcceptOp: Op
 		{
-			AcceptOp(const Weak<EventThread>& thread_)
+			explicit AcceptOp(const Weak<EventThread>& thread_)
 				: Op(KIND_ACCEPT),
 				  thread(thread_)
 			{}
@@ -73,7 +74,7 @@ namespace core
 
 		struct ReadOp: Op
 		{
-			ReadOp(const Weak<EventThread>& thread_)
+			explicit ReadOp(const Weak<EventThread>& thread_)
 				: Op(KIND_READ),
 				  thread(thread_)
 			{}
@@ -84,7 +85,7 @@ namespace core
 		struct WriteOp: Op
 		{
 			WriteOp(Buffer&& buffer_, const Weak<EventThread>& thread_)
-				: Op(KIND_READ),
+				: Op(KIND_WRITE),
 				  thread(thread_),
 				  buffer(std::move(buffer_)),
 				  remainingBytes(buffer)
@@ -95,11 +96,70 @@ namespace core
 			Span<const std::byte> remainingBytes;
 		};
 
+		struct StopThreadOp: Op
+		{
+			StopThreadOp(int eventfd_, const Weak<EventThread> thread_)
+				: Op(KIND_STOP_THREAD),
+				  eventfd(eventfd_),
+				  thread(thread_)
+			{}
+
+			~StopThreadOp() override
+			{
+				if (eventfd != -1)
+				{
+					[[maybe_unused]] auto res = ::close(eventfd);
+					assert(res == 0);
+				}
+			}
+
+			int eventfd = -1;
+			Weak<EventThread> thread;
+		};
+
+		class OpQueue
+		{
+			Mutex m_mutex;
+			Queue<Unique<Op>> m_ops;
+		public:
+			explicit OpQueue(Allocator* allocator)
+				: m_mutex(allocator),
+				  m_ops(allocator)
+			{}
+
+			void pushOpFront(Unique<Op> op)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				assert(op != nullptr);
+				m_ops.push_front(std::move(op));
+			}
+
+			void pushOp(Unique<Op> op)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				assert(op != nullptr);
+				m_ops.push_back(std::move(op));
+			}
+
+			Unique<Op> popOp()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+
+				if (m_ops.count() > 0)
+				{
+					auto res = std::move(m_ops.front());
+					m_ops.pop_front();
+					return res;
+				}
+				return nullptr;
+			}
+		};
+
 		class LinuxEventSource: public EventSource2
 		{
 			Allocator* m_allocator = nullptr;
-			Queue<Unique<Op>> m_pollInOps;
-			Queue<Unique<Op>> m_pollOutOps;
+			OpQueue m_pollInOps;
+			OpQueue m_pollOutOps;
 		public:
 			explicit LinuxEventSource(Allocator* allocator)
 				: m_allocator(allocator),
@@ -109,36 +169,27 @@ namespace core
 
 			void pushPollIn(Unique<Op> op)
 			{
-				assert(op != nullptr);
-				m_pollInOps.push_back(std::move(op));
+				m_pollInOps.pushOp(std::move(op));
 			}
 
 			Unique<Op> popPollIn()
 			{
-				if (m_pollInOps.count() > 0)
-				{
-					auto res = std::move(m_pollInOps.front());
-					m_pollInOps.pop_front();
-					return res;
-				}
-				return nullptr;
+				return m_pollInOps.popOp();
+			}
+
+			void pushPollOutFront(Unique<Op> op)
+			{
+				m_pollOutOps.pushOpFront(std::move(op));
 			}
 
 			void pushPollOut(Unique<Op> op)
 			{
-				assert(op != nullptr);
-				m_pollOutOps.push_back(std::move(op));
+				m_pollOutOps.pushOp(std::move(op));
 			}
 
 			Unique<Op> popPollOut()
 			{
-				if (m_pollOutOps.count() > 0)
-				{
-					auto res = std::move(m_pollOutOps.front());
-					m_pollOutOps.pop_front();
-					return res;
-				}
-				return nullptr;
+				return m_pollOutOps.popOp();
 			}
 
 			HumanError accept(const Shared<EventThread>& thread) override
@@ -163,6 +214,12 @@ namespace core
 			}
 
 			virtual HumanError handlePollOut()
+			{
+				assert(false);
+				return errf(m_allocator, "not implemented"_sv);
+			}
+
+			virtual HumanError rearm()
 			{
 				assert(false);
 				return errf(m_allocator, "not implemented"_sv);
@@ -209,15 +266,7 @@ namespace core
 
 			HumanError accept(const Shared<EventThread>& thread) override
 			{
-				auto& epoll = m_eventThreadPool->m_epoll;
 				auto& allocator = m_eventThreadPool->m_allocator;
-
-				epoll_event sub{};
-				sub.events = EPOLLIN | EPOLLONESHOT;
-				sub.data.ptr = this;
-				auto ok = epoll_ctl(epoll, EPOLL_CTL_ADD, m_socket->fd(), &sub);
-				if (ok == -1)
-					return errf(allocator, "failed to schedule accept call, ErrorCode({})"_sv, errno);
 
 				auto op = unique_from<AcceptOp>(allocator, thread);
 				pushPollIn(std::move(op));
@@ -226,15 +275,7 @@ namespace core
 
 			HumanError read(const Shared<EventThread>& thread) override
 			{
-				auto& epoll = m_eventThreadPool->m_epoll;
 				auto& allocator = m_eventThreadPool->m_allocator;
-
-				epoll_event sub{};
-				sub.events = EPOLLIN | EPOLLONESHOT;
-				sub.data.ptr = this;
-				auto ok = epoll_ctl(epoll, EPOLL_CTL_ADD, m_socket->fd(), &sub);
-				if (ok == -1)
-					return errf(allocator, "failed to schedule read call, ErrorCode({})"_sv, errno);
 
 				auto op = unique_from<ReadOp>(allocator, thread);
 				pushPollIn(std::move(op));
@@ -243,15 +284,7 @@ namespace core
 
 			HumanError write(Span<const std::byte> bytes, const Shared<EventThread>& thread) override
 			{
-				auto& epoll = m_eventThreadPool->m_epoll;
 				auto& allocator = m_eventThreadPool->m_allocator;
-
-				epoll_event sub{};
-				sub.events = EPOLLOUT | EPOLLONESHOT;
-				sub.data.ptr = this;
-				auto ok = epoll_ctl(epoll, EPOLL_CTL_ADD, m_socket->fd(), &sub);
-				if (ok == -1)
-					return errf(allocator, "failed to schedule read call, ErrorCode({})"_sv, errno);
 
 				Buffer buffer{allocator};
 				buffer.push(bytes);
@@ -266,6 +299,9 @@ namespace core
 				auto& threadPool = m_eventThreadPool->m_threadPool;
 
 				auto op = popPollIn();
+				if (op == nullptr)
+					return {};
+
 				switch (op->kind)
 				{
 				case Op::KIND_ACCEPT:
@@ -276,10 +312,10 @@ namespace core
 					auto acceptedSocket = m_socket->accept();
 					if (threadPool)
 					{
-						auto func = [acceptedSocket = std::move(acceptedSocket), thread]() mutable {
+						auto func = Func<void()>{allocator, [acceptedSocket = std::move(acceptedSocket), thread]() mutable {
 							AcceptEvent2 acceptEvent{std::move(acceptedSocket)};
 							thread->handle(&acceptEvent);
-						};
+						}};
 						thread->executionQueue()->push(threadPool, std::move(func));
 					}
 					else
@@ -319,12 +355,15 @@ namespace core
 				}
 			}
 
-			virtual HumanError handlePollOut()
+			HumanError handlePollOut() override
 			{
 				auto& allocator = m_eventThreadPool->m_allocator;
 				auto& threadPool = m_eventThreadPool->m_threadPool;
 
 				auto op = popPollOut();
+				if (op == nullptr)
+					return {};
+
 				switch (op->kind)
 				{
 				case Op::KIND_WRITE:
@@ -333,19 +372,27 @@ namespace core
 					auto writeOp = unique_static_cast<WriteOp>(std::move(op));
 					auto thread = writeOp->thread.lock();
 					auto writtenSize = m_socket->write(writeOp->remainingBytes.data(), writeOp->remainingBytes.count());
-					assert(writtenSize == writeOp->remainingBytes.count());
-					if (threadPool)
+					if (writtenSize == writeOp->remainingBytes.count())
 					{
-						auto func = [writtenSize, thread] {
+						if (threadPool)
+						{
+							auto func = Func<void()>{allocator, [writtenSize, thread]
+							{
+								WriteEvent2 writeEvent{writtenSize};
+								thread->handle(&writeEvent);
+							}};
+							thread->executionQueue()->push(threadPool, std::move(func));
+						}
+						else
+						{
 							WriteEvent2 writeEvent{writtenSize};
 							thread->handle(&writeEvent);
-						};
-						thread->executionQueue()->push(threadPool, std::move(func));
+						}
 					}
 					else
 					{
-						WriteEvent2 writeEvent{writtenSize};
-						thread->handle(&writeEvent);
+						writeOp->remainingBytes = writeOp->remainingBytes.slice(writtenSize, writeOp->remainingBytes.count() - writtenSize);
+						pushPollOutFront(std::move(writeOp));
 					}
 					return {};
 				}
@@ -353,6 +400,20 @@ namespace core
 					assert(false);
 					return errf(allocator, "unknown op"_sv);
 				}
+			}
+
+			HumanError rearm() override
+			{
+				auto epoll = m_eventThreadPool->m_epoll;
+				auto allocator = m_eventThreadPool->m_allocator;
+
+				epoll_event sub{};
+				sub.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+				sub.data.ptr = this;
+				auto ok = epoll_ctl(epoll, EPOLL_CTL_MOD, m_socket->fd(), &sub);
+				if (ok == -1)
+					return errf(allocator, "failed to rearm the socket source, ErrorCode({})"_sv, errno);
+				return {};
 			}
 		};
 
@@ -577,7 +638,7 @@ namespace core
 					auto event = events[i];
 					if (auto source = m_sources.popSource((LinuxEventSource*)event.data.ptr))
 					{
-						if (event.events | EPOLLIN)
+						if (event.events & EPOLLIN)
 						{
 							// close event
 							if (source.get() == (LinuxEventSource *) m_closeEventSource.get())
@@ -592,11 +653,13 @@ namespace core
 									return err;
 							}
 						}
-						else if (event.events | EPOLLOUT)
+						if (event.events & EPOLLOUT)
 						{
 							if (auto err = source->handlePollOut())
 								return err;
 						}
+						if (auto err = source->rearm())
+							return err;
 					}
 					else if (auto op = m_ops.pop((Op*)event.data.ptr))
 					{
@@ -608,15 +671,22 @@ namespace core
 							auto thread = sendEventOp->thread.lock();
 							if (m_threadPool)
 							{
-								auto func = [event = std::move(sendEventOp->event), thread]{
+								auto func = Func<void()>{m_allocator, [event = std::move(sendEventOp->event), thread]{
 									thread->handle(event.get());
-								};
+								}};
 								thread->executionQueue()->push(m_threadPool, std::move(func));
 							}
 							else
 							{
 								thread->handle(sendEventOp->event.get());
 							}
+							break;
+						}
+						case Op::KIND_STOP_THREAD:
+						{
+							auto stopThreadOp = unique_static_cast<StopThreadOp>(std::move(op));
+							if (auto thread = stopThreadOp->thread.lock())
+								m_threads.pop(thread.get());
 							break;
 						}
 						default:
@@ -642,13 +712,30 @@ namespace core
 
 		Result<EventSocket> registerSocket(Unique<Socket> socket) override
 		{
+			auto fd = socket->fd();
 			auto res = shared_from<LinuxEventSocket>(m_allocator, std::move(socket), this);
+			epoll_event sub{};
+			sub.events = EPOLLIN | EPOLLOUT | EPOLLONESHOT;
+			sub.data.ptr = res.get();
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sub);
+			if (ok == -1)
+				return errf(m_allocator, "failed to register socket, ErrorCode({})"_sv, errno);
+
+			m_sources.pushSource(res);
 			return EventSocket{res};
 		}
 
 		void stopThread(const Shared<EventThread>& thread) override
 		{
-			assert(false && "NOT IMPLEMENTED");
+			auto fd = eventfd(0, 0);
+			assert(fd != -1);
+			auto op = unique_from<StopThreadOp>(m_allocator, fd, thread);
+			if (m_ops.tryPush(std::move(op)))
+			{
+				int64_t v = 1;
+				[[maybe_unused]] auto res = ::write(fd, &v, sizeof(v));
+				assert(res == sizeof(v));
+			}
 		}
 	};
 
