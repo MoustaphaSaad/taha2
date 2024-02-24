@@ -34,9 +34,21 @@ namespace core
 
 		struct CloseOp: Op
 		{
-			CloseOp()
-				: Op(KIND_CLOSE)
+			CloseOp(int eventfd_)
+				: Op(KIND_CLOSE),
+				  eventfd(eventfd_)
 			{}
+
+			~CloseOp() override
+			{
+				if (eventfd != -1)
+				{
+					[[maybe_unused]] auto res = ::close(eventfd);
+					assert(res == 0);
+				}
+			}
+
+			int eventfd = -1;
 		};
 
 		struct SendEventOp: Op
@@ -223,33 +235,6 @@ namespace core
 			{
 				assert(false);
 				return errf(m_allocator, "not implemented"_sv);
-			}
-		};
-
-		class LinuxCloseEventSource: public LinuxEventSource
-		{
-			int m_eventfd = -1;
-		public:
-			LinuxCloseEventSource(int eventfd, Allocator* allocator)
-				: LinuxEventSource(allocator),
-				  m_eventfd(eventfd)
-			{}
-
-			~LinuxCloseEventSource() override
-			{
-				if (m_eventfd != -1)
-				{
-					[[maybe_unused]] auto res = ::close(m_eventfd);
-					assert(res == 0);
-				}
-			}
-
-			void signalClose()
-			{
-				ZoneScoped;
-				int64_t close = 1;
-				[[maybe_unused]] auto res = ::write(m_eventfd, &close, sizeof(close));
-				assert(res == sizeof(close));
 			}
 		};
 
@@ -536,11 +521,13 @@ namespace core
 
 		Log* m_log = nullptr;
 		int m_epoll = -1;
-		Shared<LinuxCloseEventSource> m_closeEventSource;
 		SourceSet m_sources;
 		ThreadSet m_threads;
 		OpSet m_ops;
 		ThreadPool* m_threadPool = nullptr;
+		Array<Thread> m_driverThreads;
+		size_t m_driverThreadsCount = 1;
+		std::atomic<int> m_runningDriverThreads = 0;
 
 		void addThread(const Shared<EventThread>& thread) override
 		{
@@ -577,43 +564,9 @@ namespace core
 			return {};
 		}
 
-	public:
-		LinuxThreadPool(ThreadPool* threadPool, int epoll, Log* log, Allocator* allocator)
-			: EventThreadPool(allocator),
-			  m_log(log),
-			  m_epoll(epoll),
-			  m_sources(allocator),
-			  m_threads(allocator),
-			  m_ops(allocator),
-			  m_threadPool(threadPool)
-		{}
-
-		~LinuxThreadPool() override
+		HumanError driveEventLoop()
 		{
-			if (m_epoll == -1)
-			{
-				[[maybe_unused]] auto res = ::close(m_epoll);
-				assert(res == 0);
-				m_epoll = -1;
-			}
-		}
-
-		HumanError run() override
-		{
-			auto closefd = eventfd(0, 0);
-			if (closefd == -1)
-				return errf(m_allocator, "failed to create close event, ErrorCode({})"_sv, errno);
-			m_closeEventSource = shared_from<LinuxCloseEventSource>(m_allocator, closefd, m_allocator);
-			m_sources.pushSource(m_closeEventSource);
-			m_closeEventSource->pushPollIn(unique_from<CloseOp>(m_allocator));
-
-			epoll_event closeEvent{};
-			closeEvent.events = EPOLLIN | EPOLLONESHOT;
-			closeEvent.data.ptr = m_closeEventSource.get();
-			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, closefd, &closeEvent);
-			if (ok == -1)
-				return errf(m_allocator, "failed to add close event to epoll, ErrorCode({})"_sv, errno);
-
+			m_runningDriverThreads.fetch_add(1);
 			constexpr int MAX_EVENTS = 128;
 			epoll_event events[MAX_EVENTS];
 			while (true)
@@ -621,7 +574,10 @@ namespace core
 				int numEntries = 0;
 				{
 					ZoneScopedN("EventThreadPool::epoll_wait");
-					numEntries = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
+					auto entriesSize = MAX_EVENTS;
+					if (m_driverThreadsCount > 1)
+						entriesSize = 1;
+					numEntries = epoll_wait(m_epoll, events, entriesSize, -1);
 					if (numEntries == -1)
 					{
 						if (errno == EINTR)
@@ -640,18 +596,8 @@ namespace core
 					{
 						if (event.events & EPOLLIN)
 						{
-							// close event
-							if (source.get() == (LinuxEventSource *) m_closeEventSource.get())
-							{
-								m_log->debug("event loop closed"_sv);
-								m_closeEventSource = nullptr;
-								return {};
-							}
-							else
-							{
-								if (auto err = source->handlePollIn())
-									return err;
-							}
+							if (auto err = source->handlePollIn())
+								return err;
 						}
 						if (event.events & EPOLLOUT)
 						{
@@ -665,6 +611,16 @@ namespace core
 					{
 						switch (op->kind)
 						{
+						case Op::KIND_CLOSE:
+						{
+							if (m_runningDriverThreads.fetch_sub(1) == 1)
+							{
+								m_log->debug("event loop closed"_sv);
+								m_ops.close();
+								m_threads.clear();
+							}
+							return {};
+						}
 						case Op::KIND_SEND_EVENT:
 						{
 							auto sendEventOp = unique_static_cast<SendEventOp>(std::move(op));
@@ -703,11 +659,77 @@ namespace core
 			return {};
 		}
 
+	public:
+		LinuxThreadPool(size_t driverThreadsCount, ThreadPool* threadPool, int epoll, Log* log, Allocator* allocator)
+			: EventThreadPool(allocator),
+			  m_log(log),
+			  m_epoll(epoll),
+			  m_sources(allocator),
+			  m_threads(allocator),
+			  m_ops(allocator),
+			  m_threadPool(threadPool),
+			  m_driverThreads(allocator),
+			  m_driverThreadsCount(driverThreadsCount)
+		{}
+
+		~LinuxThreadPool() override
+		{
+			if (m_epoll == -1)
+			{
+				[[maybe_unused]] auto res = ::close(m_epoll);
+				assert(res == 0);
+				m_epoll = -1;
+			}
+		}
+
+		HumanError run() override
+		{
+			m_ops.open();
+
+			assert(m_driverThreadsCount < 128);
+			HumanError errors[128];
+			for (size_t i = 1; i < m_driverThreadsCount; ++i)
+			{
+				m_driverThreads.push(Thread{m_allocator, [this, &errors, i]{
+					errors[i] = driveEventLoop();
+				}});
+			}
+			errors[0] = driveEventLoop();
+
+			for (size_t i = 0; i < m_driverThreadsCount; ++i)
+				if (errors[i])
+					return errors[i];
+
+			return {};
+		}
+
 		void stop() override
 		{
 			ZoneScoped;
 			m_log->debug("stop"_sv);
-			m_closeEventSource->signalClose();
+			for (int i = 0; i < m_driverThreadsCount; ++i)
+			{
+				auto fd = eventfd(0, 0);
+				assert(fd != -1);
+				auto op = unique_from<CloseOp>(m_allocator, fd);
+
+				epoll_event sub{};
+				sub.events = EPOLLIN | EPOLLONESHOT;
+				sub.data.ptr = op.get();
+				auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sub);
+				assert(ok != -1);
+
+				if (m_ops.tryPush(std::move(op)))
+				{
+					int64_t v = 1;
+					[[maybe_unused]] auto res = ::write(fd, &v, sizeof(v));
+					assert(res == sizeof(v));
+				}
+			}
+			m_ops.close();
+			for (auto& thread: m_driverThreads)
+				thread.join();
+			m_driverThreads.clear();
 		}
 
 		Result<EventSocket> registerSocket(Unique<Socket> socket) override
@@ -745,6 +767,15 @@ namespace core
 		if (epoll == -1)
 			return errf(allocator, "failed to create epoll, ErrorCode({})"_sv, errno);
 
-		return unique_from<LinuxThreadPool>(allocator, threadPool, epoll, log, allocator);
+		size_t driverThreadsCount = 1;
+		if (threadPool)
+		{
+			// spawn a driver thread per 10 worker thread
+			constexpr auto WORKER_THREAD_PER_DRIVER_THREAD = 10;
+			auto threadsCountRoundedUp = ((threadPool->threadsCount() + WORKER_THREAD_PER_DRIVER_THREAD - 1) / WORKER_THREAD_PER_DRIVER_THREAD) * WORKER_THREAD_PER_DRIVER_THREAD;
+			driverThreadsCount = threadsCountRoundedUp / WORKER_THREAD_PER_DRIVER_THREAD;
+		}
+
+		return unique_from<LinuxThreadPool>(allocator, driverThreadsCount, threadPool, epoll, log, allocator);
 	}
 }
