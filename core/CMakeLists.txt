@@ -36,6 +36,7 @@ target_sources(core PRIVATE
 	include/core/SHA1.h
 	include/core/Rand.h
 	include/core/EventLoop.h
+	include/core/EventLoop2.h
 	include/core/ExecutionQueue.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
@@ -107,6 +108,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/Socket.cpp
 			src/core/linux/Rand.cpp
 			src/core/linux/EventLoop.cpp
+			src/core/linux/EventLoop2.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()
