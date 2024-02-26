@@ -85,11 +85,8 @@ namespace core
 			destroy();
 		}
 
-		const T& operator*() const { return *m_ptr; }
-		T& operator*() { return *m_ptr; }
-
-		const T* operator->() const { return m_ptr; }
-		T* operator->() { return m_ptr; }
+		T& operator*() const { return *m_ptr; }
+		T* operator->() const { return m_ptr; }
 
 		operator bool() const { return m_ptr != nullptr; }
 		bool operator==(std::nullptr_t) const { return m_ptr == nullptr; }
