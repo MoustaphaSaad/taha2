@@ -20,7 +20,7 @@ CPMDeclarePackage(utf8proc
 
 CPMDeclarePackage(fmt
   NAME fmt
-  GIT_TAG 10.1.1
+  GIT_TAG 10.2.1
   GIT_REPOSITORY git@github.com:fmtlib/fmt.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
@@ -28,7 +28,7 @@ CPMDeclarePackage(fmt
 
 CPMDeclarePackage(spdlog
   NAME spdlog
-  GIT_TAG v1.12.0
+  GIT_TAG v1.13.0
   GIT_REPOSITORY git@github.com:gabime/spdlog.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
