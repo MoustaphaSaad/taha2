@@ -72,7 +72,7 @@ namespace core
 
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
-		virtual EventSocket2 registerSocket(Unique<Socket> socket) = 0;
+		virtual Result<EventSocket2> registerSocket(Unique<Socket> socket) = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)

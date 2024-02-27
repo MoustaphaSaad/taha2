@@ -160,6 +160,39 @@ namespace core
 			}
 		};
 
+		class SourceSet
+		{
+			Mutex m_mutex;
+			Map<EventSource2*, Weak<EventSource2>> m_sources;
+		public:
+			explicit SourceSet(Allocator* allocator)
+				: m_mutex(allocator),
+				  m_sources(allocator)
+			{}
+
+			void pushSource(const Shared<EventSource2>& source)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto key = source.get();
+				m_sources.insert(key, source);
+			}
+
+			void removeSource(EventSource2* source)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_sources.remove(source);
+			}
+
+			Shared<EventSource2> popSource(EventSource2* source)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto it = m_sources.lookup(source);
+				if (it == m_sources.end())
+					return nullptr;
+				return it->value.lock();
+			}
+		};
+
 		class SocketSource: public EventSource2
 		{
 			LinuxEventLoop2* m_eventLoop = nullptr;
@@ -203,13 +236,15 @@ namespace core
 		int m_epoll = -1;
 		OpSet m_ops;
 		ThreadSet m_threads;
+		SourceSet m_sources;
 	public:
 		LinuxEventLoop2(int epoll, Log* log, Allocator* allocator)
 			: EventLoop2(allocator),
 			  m_log(log),
 			  m_epoll(epoll),
 			  m_ops(allocator),
-			  m_threads(allocator)
+			  m_threads(allocator),
+			  m_sources(allocator)
 		{}
 
 		~LinuxEventLoop2() override
@@ -303,9 +338,19 @@ namespace core
 			m_ops.close();
 		}
 
-		EventSocket2 registerSocket(Unique<Socket> socket) override
+		Result<EventSocket2> registerSocket(Unique<Socket> socket) override
 		{
+			auto fd = socket->fd();
 			auto res = shared_from<SocketSource>(m_allocator, std::move(socket), this);
+
+			epoll_event sub{};
+			sub.events = EPOLLIN | EPOLLOUT | EPOLLET;
+			sub.data.ptr = res.get();
+			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sub);
+			if (ok == -1)
+				return errf(m_allocator, "failed to register socket, ErrorCode({})"_sv, errno);
+
+			m_sources.pushSource(res);
 			return EventSocket2{res};
 		}
 
