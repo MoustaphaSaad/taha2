@@ -5,6 +5,7 @@
 #include "core/Unique.h"
 #include "core/Log.h"
 #include "core/Shared.h"
+#include "core/Socket.h"
 
 namespace core
 {
@@ -18,6 +19,40 @@ namespace core
 	{};
 
 	class EventThread2;
+
+	class EventSource2
+	{
+	public:
+		virtual ~EventSource2() = default;
+
+		virtual HumanError accept(const Shared<EventThread2>& thread) = 0;
+		virtual HumanError read(const Shared<EventThread2>& thread) = 0;
+		virtual HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread) = 0;
+	};
+
+	class EventSocket2
+	{
+		Shared<EventSource2> m_socketSource;
+	public:
+		explicit EventSocket2(const Shared<EventSource2>& socket)
+			: m_socketSource(socket)
+		{}
+
+		HumanError accept(const Shared<EventThread2>& thread)
+		{
+			return m_socketSource->accept(thread);
+		}
+
+		HumanError read(const Shared<EventThread2>& thread)
+		{
+			return m_socketSource->read(thread);
+		}
+
+		HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread)
+		{
+			return m_socketSource->write(bytes, thread);
+		}
+	};
 
 	class EventLoop2
 	{
@@ -37,6 +72,7 @@ namespace core
 
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
+		virtual EventSocket2 registerSocket(Unique<Socket> socket) = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)

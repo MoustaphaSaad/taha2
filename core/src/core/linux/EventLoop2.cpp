@@ -160,6 +160,35 @@ namespace core
 			}
 		};
 
+		class SocketSource: public EventSource2
+		{
+			LinuxEventLoop2* m_eventLoop = nullptr;
+			Unique<Socket> m_socket;
+		public:
+			SocketSource(Unique<Socket> socket, LinuxEventLoop2* eventLoop)
+				: m_socket(std::move(socket)),
+				  m_eventLoop(eventLoop)
+			{}
+
+			HumanError accept(const Shared<EventThread2>& thread) override
+			{
+				auto allocator = m_eventLoop->m_allocator;
+				return errf(allocator, "not implemented"_sv);
+			}
+
+			HumanError read(const Shared<EventThread2>& thread) override
+			{
+				auto allocator = m_eventLoop->m_allocator;
+				return errf(allocator, "not implemented"_sv);
+			}
+
+			HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread) override
+			{
+				auto allocator = m_eventLoop->m_allocator;
+				return errf(allocator, "not implemented"_sv);
+			}
+		};
+
 		void addThread(const Shared<EventThread2>& thread) override
 		{
 			ZoneScoped;
@@ -272,6 +301,12 @@ namespace core
 			}
 
 			m_ops.close();
+		}
+
+		EventSocket2 registerSocket(Unique<Socket> socket) override
+		{
+			auto res = shared_from<SocketSource>(m_allocator, std::move(socket), this);
+			return EventSocket2{res};
 		}
 
 		HumanError sendEventToThread(Unique<Event2> event, const Weak<EventThread2>& thread)
