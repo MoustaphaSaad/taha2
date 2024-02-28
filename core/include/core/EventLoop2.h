@@ -18,6 +18,39 @@ namespace core
 	class StartEvent2: public Event2
 	{};
 
+	class AcceptEvent2: public Event2
+	{
+		Unique<Socket> m_socket;
+	public:
+		explicit AcceptEvent2(Unique<Socket> socket)
+			: m_socket(std::move(socket))
+		{}
+
+		[[nodiscard]] Unique<Socket> releaseSocket() { return std::move(m_socket); }
+	};
+
+	class ReadEvent2: public Event2
+	{
+		Span<const std::byte> m_bytes;
+	public:
+		explicit ReadEvent2(Span<const std::byte> bytes)
+			: m_bytes(bytes)
+		{}
+
+		Span<const std::byte> bytes() const { return m_bytes; }
+	};
+
+	class WriteEvent2: public Event2
+	{
+		size_t m_writtenBytes = 0;
+	public:
+		explicit WriteEvent2(size_t writtenBytes)
+			: m_writtenBytes(writtenBytes)
+		{}
+
+		size_t writtenBytes() const { return m_writtenBytes; }
+	};
+
 	class EventThread2;
 
 	class EventSource2

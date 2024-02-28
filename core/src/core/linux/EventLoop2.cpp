@@ -1,9 +1,14 @@
 #include "core/EventLoop2.h"
 #include "core/Mutex.h"
 #include "core/Hash.h"
+#include "core/Queue.h"
 
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/socket.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
 
 #include <tracy/Tracy.hpp>
 
@@ -74,6 +79,37 @@ namespace core
 
 			int eventfd = -1;
 			Weak<EventThread2> thread;
+		};
+
+		struct AcceptOp: Op
+		{
+			explicit AcceptOp(const Weak<EventThread2>& thread_)
+				: thread(thread_)
+			{}
+
+			Weak<EventThread2> thread;
+		};
+
+		struct ReadOp: Op
+		{
+			explicit ReadOp(const Weak<EventThread2>& thread_)
+				: thread(thread_)
+			{}
+
+			Weak<EventThread2> thread;
+		};
+
+		struct WriteOp: Op
+		{
+			WriteOp(Buffer&& buffer_, const Weak<EventThread2>& thread_)
+				: buffer(std::move(buffer_)),
+				  thread(thread_),
+				  remainingBytes(buffer)
+			{}
+
+			Buffer buffer;
+			Weak<EventThread2> thread;
+			Span<const std::byte> remainingBytes;
 		};
 
 		class OpSet
@@ -170,20 +206,20 @@ namespace core
 				  m_sources(allocator)
 			{}
 
-			void pushSource(const Shared<EventSource2>& source)
+			void push(const Shared<EventSource2>& source)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				auto key = source.get();
 				m_sources.insert(key, source);
 			}
 
-			void removeSource(EventSource2* source)
+			void remove(EventSource2* source)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				m_sources.remove(source);
 			}
 
-			Shared<EventSource2> popSource(EventSource2* source)
+			Shared<EventSource2> pop(EventSource2* source)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				auto it = m_sources.lookup(source);
@@ -193,32 +229,165 @@ namespace core
 			}
 		};
 
+		class OpQueue
+		{
+			Mutex m_mutex;
+			Queue<Unique<Op>> m_ops;
+		public:
+			explicit OpQueue(Allocator* allocator)
+				: m_mutex(allocator),
+				  m_ops(allocator)
+			{}
+
+			void push(Unique<Op> op)
+			{
+				assert(op != nullptr);
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_ops.push_back(std::move(op));
+			}
+
+			Unique<Op> pop()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				if (m_ops.count() == 0)
+					return nullptr;
+
+				auto res = std::move(m_ops.front());
+				m_ops.pop_front();
+				return res;
+			}
+
+			Op* peek()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				if (m_ops.count() == 0)
+					return nullptr;
+				return m_ops.front().get();
+			}
+		};
+
 		class SocketSource: public EventSource2
 		{
 			LinuxEventLoop2* m_eventLoop = nullptr;
 			Unique<Socket> m_socket;
+			OpQueue m_pollIn;
+			OpQueue m_pollOut;
 		public:
 			SocketSource(Unique<Socket> socket, LinuxEventLoop2* eventLoop)
 				: m_socket(std::move(socket)),
-				  m_eventLoop(eventLoop)
+				  m_eventLoop(eventLoop),
+				  m_pollIn(eventLoop->m_allocator),
+				  m_pollOut(eventLoop->m_allocator)
 			{}
 
 			HumanError accept(const Shared<EventThread2>& thread) override
 			{
 				auto allocator = m_eventLoop->m_allocator;
-				return errf(allocator, "not implemented"_sv);
+
+				auto op = unique_from<AcceptOp>(allocator, thread);
+				m_pollIn.push(std::move(op));
+				return {};
 			}
 
 			HumanError read(const Shared<EventThread2>& thread) override
 			{
 				auto allocator = m_eventLoop->m_allocator;
-				return errf(allocator, "not implemented"_sv);
+
+				auto op = unique_from<ReadOp>(allocator, thread);
+				m_pollIn.push(std::move(op));
+				return {};
 			}
 
 			HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread) override
 			{
 				auto allocator = m_eventLoop->m_allocator;
-				return errf(allocator, "not implemented"_sv);
+
+				Buffer buffer{allocator};
+				buffer.push(bytes);
+				auto op = unique_from<WriteOp>(allocator, std::move(buffer), thread);
+				m_pollOut.push(std::move(op));
+				return {};
+			}
+
+			HumanError handlePollIn()
+			{
+				auto& allocator = m_eventLoop->m_allocator;
+				std::byte line[2048] = {};
+
+				while (auto op = m_pollIn.peek())
+				{
+					if (auto acceptOp = dynamic_cast<AcceptOp*>(op))
+					{
+						auto thread = acceptOp->thread.lock();
+						auto acceptedSocket = m_socket->accept();
+						if (acceptedSocket == nullptr)
+						{
+							if (errno == EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator, "failed to accept connection, ErrorCode({})"_sv, errno);
+						}
+						m_pollIn.pop();
+						// assert(m_eventLoop == thread->m_eventLoop);
+						AcceptEvent2 acceptEvent{std::move(acceptedSocket)};
+						if (thread)
+							if (auto err = thread->handle(&acceptEvent))
+								return err;
+					}
+					else if (auto readOp = dynamic_cast<ReadOp*>(op))
+					{
+						auto thread = readOp->thread.lock();
+						auto readBytes = ::read((int)m_socket->fd(), line, sizeof(line));
+						if (readBytes == -1)
+						{
+							if (errno = EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator, "failed to read from socket, ErrorCode({})"_sv, errno);
+						}
+						m_pollIn.pop();
+						// assert(m_eventLoop == thread->m_eventLoop);
+						ReadEvent2 readEvent{Span<const std::byte>{line, (size_t)readBytes}};
+						if (thread)
+							if (auto err = thread->handle(&readEvent))
+								return err;
+					}
+				}
+
+				return {};
+			}
+
+			HumanError handlePollOut()
+			{
+				auto& allocator = m_eventLoop->m_allocator;
+
+				while (auto op = m_pollOut.peek())
+				{
+					if (auto writeOp = dynamic_cast<WriteOp*>(op))
+					{
+						auto thread = writeOp->thread.lock();
+						auto writtenBytes = ::write((int)m_socket->fd(), writeOp->remainingBytes.data(), writeOp->remainingBytes.sizeInBytes());
+						if (writtenBytes == -1)
+						{
+							if (errno == EAGAIN || errno == EWOULDBLOCK)
+								return {};
+							else
+								return errf(allocator, "failed to write to socket, ErrorCode({})"_sv, errno);
+						}
+						writeOp->remainingBytes = writeOp->remainingBytes.slice(writtenBytes, writeOp->remainingBytes.count() - writtenBytes);
+
+						if (writeOp->remainingBytes.count() == 0)
+						{
+							m_pollOut.pop();
+							// assert(m_eventLoop == thread->m_eventLoop);
+							WriteEvent2 writeEvent{writeOp->buffer.count()};
+							if (auto err = thread->handle(&writeEvent))
+								return err;
+						}
+					}
+				}
+
+				return {};
 			}
 		};
 
@@ -305,6 +474,20 @@ namespace core
 								m_threads.pop(thread.get());
 						}
 					}
+					else if (auto source = m_sources.pop((EventSource2*)event.data.ptr))
+					{
+						if (auto socketSource = dynamic_cast<SocketSource*>(source.get()))
+						{
+							if (event.events & EPOLLIN)
+							{
+								// handle epoll in
+							}
+							if (event.events & EPOLLOUT)
+							{
+								// handle epoll out
+							}
+						}
+					}
 					else
 					{
 						assert(false);
@@ -341,6 +524,18 @@ namespace core
 		Result<EventSocket2> registerSocket(Unique<Socket> socket) override
 		{
 			auto fd = socket->fd();
+
+			auto flags = fcntl(fd, F_GETFL, 0);
+			if (flags == -1)
+				return errf(m_allocator, "failed to get socket flags, ErrorCode({})"_sv, errno);
+			flags |= O_NONBLOCK;
+			if (fcntl(fd, F_SETFL, flags) != 0)
+				return errf(m_allocator, "failed to make socket non-blocking, ErrorCode({})"_sv, errno);
+
+			int yes = 1;
+			if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) != 0)
+				return errf(m_allocator, "failed to set TCP socket no delay, ErrorCode({})"_sv, errno);
+
 			auto res = shared_from<SocketSource>(m_allocator, std::move(socket), this);
 
 			epoll_event sub{};
@@ -350,7 +545,7 @@ namespace core
 			if (ok == -1)
 				return errf(m_allocator, "failed to register socket, ErrorCode({})"_sv, errno);
 
-			m_sources.pushSource(res);
+			m_sources.push(res);
 			return EventSocket2{res};
 		}
 
