@@ -352,6 +352,7 @@ namespace core
 							if (auto err = thread->handle(&readEvent))
 								return err;
 					}
+					break;
 				}
 
 				return {};
@@ -381,10 +382,12 @@ namespace core
 							m_pollOut.pop();
 							// assert(m_eventLoop == thread->m_eventLoop);
 							WriteEvent2 writeEvent{writeOp->buffer.count()};
-							if (auto err = thread->handle(&writeEvent))
-								return err;
+							if (thread)
+								if (auto err = thread->handle(&writeEvent))
+									return err;
 						}
 					}
+					break;
 				}
 
 				return {};
@@ -480,11 +483,13 @@ namespace core
 						{
 							if (event.events & EPOLLIN)
 							{
-								// handle epoll in
+								if (auto err = socketSource->handlePollIn())
+									return err;
 							}
 							if (event.events & EPOLLOUT)
 							{
-								// handle epoll out
+								if (auto err = socketSource->handlePollOut())
+									return err;
 							}
 						}
 					}
@@ -539,7 +544,7 @@ namespace core
 			auto res = shared_from<SocketSource>(m_allocator, std::move(socket), this);
 
 			epoll_event sub{};
-			sub.events = EPOLLIN | EPOLLOUT | EPOLLET;
+			sub.events = EPOLLIN | EPOLLOUT;
 			sub.data.ptr = res.get();
 			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sub);
 			if (ok == -1)

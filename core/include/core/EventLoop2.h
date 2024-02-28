@@ -124,6 +124,7 @@ namespace core
 			: m_eventLoop(eventLoop)
 		{}
 
+		EventLoop2* eventLoop() const { return m_eventLoop; }
 		virtual HumanError handle(Event2* event) = 0;
 		CORE_EXPORT HumanError send(Unique<Event2> event);
 		CORE_EXPORT void stop();
