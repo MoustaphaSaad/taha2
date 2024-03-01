@@ -26,6 +26,26 @@ namespace core
 		struct CloseOp: Op
 		{};
 
+		struct SendEventOp: Op
+		{
+			SendEventOp(Unique<Event2> event_, const Weak<EventThread2>& thread_)
+				: event(std::move(event_)),
+				  thread(thread_)
+			{}
+
+			Unique<Event2> event;
+			Weak<EventThread2> thread;
+		};
+
+		struct StopThreadOp: Op
+		{
+			StopThreadOp(const Weak<EventThread2>& thread_)
+				: thread(thread_)
+			{}
+
+			Weak<EventThread2> thread;
+		};
+
 		class OpSet
 		{
 			Mutex m_mutex;
@@ -80,22 +100,59 @@ namespace core
 			}
 		};
 
+		class ThreadSet
+		{
+			Mutex m_mutex;
+			Map<EventThread2*, Shared<EventThread2>> m_threads;
+		public:
+			explicit ThreadSet(Allocator* allocator)
+				: m_mutex(allocator),
+				  m_threads(allocator)
+			{}
+
+			void push(const Shared<EventThread2>& thread)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto handle = thread.get();
+				m_threads.insert(handle, thread);
+			}
+
+			void pop(EventThread2* handle)
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_threads.remove(handle);
+			}
+
+			void clear()
+			{
+				auto lock = Lock<Mutex>::lock(m_mutex);
+				m_threads.clear();
+			}
+		};
+
 		void addThread(const Shared<EventThread2>& thread) override
 		{
-			assert(false);
+			ZoneScoped;
+			m_threads.push(thread);
+
+			auto startEvent = unique_from<StartEvent2>(m_allocator);
+			[[maybe_unused]] auto err = sendEventToThread(std::move(startEvent), thread);
+			assert(!err);
 		}
 
 		Log* m_log = nullptr;
 		HANDLE m_completionPort = INVALID_HANDLE_VALUE;
 		LPFN_ACCEPTEX m_acceptEx = nullptr;
 		OpSet m_ops;
+		ThreadSet m_threads;
 	public:
 		WinOSEventLoop2(HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log* log, Allocator* allocator)
 			: EventLoop2(allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
 			  m_acceptEx(acceptEx),
-			  m_ops(allocator)
+			  m_ops(allocator),
+			  m_threads(allocator)
 		{}
 
 		~WinOSEventLoop2() override
@@ -134,7 +191,21 @@ namespace core
 						if (auto closeOp = dynamic_cast<CloseOp*>(op.get()))
 						{
 							m_ops.clear();
+							m_threads.clear();
 							return {};
+						}
+						else if (auto sendEventOp = dynamic_cast<SendEventOp*>(op.get()))
+						{
+							if (auto thread = sendEventOp->thread.lock())
+							{
+								if (auto err = thread->handle(sendEventOp->event.get()))
+									return err;
+							}
+						}
+						else if (auto stopThreadOp = dynamic_cast<StopThreadOp*>(op.get()))
+						{
+							if (auto thread = stopThreadOp->thread.lock())
+								m_threads.pop(thread.get());
 						}
 						else
 						{
@@ -162,6 +233,31 @@ namespace core
 		{
 			assert(false);
 			return errf(m_allocator, "not implemented"_sv);
+		}
+
+		HumanError sendEventToThread(Unique<Event2> event, const Weak<EventThread2>& thread)
+		{
+			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
+			auto handle = op.get();
+
+			if (m_ops.tryPush(std::move(op)))
+			{
+				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (OVERLAPPED*)handle);
+				assert(SUCCEEDED(res));
+			}
+			return {};
+		}
+
+		void stopThread(const Weak<EventThread2>& thread)
+		{
+			auto op = unique_from<StopThreadOp>(m_allocator, thread);
+			auto handle = op.get();
+
+			if (m_ops.tryPush(std::move(op)))
+			{
+				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (OVERLAPPED*)handle);
+				assert(SUCCEEDED(res));
+			}
 		}
 	};
 
@@ -193,5 +289,19 @@ namespace core
 			return errf(allocator, "failed to get AcceptEx function pointer, ErrorCode({})"_sv, res);
 
 		return unique_from<WinOSEventLoop2>(allocator, completionPort, acceptEx, log, allocator);
+	}
+
+	HumanError EventThread2::send(Unique<Event2> event)
+	{
+		ZoneScoped;
+		auto linuxEventLoop = (WinOSEventLoop2*)m_eventLoop;
+		return linuxEventLoop->sendEventToThread(std::move(event), weakFromThis());
+	}
+
+	void EventThread2::stop()
+	{
+		ZoneScoped;
+		auto linuxEventLoop = (WinOSEventLoop2*)m_eventLoop;
+		linuxEventLoop->stopThread(weakFromThis());
 	}
 }

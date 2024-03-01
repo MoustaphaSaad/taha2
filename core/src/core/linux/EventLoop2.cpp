@@ -651,6 +651,6 @@ namespace core
 	{
 		ZoneScoped;
 		auto linuxEventLoop = (LinuxEventLoop2*)m_eventLoop;
-		return linuxEventLoop->stopThread(weakFromThis());
+		linuxEventLoop->stopThread(weakFromThis());
 	}
 }
