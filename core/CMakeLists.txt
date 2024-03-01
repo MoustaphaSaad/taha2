@@ -77,6 +77,7 @@ if (WIN32)
 			src/core/winos/Socket.cpp
 			src/core/winos/Rand.cpp
 			src/core/winos/EventLoop.cpp
+			src/core/winos/EventLoop2.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
