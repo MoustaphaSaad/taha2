@@ -328,11 +328,21 @@ namespace core
 								return errf(allocator, "failed to accept connection, ErrorCode({})"_sv, errno);
 						}
 						m_pollIn.pop();
-						// assert(m_eventLoop == thread->m_eventLoop);
-						AcceptEvent2 acceptEvent{std::move(acceptedSocket)};
 						if (thread)
-							if (auto err = thread->handle(&acceptEvent))
-								return err;
+						{
+							if (m_eventLoop == thread->eventLoop())
+							{
+								AcceptEvent2 acceptEvent{std::move(acceptedSocket)};
+								if (auto err = thread->handle(&acceptEvent))
+									return err;
+							}
+							else
+							{
+								auto acceptEvent = unique_from<AcceptEvent2>(allocator, std::move(acceptedSocket));
+								if (auto err = thread->send(std::move(acceptEvent)))
+									return err;
+							}
+						}
 					}
 					else if (auto readOp = dynamic_cast<ReadOp*>(op))
 					{
@@ -346,11 +356,23 @@ namespace core
 								return errf(allocator, "failed to read from socket, ErrorCode({})"_sv, errno);
 						}
 						m_pollIn.pop();
-						// assert(m_eventLoop == thread->m_eventLoop);
-						ReadEvent2 readEvent{Span<const std::byte>{line, (size_t)readBytes}};
 						if (thread)
-							if (auto err = thread->handle(&readEvent))
-								return err;
+						{
+							if (m_eventLoop == thread->eventLoop())
+							{
+								ReadEvent2 readEvent{Span<const std::byte>{line, (size_t)readBytes}, allocator};
+								if (auto err = thread->handle(&readEvent))
+									return err;
+							}
+							else
+							{
+								Buffer buffer{allocator};
+								buffer.push(Span<const std::byte>{line, (size_t)readBytes});
+								auto readEvent = unique_from<ReadEvent2>(allocator, std::move(buffer));
+								if (auto err = thread->send(std::move(readEvent)))
+									return err;
+							}
+						}
 					}
 					break;
 				}
@@ -380,11 +402,21 @@ namespace core
 						if (writeOp->remainingBytes.count() == 0)
 						{
 							m_pollOut.pop();
-							// assert(m_eventLoop == thread->m_eventLoop);
-							WriteEvent2 writeEvent{writeOp->buffer.count()};
 							if (thread)
-								if (auto err = thread->handle(&writeEvent))
-									return err;
+							{
+								if (m_eventLoop == thread->eventLoop())
+								{
+									WriteEvent2 writeEvent{writeOp->buffer.count()};
+									if (auto err = thread->handle(&writeEvent))
+										return err;
+								}
+								else
+								{
+									auto writeEvent = unique_from<WriteEvent2>(allocator, writeOp->buffer.count());
+									if (auto err = thread->send(std::move(writeEvent)))
+										return err;
+								}
+							}
 						}
 					}
 					break;

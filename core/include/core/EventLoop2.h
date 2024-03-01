@@ -31,10 +31,17 @@ namespace core
 
 	class ReadEvent2: public Event2
 	{
+		Buffer m_backingBuffer;
 		Span<const std::byte> m_bytes;
 	public:
-		explicit ReadEvent2(Span<const std::byte> bytes)
-			: m_bytes(bytes)
+		ReadEvent2(Span<const std::byte> bytes, Allocator* allocator)
+			: m_backingBuffer(allocator),
+			  m_bytes(bytes)
+		{}
+
+		explicit ReadEvent2(Buffer&& bytes)
+			: m_backingBuffer(std::move(bytes)),
+			  m_bytes(m_backingBuffer)
 		{}
 
 		Span<const std::byte> bytes() const { return m_bytes; }
