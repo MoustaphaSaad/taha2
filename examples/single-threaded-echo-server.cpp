@@ -34,6 +34,12 @@ public:
 		}
 		else if (auto readEvent = dynamic_cast<core::ReadEvent2*>(event))
 		{
+			if (readEvent->bytes().count() == 0)
+			{
+				stop();
+				return {};
+			}
+
 			if (auto err = m_socket.write(readEvent->bytes(), nullptr))
 				return err;
 			return m_socket.read(sharedFromThis());
