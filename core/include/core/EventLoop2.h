@@ -94,18 +94,25 @@ namespace core
 		}
 	};
 
+	class ThreadedEventLoop2;
+
 	class EventLoop2
 	{
 		virtual void addThread(const Shared<EventThread2>& thread) = 0;
 
 	protected:
 		Allocator* m_allocator = nullptr;
-
+		ThreadedEventLoop2* m_parentThreadedEventLoop = nullptr;
 	public:
-		CORE_EXPORT static Result<Unique<EventLoop2>> create(Log* log, Allocator* allocator);
+		CORE_EXPORT static Result<Unique<EventLoop2>> create(ThreadedEventLoop2* parent, Log* log, Allocator* allocator);
+		static Result<Unique<EventLoop2>> create(Log* log, Allocator* allocator)
+		{
+			return create(nullptr, log, allocator);
+		}
 
-		explicit EventLoop2(Allocator* allocator)
-			: m_allocator(allocator)
+		EventLoop2(ThreadedEventLoop2* threadedEventLoop, Allocator* allocator)
+			: m_allocator(allocator),
+			  m_parentThreadedEventLoop(threadedEventLoop)
 		{}
 
 		virtual ~EventLoop2() = default;
@@ -113,6 +120,7 @@ namespace core
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 		virtual Result<EventSocket2> registerSocket(Unique<Socket> socket) = 0;
+		virtual EventLoop2* next() = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)

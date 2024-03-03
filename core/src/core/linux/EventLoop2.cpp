@@ -1,4 +1,5 @@
 #include "core/EventLoop2.h"
+#include "core/ThreadedEventLoop2.h"
 #include "core/Mutex.h"
 #include "core/Hash.h"
 #include "core/Queue.h"
@@ -442,8 +443,8 @@ namespace core
 		ThreadSet m_threads;
 		SourceSet m_sources;
 	public:
-		LinuxEventLoop2(int epoll, Log* log, Allocator* allocator)
-			: EventLoop2(allocator),
+		LinuxEventLoop2(int epoll, ThreadedEventLoop2* parent, Log* log, Allocator* allocator)
+			: EventLoop2(parent, allocator),
 			  m_log(log),
 			  m_epoll(epoll),
 			  m_ops(allocator),
@@ -586,6 +587,13 @@ namespace core
 			return EventSocket2{res};
 		}
 
+		EventLoop2* next() override
+		{
+			if (m_parentThreadedEventLoop)
+				return m_parentThreadedEventLoop->next();
+			return this;
+		}
+
 		HumanError sendEventToThread(Unique<Event2> event, const Weak<EventThread2>& thread)
 		{
 			auto fd = eventfd(0, 0);
@@ -631,13 +639,13 @@ namespace core
 		}
 	};
 
-	Result<Unique<EventLoop2>> EventLoop2::create(Log *log, Allocator *allocator)
+	Result<Unique<EventLoop2>> EventLoop2::create(ThreadedEventLoop2* parent, Log *log, Allocator *allocator)
 	{
 		auto epoll = epoll_create1(0);
 		if (epoll == -1)
 			return errf(allocator, "failed to create epoll, ErrorCode({})"_sv, errno);
 
-		return unique_from<LinuxEventLoop2>(allocator, epoll, log, allocator);
+		return unique_from<LinuxEventLoop2>(allocator, epoll, parent, log, allocator);
 	}
 
 	HumanError EventThread2::send(Unique<Event2> event)

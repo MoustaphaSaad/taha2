@@ -1,4 +1,5 @@
 #include "core/EventLoop2.h"
+#include "core/ThreadedEventLoop2.h"
 #include "core/Mutex.h"
 #include "core/Hash.h"
 
@@ -305,8 +306,8 @@ namespace core
 		OpSet m_ops;
 		ThreadSet m_threads;
 	public:
-		WinOSEventLoop2(HANDLE completionPort, LPFN_ACCEPTEX acceptEx, Log* log, Allocator* allocator)
-			: EventLoop2(allocator),
+		WinOSEventLoop2(HANDLE completionPort, LPFN_ACCEPTEX acceptEx, ThreadedEventLoop2* parent, Log* log, Allocator* allocator)
+			: EventLoop2(parent, allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
 			  m_acceptEx(acceptEx),
@@ -465,6 +466,13 @@ namespace core
 			return EventSocket2{res};
 		}
 
+		EventLoop2* next() override
+		{
+			if (m_parentThreadedEventLoop)
+				return m_parentThreadedEventLoop->next();
+			return this;
+		}
+
 		HumanError sendEventToThread(Unique<Event2> event, const Weak<EventThread2>& thread)
 		{
 			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
@@ -491,7 +499,7 @@ namespace core
 		}
 	};
 
-	Result<Unique<EventLoop2>> EventLoop2::create(Log *log, Allocator *allocator)
+	Result<Unique<EventLoop2>> EventLoop2::create(ThreadedEventLoop2* parent, Log *log, Allocator *allocator)
 	{
 		auto completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 		if (completionPort == NULL)
@@ -518,7 +526,7 @@ namespace core
 		if (res == SOCKET_ERROR)
 			return errf(allocator, "failed to get AcceptEx function pointer, ErrorCode({})"_sv, res);
 
-		return unique_from<WinOSEventLoop2>(allocator, completionPort, acceptEx, log, allocator);
+		return unique_from<WinOSEventLoop2>(allocator, completionPort, acceptEx, parent, log, allocator);
 	}
 
 	HumanError EventThread2::send(Unique<Event2> event)
