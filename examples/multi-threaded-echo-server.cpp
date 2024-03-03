@@ -30,10 +30,12 @@ public:
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
+			ZoneScopedN("EchoThread::StartEvent");
 			return m_socket.read(sharedFromThis());
 		}
 		else if (auto readEvent = dynamic_cast<core::ReadEvent2*>(event))
 		{
+			ZoneScopedN("EchoThread::ReadEvent");
 			if (readEvent->bytes().count() == 0)
 			{
 				stop();
@@ -63,10 +65,12 @@ public:
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
+			ZoneScopedN("AcceptThread::StartEvent");
 			return m_socket.accept(sharedFromThis());
 		}
 		else if (auto acceptEvent = dynamic_cast<core::AcceptEvent2*>(event))
 		{
+			ZoneScopedN("AcceptThread::AcceptEvent");
 			auto loop = m_threadedEventLoop->next();
 			auto socketResult = loop->registerSocket(acceptEvent->releaseSocket());
 			if (socketResult.isError())
