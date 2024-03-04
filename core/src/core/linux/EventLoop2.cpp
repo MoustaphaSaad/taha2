@@ -618,24 +618,28 @@ namespace core
 			return {};
 		}
 
-		void stopThread(const Weak<EventThread2>& thread)
+		HumanError stopThread(const Weak<EventThread2>& thread)
 		{
 			auto fd = eventfd(0, 0);
-			assert(fd != -1);
+			if (fd == -1)
+				return errf(m_allocator, "failed to create eventfd, ErrorCode({})"_sv, errno);
 			auto op = unique_from<StopThreadOp>(m_allocator, fd, thread);
 
 			epoll_event sub{};
 			sub.events = EPOLLIN | EPOLLONESHOT;
 			sub.data.ptr = op.get();
 			auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sub);
-			assert(ok != -1);
+			if (ok == -1)
+				return errf(m_allocator, "failed to register eventfd, ErrorCode({})"_sv, errno);
 
 			if (m_ops.tryPush(std::move(op)))
 			{
 				int64_t v = 1;
 				auto res = ::write(fd, &v, sizeof(v));
-				assert(res == sizeof(v));
+				if (res != sizeof(v))
+					return errf(m_allocator, "failed to signal eventfd, ErrorCode({})"_sv, errno);
 			}
+			return {};
 		}
 	};
 
@@ -655,10 +659,10 @@ namespace core
 		return linuxEventLoop->sendEventToThread(std::move(event), weakFromThis());
 	}
 
-	void EventThread2::stop()
+	HumanError EventThread2::stop()
 	{
 		ZoneScoped;
 		auto linuxEventLoop = (LinuxEventLoop2*)m_eventLoop;
-		linuxEventLoop->stopThread(weakFromThis());
+		return linuxEventLoop->stopThread(weakFromThis());
 	}
 }

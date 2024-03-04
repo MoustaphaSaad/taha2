@@ -93,7 +93,8 @@ namespace core
 			return m_ptr[i];
 		}
 
-		operator StringView() const { return StringView(m_ptr, m_count); }
+		operator StringView() const { return StringView{m_ptr, m_count}; }
+		explicit operator Span<const std::byte>() const { return Span<const std::byte>{(const std::byte*)m_ptr, m_count}; }
 
 		size_t count() const { return m_count; }
 		size_t capacity() const { return m_capacity; }

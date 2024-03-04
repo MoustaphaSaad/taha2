@@ -486,16 +486,18 @@ namespace core
 			return {};
 		}
 
-		void stopThread(const Weak<EventThread2>& thread)
+		HumanError stopThread(const Weak<EventThread2>& thread)
 		{
 			auto op = unique_from<StopThreadOp>(m_allocator, thread);
 			auto handle = op.get();
 
 			if (m_ops.tryPush(std::move(op)))
 			{
-				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (OVERLAPPED*)handle);
-				assert(SUCCEEDED(res));
+				auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (OVERLAPPED*)handle);
+				if (FAILED(res))
+					return errf(m_allocator, "failed to send stop thread event, ErrorCode({})"_sv, GetLastError());
 			}
+			return {};
 		}
 	};
 
@@ -536,10 +538,10 @@ namespace core
 		return linuxEventLoop->sendEventToThread(std::move(event), weakFromThis());
 	}
 
-	void EventThread2::stop()
+	HumanError EventThread2::stop()
 	{
 		ZoneScoped;
 		auto linuxEventLoop = (WinOSEventLoop2*)m_eventLoop;
-		linuxEventLoop->stopThread(weakFromThis());
+		return linuxEventLoop->stopThread(weakFromThis());
 	}
 }

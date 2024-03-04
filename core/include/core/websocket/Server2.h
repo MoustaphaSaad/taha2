@@ -6,6 +6,17 @@
 
 namespace core::websocket
 {
+	class NewConnection: public Event2
+	{
+		EventSocket2 m_socket;
+	public:
+		NewConnection(EventSocket2 socket)
+			: m_socket(socket)
+		{}
+
+		EventSocket2 releaseSocket() { return std::move(m_socket); }
+	};
+
 	struct ServerConfig2
 	{
 		StringView host = "127.0.0.1"_sv;
