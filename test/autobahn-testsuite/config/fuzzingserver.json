@@ -1,5 +1,5 @@
 {
-    "url": "ws://127.0.0.1:9010",
+    "url": "ws://host.docker.internal:9011",
     "outdir": "./reports/clients",
     "cases": ["*"],
     "exclude-cases": [],

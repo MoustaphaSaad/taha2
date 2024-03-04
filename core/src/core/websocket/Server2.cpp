@@ -10,14 +10,16 @@ namespace core::websocket
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		EventSocket2 m_socket;
+		Shared<EventThread2> m_handler;
 		Buffer m_buffer;
 		size_t m_maxHandshakeSize = 0;
 	public:
-		HandshakeThread(EventSocket2 socket, size_t maxHandshakeSize, EventLoop2* loop, Log* log, Allocator* allocator)
+		HandshakeThread(EventSocket2 socket, const Shared<EventThread2>& handler, size_t maxHandshakeSize, EventLoop2* loop, Log* log, Allocator* allocator)
 			: EventThread2(loop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
+			  m_handler(handler),
 			  m_buffer(allocator),
 			  m_maxHandshakeSize(maxHandshakeSize)
 		{}
@@ -66,6 +68,14 @@ namespace core::websocket
 						m_log->error("failed to send handshake reply, {}"_sv, err);
 						return stop();
 					}
+
+					auto newConn = unique_from<NewConnection>(m_allocator, m_socket);
+					if (auto err = m_handler->send(std::move(newConn)))
+					{
+						m_log->error("failed to send new connection event, {}"_sv, err);
+						return stop();
+					}
+					return stop();
 				}
 				else
 				{
@@ -114,7 +124,7 @@ namespace core::websocket
 				if (socketResult.isError())
 					return socketResult.releaseError();
 
-				auto handshake = loop->startThread<HandshakeThread>(socketResult.releaseValue(), m_maxHandshakeSize, loop, m_log, m_allocator);
+				auto handshake = loop->startThread<HandshakeThread>(socketResult.releaseValue(), m_handler, m_maxHandshakeSize, loop, m_log, m_allocator);
 				m_threads.push(handshake);
 				return m_socket.accept(sharedFromThis());
 			}
