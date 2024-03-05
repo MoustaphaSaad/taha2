@@ -173,7 +173,7 @@ namespace core::websocket
 								return stop();
 							}
 
-							auto errorCode = uint16_t(msg.payload[1]) | uint16_t(msg.payload[0] << 8);
+							auto errorCode = uint16_t(msg.payload[1]) | (uint16_t(msg.payload[0]) << 8);
 							if (errorCode < 1000 || errorCode == 1004 || errorCode == 1005 || errorCode == 1006 || (errorCode > 1013  && errorCode < 3000))
 							{
 								(void)writeCloseWithCode(1002, {});
