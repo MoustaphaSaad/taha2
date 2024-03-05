@@ -3,6 +3,7 @@
 #include "core/Exports.h"
 #include "core/EventLoop2.h"
 #include "core/ThreadedEventLoop2.h"
+#include "core/websocket/Message.h"
 
 namespace core::websocket
 {
@@ -15,6 +16,18 @@ namespace core::websocket
 		{}
 
 		EventSocket2 releaseSocket() { return std::move(m_socket); }
+	};
+
+	class MessageEvent: public Event2
+	{
+		Message m_message;
+	public:
+		MessageEvent(Message&& message)
+			: m_message(std::move(message))
+		{}
+
+		Message& message() { return m_message; }
+		const Message& message() const { return m_message; }
 	};
 
 	struct ServerConfig2
@@ -37,5 +50,6 @@ namespace core::websocket
 		{}
 
 		CORE_EXPORT HumanError start(const ServerConfig2& config, EventLoop2* loop);
+		CORE_EXPORT HumanError handleClient(EventSocket2 socket, const Shared<EventThread2>& handler);
 	};
 }

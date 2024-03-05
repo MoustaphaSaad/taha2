@@ -1,10 +1,103 @@
 #include "core/websocket/Server2.h"
 #include "core/websocket/Handshake.h"
+#include "core/websocket/MessageParser.h"
 #include "core/SHA1.h"
 #include "core/Base64.h"
 
 namespace core::websocket
 {
+	class ClientThread: public EventThread2
+	{
+		Allocator* m_allocator = nullptr;
+		Log* m_log = nullptr;
+		EventSocket2 m_socket;
+		Shared<EventThread2> m_handler;
+		Buffer m_buffer;
+		MessageParser m_messageParser;
+	public:
+		ClientThread(EventSocket2 socket, const Shared<EventThread2>& handler, EventLoop2* loop, Log* log, Allocator* allocator)
+			: EventThread2(loop),
+			  m_allocator(allocator),
+			  m_log(log),
+			  m_socket(socket),
+			  m_handler(handler),
+			  m_buffer(allocator),
+			  m_messageParser(allocator, 64ULL * 1024ULL * 1024ULL)
+		{}
+
+		HumanError handle(Event2* event) override
+		{
+			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
+			{
+				return m_socket.read(sharedFromThis());
+			}
+			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
+			{
+				m_buffer.push(readEvent->bytes());
+
+				auto bytes = Span<const std::byte>{m_buffer};
+				while (bytes.count() > 0)
+				{
+					auto parserResult = m_messageParser.consume(bytes);
+					if (parserResult.isError())
+					{
+						// TODO: close and return
+						return stop();
+					}
+					auto consumedBytes = parserResult.value();
+
+					// if we didn't consume any bytes we just wait for more bytes
+					if (consumedBytes == 0 && m_messageParser.hasMessage() == false)
+						break;
+
+					if (consumedBytes > 0)
+						bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
+
+					if (m_messageParser.hasMessage())
+					{
+						auto msg = m_messageParser.message();
+						if (msg.type == Message::TYPE_TEXT)
+						{
+							auto text = StringView{msg.payload};
+							if (text.isValidUtf8() == false)
+							{
+								// TODO: close and return
+								return stop();
+							}
+							if (auto err = m_handler->send(unique_from<MessageEvent>(m_allocator, std::move(msg))))
+								return err;
+						}
+						else if (msg.type == Message::TYPE_BINARY)
+						{
+							if (auto err = m_handler->send(unique_from<MessageEvent>(m_allocator, std::move(msg))))
+								return err;
+						}
+						else if (msg.type == Message::TYPE_CLOSE)
+						{
+
+						}
+					}
+				}
+
+				if (bytes.count() == 0)
+				{
+					m_buffer.clear();
+				}
+				else
+				{
+					::memmove(m_buffer.data(), bytes.data(), bytes.count());
+					m_buffer.resize(bytes.count());
+				}
+
+				if (auto err = m_socket.read(sharedFromThis()))
+				{
+					return stop();
+				}
+				return {};
+			}
+		}
+	};
+
 	class HandshakeThread: public EventThread2
 	{
 		Allocator* m_allocator = nullptr;
@@ -152,6 +245,13 @@ namespace core::websocket
 		auto eventSocket = eventSocketResult.releaseValue();
 
 		m_acceptThread = loop->startThread<AcceptThread>(eventSocket, config.handler, config.maxHandshakeSize, loop, m_log, m_allocator);
+		return {};
+	}
+
+	HumanError Server2::handleClient(EventSocket2 socket, const Shared<EventThread2> &handler)
+	{
+		auto loop = handler->eventLoop();
+		loop->startThread<ClientThread>(socket, handler, loop, m_log, m_allocator);
 		return {};
 	}
 }
