@@ -17,10 +17,12 @@ void signalHandler(int signal)
 
 class ServerHandler: public core::EventThread2
 {
+	core::websocket::Server2* m_server = nullptr;
 	core::Log* m_log = nullptr;
 public:
-	ServerHandler(core::EventLoop2* eventLoop, core::Log* log)
+	ServerHandler(core::EventLoop2* eventLoop, core::websocket::Server2* server, core::Log* log)
 		: EventThread2(eventLoop),
+		  m_server(server),
 		  m_log(log)
 	{}
 
@@ -28,7 +30,7 @@ public:
 	{
 		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
 		{
-			m_log->debug("new connection"_sv);
+			return m_server->handleClient(newConn->releaseSocket(), sharedFromThis());
 		}
 		return {};
 	}
@@ -62,10 +64,11 @@ int main(int argc, char** argv)
 	auto threadedEventLoop = threadedEventLoopResult.releaseValue();
 	EVENT_LOOP = threadedEventLoop.get();
 
-	auto eventLoop = threadedEventLoop->next();
-	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, &log);
-
 	auto server = core::websocket::Server2{&log, &allocator};
+
+	auto eventLoop = threadedEventLoop->next();
+	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, &server, &log);
+
 	core::websocket::ServerConfig2 config {
 		.host = parsedUrl.host(),
 		.port = parsedUrl.port(),

@@ -25,6 +25,7 @@ namespace core::websocket
 		bool isFin = false;
 		uint64_t payloadLength = 0;
 
+		static bool isCtrlOpcode(OPCODE opcode) { return (opcode & 0b1000); }
 		bool isControlOpcode() const { return (opcode & 0b1000); }
 	};
 

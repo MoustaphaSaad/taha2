@@ -3,6 +3,7 @@
 #include "core/websocket/MessageParser.h"
 #include "core/SHA1.h"
 #include "core/Base64.h"
+#include "core/Rand.h"
 
 namespace core::websocket
 {
@@ -14,6 +15,89 @@ namespace core::websocket
 		Shared<EventThread2> m_handler;
 		Buffer m_buffer;
 		MessageParser m_messageParser;
+
+		HumanError writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> payload)
+		{
+			if (FrameHeader::isCtrlOpcode(opcode))
+			{
+				assert(payload.sizeInBytes() <= 125);
+				if (payload.sizeInBytes() > 125)
+					payload = payload.slice(0, 125);
+			}
+
+			bool shouldMask = false;
+			std::byte mask[4] = {};
+			if (shouldMask)
+			{
+				if (Rand::cryptoRand(Span<std::byte>{mask, sizeof(mask)}) == false)
+					return errf(m_allocator, "failed to generate random mask"_sv);
+			}
+
+			std::byte buf[14] = {};
+			buf[0] = std::byte(128 | opcode);
+			size_t bufSize = 1;
+
+			if (payload.count() <= 125)
+			{
+				buf[1] = std::byte(payload.count());
+				++bufSize;
+			}
+			else if (payload.count() <= UINT16_MAX)
+			{
+				buf[1] = std::byte(126);
+				buf[2] = std::byte((payload.count() >> 8) & 0xFF);
+				buf[3] = std::byte(payload.count() & 0xFF);
+				bufSize += 3;
+			}
+			else
+			{
+				buf[1] = std::byte(127);
+				buf[2] = std::byte((payload.count() >> 56) & 0xFF);
+				buf[3] = std::byte((payload.count() >> 48) & 0xFF);
+				buf[4] = std::byte((payload.count() >> 40) & 0xFF);
+				buf[5] = std::byte((payload.count() >> 32) & 0xFF);
+				buf[6] = std::byte((payload.count() >> 24) & 0xFF);
+				buf[7] = std::byte((payload.count() >> 16) & 0xFF);
+				buf[8] = std::byte((payload.count() >> 8) & 0xFF);
+				buf[9] = std::byte(payload.count() & 0xFF);
+				bufSize += 9;
+			}
+
+			if (shouldMask)
+			{
+				buf[1] |= std::byte(128);
+				::memcpy(buf + bufSize, mask, sizeof(mask));
+				bufSize += sizeof(mask);
+			}
+
+			if (auto err = m_socket.write(Span<const std::byte>{buf, bufSize}, nullptr))
+				return err;
+
+			if (shouldMask)
+			{
+				Buffer maskedPayload{m_allocator};
+				maskedPayload.push(payload);
+				for (size_t i = 0; i < maskedPayload.count(); ++i)
+					maskedPayload[i] ^= mask[i & 3];
+				return m_socket.write(Span<const std::byte>{maskedPayload}, nullptr);
+			}
+			else
+			{
+				return m_socket.write(payload, nullptr);
+			}
+		}
+
+		HumanError writeCloseWithCode(uint16_t code, StringView reason)
+		{
+			std::byte buf[125];
+			buf[0] = std::byte((code >> 8) & 0xFF);
+			buf[1] = std::byte(code & 0xFF);
+			auto maxReasonSize = reason.count() > 123 ? 0 : reason.count();
+			::memcpy(buf + 2, reason.data(), maxReasonSize);
+			auto payloadSize = 2 + maxReasonSize;
+			return writeFrame(FrameHeader::OPCODE_CLOSE, {buf, payloadSize});
+		}
+
 	public:
 		ClientThread(EventSocket2 socket, const Shared<EventThread2>& handler, EventLoop2* loop, Log* log, Allocator* allocator)
 			: EventThread2(loop),
@@ -41,7 +125,7 @@ namespace core::websocket
 					auto parserResult = m_messageParser.consume(bytes);
 					if (parserResult.isError())
 					{
-						// TODO: close and return
+						(void)writeCloseWithCode(1002, parserResult.error().message());
 						return stop();
 					}
 					auto consumedBytes = parserResult.value();
@@ -58,23 +142,73 @@ namespace core::websocket
 						auto msg = m_messageParser.message();
 						if (msg.type == Message::TYPE_TEXT)
 						{
+							m_log->debug("text: {}"_sv, msg.payload.count());
 							auto text = StringView{msg.payload};
 							if (text.isValidUtf8() == false)
 							{
-								// TODO: close and return
+								(void)writeCloseWithCode(1007, "invalid utf8"_sv);
 								return stop();
 							}
-							if (auto err = m_handler->send(unique_from<MessageEvent>(m_allocator, std::move(msg))))
+							if (auto err = writeFrame(FrameHeader::OPCODE_TEXT, Span<const std::byte>{msg.payload}))
 								return err;
 						}
 						else if (msg.type == Message::TYPE_BINARY)
 						{
-							if (auto err = m_handler->send(unique_from<MessageEvent>(m_allocator, std::move(msg))))
+							m_log->debug("binary: {}"_sv, msg.payload.count());
+							if (auto err = writeFrame(FrameHeader::OPCODE_BINARY, Span<const std::byte>{msg.payload}))
 								return err;
 						}
 						else if (msg.type == Message::TYPE_CLOSE)
 						{
+							m_log->debug("close: {}"_sv, msg.payload.count());
+							if (msg.payload.count() == 0)
+							{
+								(void)writeCloseWithCode(1000, {});
+								return stop();
+							}
 
+							if (msg.payload.count() == 1)
+							{
+								(void)writeCloseWithCode(1002, {});
+								return stop();
+							}
+
+							auto errorCode = uint16_t(msg.payload[1]) | uint16_t(msg.payload[0] << 8);
+							if (errorCode < 1000 || errorCode == 1004 || errorCode == 1005 || errorCode == 1006 || (errorCode > 1013  && errorCode < 3000))
+							{
+								(void)writeCloseWithCode(1002, {});
+								return stop();
+							}
+
+							if (msg.payload.count() == 2)
+							{
+								(void)writeCloseWithCode(1000, {});
+								return stop();
+							}
+
+							auto payload = StringView{msg.payload}.slice(2, msg.payload.count());
+							if (payload.isValidUtf8() == false)
+							{
+								(void)writeCloseWithCode(1007, {});
+								return stop();
+							}
+
+							(void)writeCloseWithCode(1000, {});
+							return stop();
+						}
+						else if (msg.type == Message::TYPE_PING)
+						{
+							m_log->debug("ping: {}"_sv, msg.payload.count());
+							if (auto err = writeFrame(FrameHeader::OPCODE_PONG, Span<const std::byte>{msg.payload}))
+								return err;
+						}
+						else if (msg.type == Message::TYPE_PONG)
+						{
+							m_log->debug("pong: {}"_sv, msg.payload.count());
+						}
+						else
+						{
+							assert(false);
 						}
 					}
 				}
@@ -90,11 +224,10 @@ namespace core::websocket
 				}
 
 				if (auto err = m_socket.read(sharedFromThis()))
-				{
 					return stop();
-				}
 				return {};
 			}
+			return {};
 		}
 	};
 
