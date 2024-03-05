@@ -36,8 +36,7 @@ public:
 		{
 			if (readEvent->bytes().count() == 0)
 			{
-				stop();
-				return {};
+				return stop();
 			}
 
 			if (auto err = m_socket.write(readEvent->bytes(), nullptr))
