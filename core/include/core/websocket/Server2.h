@@ -40,16 +40,11 @@ namespace core::websocket
 
 	class Server2
 	{
-		Allocator* m_allocator = nullptr;
-		Log* m_log = nullptr;
-		Shared<EventThread2> m_acceptThread;
 	public:
-		Server2(Log* log, Allocator* allocator)
-			: m_allocator(allocator),
-			  m_log(log)
-		{}
+		CORE_EXPORT static Result<Unique<Server2>> create(Log* log, Allocator* allocator);
 
-		CORE_EXPORT HumanError start(const ServerConfig2& config, EventLoop2* loop);
-		CORE_EXPORT HumanError handleClient(EventSocket2 socket, const Shared<EventThread2>& handler);
+		virtual ~Server2() = default;
+		virtual HumanError start(const ServerConfig2& config, EventLoop2* loop) = 0;
+		virtual HumanError handleClient(EventSocket2 socket, const Shared<EventThread2>& handler) = 0;
 	};
 }

@@ -64,10 +64,16 @@ int main(int argc, char** argv)
 	auto threadedEventLoop = threadedEventLoopResult.releaseValue();
 	EVENT_LOOP = threadedEventLoop.get();
 
-	auto server = core::websocket::Server2{&log, &allocator};
+	auto serverResult = core::websocket::Server2::create(&log, &allocator);
+	if (serverResult.isError())
+	{
+		log.critical("failed to create websocket server, {}"_sv, serverResult.releaseError());
+		return EXIT_FAILURE;
+	}
+	auto server = serverResult.releaseValue();
 
 	auto eventLoop = threadedEventLoop->next();
-	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, &server, &log);
+	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, server.get(), &log);
 
 	core::websocket::ServerConfig2 config {
 		.host = parsedUrl.host(),
@@ -75,7 +81,7 @@ int main(int argc, char** argv)
 		.maxHandshakeSize = 64ULL * 1024ULL * 1024ULL,
 		.handler = serverHandler,
 	};
-	auto err = server.start(config, eventLoop->next());
+	auto err = server->start(config, eventLoop->next());
 	if (err)
 	{
 		log.critical("failed to start websocket server, {}"_sv, err);

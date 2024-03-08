@@ -4,15 +4,50 @@
 #include "core/SHA1.h"
 #include "core/Base64.h"
 #include "core/Rand.h"
+#include "core/Mutex.h"
+#include "core/Hash.h"
 
 namespace core::websocket
 {
+	class ThreadSet
+	{
+		Mutex m_mutex;
+		Set<Weak<EventThread2>> m_threads;
+	public:
+		ThreadSet(Allocator* allocator)
+			: m_mutex(allocator),
+			  m_threads(allocator)
+		{}
+
+		void push(const Weak<EventThread2>& thread)
+		{
+			auto lock = Lock<Mutex>::lock(m_mutex);
+			m_threads.insert(thread);
+		}
+
+		void pop(const Weak<EventThread2>& thread)
+		{
+			auto lock = Lock<Mutex>::lock(m_mutex);
+			m_threads.remove(thread);
+		}
+
+		void stopAllAndClear()
+		{
+			auto lock = Lock<Mutex>::lock(m_mutex);
+			for (auto weakThread: m_threads)
+				if (auto thread = weakThread.lock())
+					thread->stop();
+			m_threads.clear();
+		}
+	};
+
 	class ClientThread: public EventThread2
 	{
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		EventSocket2 m_socket;
 		Shared<EventThread2> m_handler;
+		Shared<ThreadSet> m_threadSet;
 		Buffer m_buffer;
 		MessageParser m_messageParser;
 
@@ -99,15 +134,21 @@ namespace core::websocket
 		}
 
 	public:
-		ClientThread(EventSocket2 socket, const Shared<EventThread2>& handler, EventLoop2* loop, Log* log, Allocator* allocator)
+		ClientThread(EventSocket2 socket, const Shared<EventThread2>& handler, const Shared<ThreadSet>& threadSet, EventLoop2* loop, Log* log, Allocator* allocator)
 			: EventThread2(loop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
 			  m_handler(handler),
+			  m_threadSet(threadSet),
 			  m_buffer(allocator),
 			  m_messageParser(allocator, 64ULL * 1024ULL * 1024ULL)
 		{}
+
+		~ClientThread() override
+		{
+			m_threadSet->pop(weakFromThis());
+		}
 
 		HumanError handle(Event2* event) override
 		{
@@ -237,18 +278,25 @@ namespace core::websocket
 		Log* m_log = nullptr;
 		EventSocket2 m_socket;
 		Shared<EventThread2> m_handler;
+		Shared<ThreadSet> m_threadSet;
 		Buffer m_buffer;
 		size_t m_maxHandshakeSize = 0;
 	public:
-		HandshakeThread(EventSocket2 socket, const Shared<EventThread2>& handler, size_t maxHandshakeSize, EventLoop2* loop, Log* log, Allocator* allocator)
+		HandshakeThread(EventSocket2 socket, const Shared<EventThread2>& handler, const Shared<ThreadSet>& threadSet, size_t maxHandshakeSize, EventLoop2* loop, Log* log, Allocator* allocator)
 			: EventThread2(loop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
 			  m_handler(handler),
+			  m_threadSet(threadSet),
 			  m_buffer(allocator),
 			  m_maxHandshakeSize(maxHandshakeSize)
 		{}
+
+		~HandshakeThread() override
+		{
+			m_threadSet->pop(weakFromThis());
+		}
 
 		HumanError handle(Event2* event) override
 		{
@@ -318,23 +366,22 @@ namespace core::websocket
 		Log* m_log = nullptr;
 		EventSocket2 m_socket;
 		Shared<EventThread2> m_handler;
-		Array<Shared<EventThread2>> m_threads;
+		Shared<ThreadSet> m_threadSet;
 		size_t m_maxHandshakeSize;
 	public:
-		explicit AcceptThread(EventSocket2 socket, Shared<EventThread2> handler, size_t maxHandshakeSize, EventLoop2* eventLoop, Log* log, Allocator* allocator)
+		explicit AcceptThread(EventSocket2 socket, const Shared<EventThread2>& handler, const Shared<ThreadSet>& threadSet, size_t maxHandshakeSize, EventLoop2* eventLoop, Log* log, Allocator* allocator)
 			: EventThread2(eventLoop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
 			  m_handler(handler),
-			  m_threads(allocator),
+			  m_threadSet(threadSet),
 			  m_maxHandshakeSize(maxHandshakeSize)
 		{}
 
 		~AcceptThread() override
 		{
-			for (auto thread: m_threads)
-				(void)thread->stop();
+			m_threadSet->pop(weakFromThis());
 		}
 
 		HumanError handle(Event2* event) override
@@ -350,41 +397,65 @@ namespace core::websocket
 				if (socketResult.isError())
 					return socketResult.releaseError();
 
-				auto handshake = loop->startThread<HandshakeThread>(socketResult.releaseValue(), m_handler, m_maxHandshakeSize, loop, m_log, m_allocator);
-				m_threads.push(handshake);
+				auto handshake = loop->startThread<HandshakeThread>(socketResult.releaseValue(), m_handler, m_threadSet, m_maxHandshakeSize, loop, m_log, m_allocator);
+				m_threadSet->push(handshake);
 				return m_socket.accept(sharedFromThis());
 			}
 			return {};
 		}
 	};
 
-	HumanError Server2::start(const ServerConfig2 &config, EventLoop2 *loop)
+	class ImplServer2: public Server2
 	{
-		auto socket = Socket::open(m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
-		if (socket == nullptr)
-			return errf(m_allocator, "failed to open accept socket"_sv);
+		Allocator* m_allocator = nullptr;
+		Log* m_log = nullptr;
+		Shared<ThreadSet> m_threadSet;
+	public:
+		ImplServer2(Log* log, Allocator* allocator)
+			: m_allocator(allocator),
+			  m_log(log)
+		{
+			m_threadSet = shared_from<ThreadSet>(m_allocator, m_allocator);
+		}
 
-		auto ok = socket->bind(config.host, config.port);
-		if (ok == false)
-			return errf(m_allocator, "failed to bind socket"_sv);
+		~ImplServer2() override
+		{
+			m_threadSet->stopAllAndClear();
+		}
 
-		ok = socket->listen();
-		if (ok == false)
-			return errf(m_allocator, "failed to listen socket"_sv);
+		HumanError start(const ServerConfig2& config, EventLoop2* loop) override
+		{
+			auto socket = Socket::open(m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
+			if (socket == nullptr)
+				return errf(m_allocator, "failed to open accept socket"_sv);
 
-		auto eventSocketResult = loop->registerSocket(std::move(socket));
-		if (eventSocketResult.isError())
-			return eventSocketResult.releaseError();
-		auto eventSocket = eventSocketResult.releaseValue();
+			auto ok = socket->bind(config.host, config.port);
+			if (ok == false)
+				return errf(m_allocator, "failed to bind socket"_sv);
 
-		m_acceptThread = loop->startThread<AcceptThread>(eventSocket, config.handler, config.maxHandshakeSize, loop, m_log, m_allocator);
-		return {};
-	}
+			ok = socket->listen();
+			if (ok == false)
+				return errf(m_allocator, "failed to listen socket"_sv);
 
-	HumanError Server2::handleClient(EventSocket2 socket, const Shared<EventThread2> &handler)
+			auto eventSocketResult = loop->registerSocket(std::move(socket));
+			if (eventSocketResult.isError())
+				return eventSocketResult.releaseError();
+			auto eventSocket = eventSocketResult.releaseValue();
+
+			loop->startThread<AcceptThread>(eventSocket, config.handler, m_threadSet, config.maxHandshakeSize, loop, m_log, m_allocator);
+			return {};
+		}
+
+		HumanError handleClient(EventSocket2 socket, const Shared<EventThread2> &handler) override
+		{
+			auto loop = handler->eventLoop();
+			loop->startThread<ClientThread>(socket, handler, m_threadSet, loop, m_log, m_allocator);
+			return {};
+		}
+	};
+
+	Result<Unique<Server2>> Server2::create(Log *log, Allocator *allocator)
 	{
-		auto loop = handler->eventLoop();
-		loop->startThread<ClientThread>(socket, handler, loop, m_log, m_allocator);
-		return {};
+		return unique_from<ImplServer2>(allocator, log, allocator);
 	}
 }
