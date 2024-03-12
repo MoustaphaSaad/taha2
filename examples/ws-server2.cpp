@@ -1,7 +1,8 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
 #include <core/ThreadedEventLoop2.h>
-#include <core/websocket/Server2.h>
+#include <core/websocket/Server3.h>
+#include <core/websocket/Client3.h>
 #include <core/Url.h>
 
 #include <signal.h>
@@ -17,18 +18,16 @@ void signalHandler(int signal)
 
 class ServerHandler: public core::EventThread2
 {
-	core::websocket::Server2* m_server = nullptr;
 	core::Log* m_log = nullptr;
 public:
-	ServerHandler(core::EventLoop2* eventLoop, core::websocket::Server2* server, core::Log* log)
+	ServerHandler(core::EventLoop2* eventLoop, core::Log* log)
 		: EventThread2(eventLoop),
-		  m_server(server),
 		  m_log(log)
 	{}
 
 	core::HumanError handle(core::Event2* event) override
 	{
-		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
+		if (auto newConn = dynamic_cast<core::websocket::NewConnection3*>(event))
 		{
 			return newConn->client()->startReadingMessages(sharedFromThis());
 		}
@@ -64,18 +63,12 @@ int main(int argc, char** argv)
 	auto threadedEventLoop = threadedEventLoopResult.releaseValue();
 	EVENT_LOOP = threadedEventLoop.get();
 
-	auto serverResult = core::websocket::Server2::create(&log, &allocator);
-	if (serverResult.isError())
-	{
-		log.critical("failed to create websocket server, {}"_sv, serverResult.releaseError());
-		return EXIT_FAILURE;
-	}
-	auto server = serverResult.releaseValue();
+	auto server = core::websocket::Server3::create(&log, &allocator);
 
 	auto eventLoop = threadedEventLoop->next();
-	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, server.get(), &log);
+	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, &log);
 
-	core::websocket::ServerConfig2 config {
+	core::websocket::ServerConfig3 config {
 		.host = parsedUrl.host(),
 		.port = parsedUrl.port(),
 		.maxHandshakeSize = 64ULL * 1024ULL * 1024ULL,

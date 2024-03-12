@@ -46,6 +46,8 @@ target_sources(core PRIVATE
 	include/core/websocket/Client.h
 	include/core/websocket/Server2.h
 	include/core/websocket/Client2.h
+	include/core/websocket/Server3.h
+	include/core/websocket/Client3.h
 	src/core/websocket/Internal.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
@@ -67,6 +69,8 @@ target_sources(core PRIVATE
 	src/core/websocket/Client.cpp
 	src/core/websocket/Server2.cpp
 	src/core/websocket/Client2.cpp
+	src/core/websocket/Server3.cpp
+	src/core/websocket/Client3.cpp
 )
 
 if (WIN32)
