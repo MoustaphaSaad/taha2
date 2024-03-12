@@ -30,7 +30,7 @@ public:
 	{
 		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
 		{
-			return m_server->handleClient(newConn->releaseSocket(), sharedFromThis());
+			return newConn->client()->startReadingMessages(sharedFromThis());
 		}
 		return {};
 	}

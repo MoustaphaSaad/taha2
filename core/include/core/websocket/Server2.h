@@ -4,18 +4,19 @@
 #include "core/EventLoop2.h"
 #include "core/ThreadedEventLoop2.h"
 #include "core/websocket/Message.h"
+#include "core/websocket/Client2.h"
 
 namespace core::websocket
 {
 	class NewConnection: public Event2
 	{
-		EventSocket2 m_socket;
+		Client2* m_client = nullptr;
 	public:
-		NewConnection(EventSocket2 socket)
-			: m_socket(socket)
+		NewConnection(Client2* client)
+			: m_client(client)
 		{}
 
-		EventSocket2 releaseSocket() { return std::move(m_socket); }
+		Client2* client() const { return m_client; }
 	};
 
 	class MessageEvent: public Event2
@@ -45,6 +46,5 @@ namespace core::websocket
 
 		virtual ~Server2() = default;
 		virtual HumanError start(const ServerConfig2& config, EventLoop2* loop) = 0;
-		virtual HumanError handleClient(EventSocket2 socket, const Shared<EventThread2>& handler) = 0;
 	};
 }

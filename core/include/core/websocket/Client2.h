@@ -20,5 +20,6 @@ namespace core::websocket
 		CORE_EXPORT static Result<Unique<Client2>> connect(const Client2Config& config, EventLoop2* loop, Log* log, Allocator* allocator);
 
 		virtual ~Client2() = default;
+		virtual HumanError startReadingMessages(const Shared<EventThread2>& handler) = 0;
 	};
 }
