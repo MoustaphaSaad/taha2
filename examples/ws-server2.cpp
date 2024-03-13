@@ -16,6 +16,38 @@ void signalHandler(int signal)
 	}
 }
 
+class ClientHandler: public core::EventThread2
+{
+public:
+	ClientHandler(core::EventLoop2* eventLoop)
+		: EventThread2(eventLoop)
+	{}
+
+	core::HumanError handle(core::Event2* event) override
+	{
+		if (auto messageEvent = dynamic_cast<core::websocket::MessageEvent*>(event))
+		{
+			if (messageEvent->message().type == core::websocket::Message::TYPE_TEXT)
+			{
+				return messageEvent->client()->writeText(core::StringView{messageEvent->message().payload});
+			}
+			else if (messageEvent->message().type == core::websocket::Message::TYPE_BINARY)
+			{
+				return messageEvent->client()->writeBinary(core::Span<const std::byte>{messageEvent->message().payload});
+			}
+			else
+			{
+				return messageEvent->handle();
+			}
+		}
+		else if (auto errorEvent = dynamic_cast<core::websocket::ErrorEvent*>(event))
+		{
+			return errorEvent->handle();
+		}
+		return {};
+	}
+};
+
 class ServerHandler: public core::EventThread2
 {
 	core::Log* m_log = nullptr;
@@ -29,7 +61,9 @@ public:
 	{
 		if (auto newConn = dynamic_cast<core::websocket::NewConnection3*>(event))
 		{
-			return newConn->client()->startReadingMessages(sharedFromThis());
+			auto loop = eventLoop()->next();
+			auto clientHandler = loop->startThread<ClientHandler>(loop);
+			return newConn->client()->startReadingMessages(clientHandler);
 		}
 		return {};
 	}
@@ -81,7 +115,7 @@ int main(int argc, char** argv)
 		return EXIT_FAILURE;
 	}
 
-	err = eventLoop->run();
+	err = threadedEventLoop->run();
 	if (err)
 	{
 		log.critical("event loop error, {}"_sv, err);

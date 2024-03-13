@@ -32,7 +32,7 @@ namespace core
 			res->m_eventLoops.reserve(threadsCount);
 			for (size_t i = 0; i < threadsCount; ++i)
 			{
-				auto loopResult = EventLoop2::create(log, allocator);
+				auto loopResult = EventLoop2::create(res.get(), log, allocator);
 				if (loopResult.isError())
 					return loopResult.releaseError();
 				res->m_eventLoops.push(loopResult.releaseValue());
