@@ -323,7 +323,7 @@ namespace core::websocket
 	{
 		if (success)
 		{
-			m_server->clientHandshakeDone(this);
+			m_server->clientHandshakeDone(sharedFromThis());
 		}
 		else
 		{
@@ -333,7 +333,7 @@ namespace core::websocket
 
 	void Client3::connectionClosed()
 	{
-		m_server->clientClosed(this);
+		m_server->clientClosed(sharedFromThis());
 	}
 
 	Client3::Client3(EventSocket2 socket, size_t maxMessageSize, Log* log, Allocator* allocator)
@@ -343,7 +343,7 @@ namespace core::websocket
 		  m_maxMessageSize(maxMessageSize)
 	{}
 
-	Unique<Client3> Client3::acceptFromServer(
+	Shared<Client3> Client3::acceptFromServer(
 		Server3* server,
 		EventLoop2* loop,
 		EventSocket2 socket,
@@ -352,7 +352,7 @@ namespace core::websocket
 		Log* log,
 		Allocator* allocator)
 	{
-		auto res = unique_from<Client3>(allocator, socket, maxMessageSize, log, allocator);
+		auto res = shared_from<Client3>(allocator, socket, maxMessageSize, log, allocator);
 		res->m_server = server;
 		loop->startThread<ServerHandshakeThread3>(loop, res.get(), socket, maxHandshakeSize, log, allocator);
 		return res;

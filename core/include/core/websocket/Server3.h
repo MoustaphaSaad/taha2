@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Exports.h"
+#include "core/websocket/Client3.h"
 #include "core/StringView.h"
 #include "core/EventLoop2.h"
 #include "core/Unique.h"
@@ -20,17 +21,15 @@ namespace core::websocket
 		Shared<EventThread2> handler;
 	};
 
-	class Client3;
-
 	class NewConnection3: public Event2
 	{
-		Client3* m_client = nullptr;
+		Shared<Client3> m_client;
 	public:
-		NewConnection3(Client3* client)
+		NewConnection3(const Shared<Client3>& client)
 			: m_client(client)
 		{}
 
-		Client3* client() const { return m_client; }
+		const Shared<Client3>& client() const { return m_client; }
 	};
 
 	class Server3
@@ -45,11 +44,11 @@ namespace core::websocket
 		class ClientSet
 		{
 			Mutex m_mutex;
-			Map<Client3*, Unique<Client3>> m_clients;
+			Set<Shared<Client3>> m_clients;
 		public:
 			ClientSet(Allocator* allocator);
-			void push(Unique<Client3> client);
-			void pop(Client3* client);
+			void push(const Shared<Client3>& client);
+			void pop(const Shared<Client3>& client);
 		};
 
 		Allocator* m_allocator = nullptr;
@@ -61,8 +60,8 @@ namespace core::websocket
 		ClientSet m_clientSet;
 
 		void clientConnected(Unique<Socket> socket);
-		void clientHandshakeDone(Client3* client);
-		void clientClosed(Client3* client);
+		void clientHandshakeDone(const Shared<Client3>& client);
+		void clientClosed(const Shared<Client3>& client);
 		Server3(Log* log, Allocator* allocator);
 	public:
 		CORE_EXPORT static Unique<Server3> create(Log* log, Allocator* allocator);

@@ -38,14 +38,13 @@ namespace core::websocket
 		  m_clients(allocator)
 	{}
 
-	void Server3::ClientSet::push(Unique<Client3> client)
+	void Server3::ClientSet::push(const Shared<Client3>& client)
 	{
 		auto lock = Lock<Mutex>::lock(m_mutex);
-		auto handle = client.get();
-		m_clients.insert(handle, std::move(client));
+		m_clients.insert(client);
 	}
 
-	void Server3::ClientSet::pop(Client3* client)
+	void Server3::ClientSet::pop(const Shared<Client3>& client)
 	{
 		auto lock = Lock<Mutex>::lock(m_mutex);
 		m_clients.remove(client);
@@ -73,14 +72,13 @@ namespace core::websocket
 		m_clientSet.push(std::move(client));
 	}
 
-	void Server3::clientHandshakeDone(Client3* client)
+	void Server3::clientHandshakeDone(const Shared<Client3>& client)
 	{
-		// TODO: handle if the client is destroyed while the event is still being processed
 		auto newConn = unique_from<NewConnection3>(m_allocator, client);
 		(void) m_handler->send(std::move(newConn));
 	}
 
-	void Server3::clientClosed(Client3 *client)
+	void Server3::clientClosed(const Shared<Client3>& client)
 	{
 		m_clientSet.pop(client);
 	}
