@@ -39,5 +39,7 @@ namespace core
 		virtual Unique<Socket> accept() = 0;
 		virtual bool shutdown(SHUTDOWN how) = 0;
 		virtual int64_t fd() = 0;
+		virtual FAMILY family() = 0;
+		virtual TYPE type() = 0;
 	};
 }

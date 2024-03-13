@@ -458,6 +458,14 @@ namespace core
 			if (socket == nullptr)
 				return nullptr;
 
+			if (socket->type() == Socket::TYPE_TCP)
+			{
+				int flag = 1;
+				auto ok = setsockopt(socket->fd(), IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(flag));
+				if (ok == SOCKET_ERROR)
+					return errf(m_allocator, "failed to set TCP_NODELAY flag, ErrorCode({})"_sv, WSAGetLastError());
+			}
+
 			auto newPort = CreateIoCompletionPort((HANDLE)socket->fd(), m_completionPort, NULL, 0);
 			if (newPort != m_completionPort)
 				return errf(m_allocator, "failed to register socket in completion port"_sv);

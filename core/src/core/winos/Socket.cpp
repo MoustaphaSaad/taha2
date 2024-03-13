@@ -165,6 +165,31 @@ namespace core
 			return (int64_t)m_handle;
 		}
 
+		FAMILY family() override
+		{
+			switch (m_family)
+			{
+			case AF_UNSPEC: return FAMILY_UNSPEC;
+			case AF_INET: return FAMILY_IPV4;
+			case AF_INET6: return FAMILY_IPV6;
+			default:
+				assert(false);
+				return FAMILY(0);
+			}
+		}
+
+		TYPE type() override
+		{
+			switch (m_type)
+			{
+			case SOCK_STREAM: return TYPE_TCP;
+			case SOCK_DGRAM: return TYPE_UDP;
+			default:
+				assert(false);
+				return TYPE(0);
+			}
+		}
+
 		size_t read(void* buffer, size_t size) override
 		{
 			auto err = ::recv(m_handle, (char*)buffer, (int)size, 0);
