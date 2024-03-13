@@ -6,6 +6,8 @@
 #include "core/Base64.h"
 #include "core/Rand.h"
 
+#include <tracy/Tracy.hpp>
+
 namespace core::websocket
 {
 	class ServerHandshakeThread3: public EventThread2
@@ -37,10 +39,12 @@ namespace core::websocket
 		{
 			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
 			{
+				ZoneScopedN("StartEvent");
 				return m_socket.read(sharedFromThis());
 			}
 			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
 			{
+				ZoneScopedN("ReadEvent");
 				auto totalHandshakeBuffer = m_buffer.count() + readEvent->bytes().count();
 				if (totalHandshakeBuffer > m_maxHandshakeSize)
 				{
@@ -121,10 +125,12 @@ namespace core::websocket
 		{
 			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
 			{
+				ZoneScopedN("StartEvent");
 				return m_socket.read(sharedFromThis());
 			}
 			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
 			{
+				ZoneScopedN("ReadEvent");
 				m_buffer.push(readEvent->bytes());
 
 				auto bytes = Span<const std::byte>{m_buffer};
@@ -187,6 +193,7 @@ namespace core::websocket
 
 	HumanError Client3::writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> payload)
 	{
+		ZoneScoped;
 		if (FrameHeader::isCtrlOpcode(opcode))
 		{
 			assert(payload.sizeInBytes() <= 125);
@@ -258,6 +265,7 @@ namespace core::websocket
 
 	HumanError Client3::writeCloseWithCode(uint16_t code, StringView reason)
 	{
+		ZoneScoped;
 		std::byte buf[125];
 		buf[0] = std::byte((code >> 8) & 0xFF);
 		buf[1] = std::byte(code & 0xFF);
@@ -269,6 +277,7 @@ namespace core::websocket
 
 	void Client3::handshakeDone(bool success)
 	{
+		ZoneScoped;
 		if (success)
 		{
 			m_server->clientHandshakeDone(sharedFromThis());
@@ -281,6 +290,7 @@ namespace core::websocket
 
 	void Client3::connectionClosed()
 	{
+		ZoneScoped;
 		m_server->clientClosed(sharedFromThis());
 	}
 
@@ -300,6 +310,7 @@ namespace core::websocket
 		Log* log,
 		Allocator* allocator)
 	{
+		ZoneScoped;
 		auto res = shared_from<Client3>(allocator, socket, maxMessageSize, log, allocator);
 		res->m_server = server;
 		loop->startThread<ServerHandshakeThread3>(loop, res.get(), socket, maxHandshakeSize, log, allocator);
@@ -308,6 +319,7 @@ namespace core::websocket
 
 	HumanError Client3::startReadingMessages(const Shared<EventThread2>& handler)
 	{
+		ZoneScoped;
 		auto loop = handler->eventLoop();
 		loop->startThread<ReadMessageThread3>(loop, this, handler, m_socket, m_maxMessageSize, m_log, m_allocator);
 		return {};
@@ -315,31 +327,37 @@ namespace core::websocket
 
 	HumanError Client3::writeText(StringView payload)
 	{
+		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_TEXT, payload);
 	}
 
 	HumanError Client3::writeBinary(Span<const std::byte> payload)
 	{
+		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_BINARY, payload);
 	}
 
 	HumanError Client3::writePing(Span<const std::byte> payload)
 	{
+		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_PING, payload);
 	}
 
 	HumanError Client3::writePong(Span<const std::byte> payload)
 	{
+		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_PONG, payload);
 	}
 
 	HumanError Client3::writeClose(uint16_t errorCode, StringView optionalReason)
 	{
+		ZoneScoped;
 		return writeCloseWithCode(errorCode, optionalReason);
 	}
 
 	HumanError Client3::defaultMessageHandler(const Message& message)
 	{
+		ZoneScoped;
 		if (message.type == Message::TYPE_CLOSE)
 		{
 			m_log->debug("close: {}"_sv, message.payload.count());

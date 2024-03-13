@@ -5,6 +5,8 @@
 #include <core/websocket/Client3.h>
 #include <core/Url.h>
 
+#include <tracy/Tracy.hpp>
+
 #include <signal.h>
 
 core::ThreadedEventLoop2* EVENT_LOOP = nullptr;
@@ -27,6 +29,7 @@ public:
 	{
 		if (auto messageEvent = dynamic_cast<core::websocket::MessageEvent*>(event))
 		{
+			ZoneScopedN("MessageEvent");
 			if (messageEvent->message().type == core::websocket::Message::TYPE_TEXT)
 			{
 				return messageEvent->client()->writeText(core::StringView{messageEvent->message().payload});
@@ -42,6 +45,7 @@ public:
 		}
 		else if (auto errorEvent = dynamic_cast<core::websocket::ErrorEvent*>(event))
 		{
+			ZoneScopedN("ErrorEvent");
 			return errorEvent->handle();
 		}
 		return {};
@@ -61,6 +65,7 @@ public:
 	{
 		if (auto newConn = dynamic_cast<core::websocket::NewConnection3*>(event))
 		{
+			ZoneScopedN("NewConnection");
 			auto loop = eventLoop()->next();
 			auto clientHandler = loop->startThread<ClientHandler>(loop);
 			return newConn->client()->startReadingMessages(clientHandler);
