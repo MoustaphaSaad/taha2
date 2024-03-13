@@ -66,3 +66,31 @@ TEST_CASE("pointer to parent class")
 	// auto baz = core::shared_from<Baz>(&allocator);
 	// foo = baz;
 }
+
+class BaseClass
+{
+public:
+	virtual ~BaseClass() = default;
+
+	virtual void foo() = 0;
+};
+
+class DerivedClass: public core::SharedFromThis<DerivedClass>, public BaseClass
+{
+public:
+	void foo() override
+	{}
+};
+
+TEST_CASE("pointer to base class with multiple inheritance")
+{
+	core::Mallocator allocator;
+
+	core::Shared<BaseClass> base;
+	{
+		auto derived = core::shared_from<DerivedClass>(&allocator);
+		base = derived;
+		derived->foo();
+	}
+	base->foo();
+}

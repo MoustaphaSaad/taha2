@@ -15,6 +15,15 @@ namespace core
 	template<typename T>
 	class SharedFromThis;
 
+	struct SharedControlBlock
+	{
+		Allocator* allocator = nullptr;
+		void* originalPtr = nullptr;
+		size_t originalSize = 0;
+		std::atomic<int> strong = 0;
+		std::atomic<int> weak = 0;
+	};
+
 	template<typename T>
 	class Shared
 	{
@@ -31,15 +40,15 @@ namespace core
 		template<typename>
 		friend class SharedFromThis;
 
-		struct Control
-		{
-			std::atomic<int> strong = 0;
-			std::atomic<int> weak = 0;
-			T* ptr = nullptr;
-		};
+		SharedControlBlock* m_control = nullptr;
+		T* m_ptr = nullptr;
 
-		Allocator* m_allocator = nullptr;
-		Control* m_control = nullptr;
+		Allocator* getAllocator()
+		{
+			if (m_control == nullptr)
+				return nullptr;
+			return m_control->allocator;
+		}
 
 		void ref()
 		{
@@ -54,18 +63,19 @@ namespace core
 		{
 			if (m_control)
 			{
+				auto allocator = getAllocator();
 				if (m_control->strong.fetch_sub(1) == 1)
 				{
-					m_control->ptr->~T();
-					m_allocator->release((void*)m_control->ptr, sizeof(T));
-					m_allocator->free((void*)m_control->ptr, sizeof(T));
-					m_control->ptr = nullptr;
+					m_ptr->~T();
+					m_ptr = nullptr;
+					allocator->release(m_control->originalPtr, m_control->originalSize);
+					allocator->free(m_control->originalPtr, m_control->originalSize);
 				}
 
 				if (m_control->weak.fetch_sub(1) == 1)
 				{
-					m_allocator->release(m_control, sizeof(Control));
-					m_allocator->free(m_control, sizeof(Control));
+					allocator->release(m_control, sizeof(*m_control));
+					allocator->free(m_control, sizeof(*m_control));
 					m_control = nullptr;
 				}
 			}
@@ -74,18 +84,18 @@ namespace core
 		template<typename U>
 		void copyFrom(const Shared<U>& other)
 		{
-			m_allocator = other.m_allocator;
-			m_control = (Shared<T>::Control*)other.m_control;
+			m_control = other.m_control;
+			m_ptr = other.m_ptr;
 			ref();
 		}
 
 		template<typename U>
 		void moveFrom(Shared<U>&& other)
 		{
-			m_allocator = other.m_allocator;
-			m_control = (Shared<T>::Control*)other.m_control;
-			other.m_allocator = nullptr;
+			m_control = other.m_control;
+			m_ptr = other.m_ptr;
 			other.m_control = nullptr;
+			other.m_ptr = nullptr;
 		}
 
 		template<typename U>
@@ -95,9 +105,9 @@ namespace core
 	public:
 		Shared() = default;
 
-		Shared(Allocator* a, Control* c)
-			: m_allocator(a),
-			  m_control(c)
+		Shared(T* ptr, SharedControlBlock* c)
+			: m_control(c),
+			  m_ptr(ptr)
 		{
 			ref();
 		}
@@ -131,8 +141,8 @@ namespace core
 		Shared& operator=(std::nullptr_t)
 		{
 			unref();
-			m_allocator = nullptr;
 			m_control = nullptr;
+			m_ptr = nullptr;
 			return *this;
 		}
 
@@ -175,28 +185,25 @@ namespace core
 
 		T& operator*() const
 		{
-			return *m_control->ptr;
+			return *m_ptr;
 		}
 
 		T* operator->() const
 		{
-			if (m_control)
-				return m_control->ptr;
-			else
-				return nullptr;
+			return m_ptr;
 		}
 
 		operator bool() const
 		{
-			return m_control != nullptr;
+			return m_ptr != nullptr;
 		}
 
-		bool operator==(std::nullptr_t) const { return m_control == nullptr; }
-		bool operator!=(std::nullptr_t) const { return m_control != nullptr; }
+		bool operator==(std::nullptr_t) const { return m_ptr == nullptr; }
+		bool operator!=(std::nullptr_t) const { return m_ptr != nullptr; }
 		template<typename R>
-		bool operator==(const Shared<R>& other) const { return m_control == other.m_control; }
+		bool operator==(const Shared<R>& other) const { return m_ptr == other.m_ptr; }
 		template<typename R>
-		bool operator!=(const Shared<R>& other) const { return m_control != other.m_control; }
+		bool operator!=(const Shared<R>& other) const { return m_ptr != other.m_ptr; }
 
 		int ref_count() const
 		{
@@ -207,23 +214,10 @@ namespace core
 
 		T* get() const
 		{
-			if (m_control)
-				return m_control->ptr;
-			else
-				return nullptr;
+			return m_ptr;
 		}
 
-		T* leak()
-		{
-			T* res = nullptr;
-			if (m_control)
-				res = m_control->ptr;
-			m_control = nullptr;
-			m_allocator = nullptr;
-			return res;
-		}
-
-		Allocator* allocator() const { return m_allocator; }
+		Allocator* allocator() const { return getAllocator(); }
 	};
 
 	template<typename T>
@@ -246,8 +240,15 @@ namespace core
 		template<typename>
 		friend class Weak;
 
-		Allocator* allocator = nullptr;
-		typename Shared<T>::Control* control = nullptr;
+		SharedControlBlock* control = nullptr;
+		T* m_ptr = nullptr;
+
+		Allocator* getAllocator()
+		{
+			if (control == nullptr)
+				return nullptr;
+			return control->allocator;
+		}
 
 		void ref()
 		{
@@ -259,6 +260,7 @@ namespace core
 		{
 			if (control)
 			{
+				auto allocator = getAllocator();
 				if (control->weak.fetch_sub(1) == 1)
 				{
 					allocator->release(control, sizeof(*control));
@@ -271,19 +273,19 @@ namespace core
 		template<typename U>
 		void copyFrom(const Weak<U>& other)
 		{
-			allocator = other.allocator;
-			control = (typename Shared<T>::Control*)other.control;
+			control = other.control;
+			m_ptr = other.m_ptr;
 			ref();
 		}
 
 		template<typename U>
 		void moveFrom(Weak<U>&& other)
 		{
-			allocator = other.allocator;
-			control = (typename Shared<T>::Control*)other.control;
+			control = other.control;
+			m_ptr = other.m_ptr;
 
-			other.allocator = nullptr;
 			other.control = nullptr;
+			other.m_ptr = nullptr;
 		}
 
 	public:
@@ -293,8 +295,8 @@ namespace core
 
 		Weak(const Shared<T>& shared)
 		{
-			allocator = shared.m_allocator;
-			control = (typename Shared<T>::Control*)shared.m_control;
+			control = shared.m_control;
+			m_ptr = shared.m_ptr;
 			ref();
 		}
 
@@ -302,8 +304,8 @@ namespace core
 		requires std::is_convertible_v<U*, T*>
 		Weak(const Shared<U>& shared)
 		{
-			allocator = shared.m_allocator;
-			control = (typename Shared<T>::Control*)shared.m_control;
+			control = shared.m_control;
+			m_ptr = shared.m_ptr;
 			ref();
 		}
 
@@ -334,8 +336,8 @@ namespace core
 		Weak& operator=(std::nullptr_t)
 		{
 			unref();
-			allocator = nullptr;
 			control = nullptr;
+			m_ptr = nullptr;
 			return *this;
 		}
 
@@ -378,15 +380,15 @@ namespace core
 
 		operator bool() const
 		{
-			return control != nullptr;
+			return m_ptr != nullptr;
 		}
 
-		bool operator==(std::nullptr_t) const { return control == nullptr; }
-		bool operator!=(std::nullptr_t) const { return control != nullptr; }
+		bool operator==(std::nullptr_t) const { return m_ptr == nullptr; }
+		bool operator!=(std::nullptr_t) const { return m_ptr != nullptr; }
 		template<typename R>
-		bool operator==(const Weak<R>& other) const { return control == other.control; }
+		bool operator==(const Weak<R>& other) const { return m_ptr == other.m_ptr; }
 		template<typename R>
-		bool operator!=(const Weak<R>& other) const { return control != other.control; }
+		bool operator!=(const Weak<R>& other) const { return m_ptr != other.m_ptr; }
 
 		int ref_count() const
 		{
@@ -420,8 +422,8 @@ namespace core
 			{
 				if (weak.control->strong.compare_exchange_weak(count, count + 1))
 				{
-					m_allocator = weak.allocator;
-					m_control = (Shared<T>::Control*)weak.control;
+					m_ptr = weak.m_ptr;
+					m_control = weak.control;
 					m_control->weak.fetch_add(1);
 					return true;
 				}
@@ -490,20 +492,20 @@ namespace core
 		auto ptr = (T*)allocator->alloc(sizeof(T), alignof(T));
 		allocator->commit(ptr, sizeof(*ptr));
 
-		using Control = typename Shared<T>::Control;
-
-		auto control = (Control*)allocator->alloc(sizeof(Control), alignof(Control));
+		auto control = (SharedControlBlock*)allocator->alloc(sizeof(SharedControlBlock), alignof(SharedControlBlock));
 		allocator->commit(control, sizeof(*control));
 
 		::new (ptr) T{std::forward<TArgs>(args)...};
-		::new (control) Control{};
-		control->ptr = ptr;
+		::new (control) SharedControlBlock{};
+		control->allocator = allocator;
+		control->originalPtr = ptr;
+		control->originalSize = sizeof(*ptr);
 
-		auto res = Shared<T>{allocator, control};
+		auto res = Shared<T>{ptr, control};
 
 		if constexpr (InheritsFromEnableSharedFromThis<T>::value)
 		{
-			control->ptr->m_ptr = res;
+			ptr->m_ptr = res;
 		}
 
 		return res;
