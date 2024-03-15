@@ -21,3 +21,6 @@ target_link_libraries(multi-threaded-echo-server core)
 
 add_executable(ws-server2 ws-server2.cpp)
 target_link_libraries(ws-server2 core)
+
+add_executable(ws-client3 ws-client3.cpp)
+target_link_libraries(ws-client3 core)
