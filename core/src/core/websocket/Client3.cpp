@@ -481,7 +481,7 @@ namespace core::websocket
 			return errf(allocator, "failed to open socket"_sv);
 
 		auto connected = socket->connect(parsedUrl.host(), parsedUrl.port());
-		if (connected)
+		if (connected == false)
 			return errf(allocator, "failed to connect to {}"_sv, url);
 
 		auto loop = handler->eventLoop();
