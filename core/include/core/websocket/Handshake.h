@@ -21,5 +21,6 @@ namespace core::websocket
 		StringView key() const { return m_key; }
 
 		CORE_EXPORT static Result<Handshake> parse(StringView request, Allocator* allocator);
+		CORE_EXPORT static Result<Handshake> parseResponse(StringView response, Allocator* allocator);
 	};
 }

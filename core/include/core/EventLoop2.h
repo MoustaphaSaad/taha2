@@ -134,6 +134,7 @@ namespace core
 	class EventThread2: public SharedFromThis<EventThread2>
 	{
 		EventLoop2* m_eventLoop = nullptr;
+		std::atomic_flag m_stopped;
 	public:
 		explicit EventThread2(EventLoop2* eventLoop)
 			: m_eventLoop(eventLoop)
@@ -145,5 +146,6 @@ namespace core
 		virtual HumanError handle(Event2* event) = 0;
 		CORE_EXPORT HumanError send(Unique<Event2> event);
 		CORE_EXPORT HumanError stop();
+		CORE_EXPORT bool stopped() const;
 	};
 }

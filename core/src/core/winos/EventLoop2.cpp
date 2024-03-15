@@ -550,6 +550,14 @@ namespace core
 	{
 		ZoneScoped;
 		auto linuxEventLoop = (WinOSEventLoop2*)m_eventLoop;
-		return linuxEventLoop->stopThread(weakFromThis());
+		auto err = linuxEventLoop->stopThread(weakFromThis());
+		if (!err)
+			m_stopped.test_and_set();
+		return err;
+	}
+
+	bool EventThread2::stopped() const
+	{
+		return m_stopped.test();
 	}
 }

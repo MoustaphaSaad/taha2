@@ -1,5 +1,7 @@
 #include "core/websocket/Handshake.h"
 
+#include <tracy/Tracy.hpp>
+
 namespace core::websocket
 {
 	Result<Handshake> Handshake::parse(StringView request, Allocator* allocator)
@@ -59,5 +61,55 @@ namespace core::websocket
 			return errf(allocator, "missing required headers"_sv);
 
 		return Handshake{String{key, allocator}};
+	}
+
+	Result<Handshake> Handshake::parseResponse(StringView response, Allocator *allocator)
+	{
+		ZoneScoped;
+
+		auto lines = response.split("\r\n"_sv, true, allocator);
+		if (lines.count() == 0)
+			return errf(allocator, "failed to parse empty handshake response"_sv);
+
+		auto statusLine = lines[0];
+		if (statusLine.startsWithIgnoreCase("HTTP/1.1 101"_sv) == false)
+			return errf(allocator, "unexpected handshake HTTP upgrade response, {}"_sv, statusLine);
+
+		int validResponse = 0;
+		StringView responseKey{};
+		for (size_t i = 1; i < lines.count(); ++i)
+		{
+			auto line = lines[i];
+
+			auto colonIndex = line.find(Rune{':'}, 0);
+			if (colonIndex == SIZE_MAX)
+				continue;
+
+			auto key = line.slice(0, colonIndex).trim();
+			auto value = line.slice(colonIndex + 1, line.count()).trim();
+
+			if (key.equalsIgnoreCase("upgrade"_sv))
+			{
+				if (value.equalsIgnoreCase("websocket"_sv) == false)
+					return errf(allocator, "invalid upgrade header, {}"_sv, value);
+				++validResponse;
+			}
+			else if (key.equalsIgnoreCase("connection"_sv))
+			{
+				if (value.equalsIgnoreCase("upgrade"_sv) == false)
+					return errf(allocator, "invalid connection header, {}"_sv, value);
+				++validResponse;
+			}
+			else if (key.equalsIgnoreCase("sec-websocket-accept"_sv))
+			{
+				responseKey = value;
+				++validResponse;
+			}
+		}
+
+		if (validResponse != 3)
+			return errf(allocator, "missing headers in handshake response"_sv);
+
+		return Handshake{String{responseKey, allocator}};
 	}
 }

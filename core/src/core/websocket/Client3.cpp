@@ -5,6 +5,8 @@
 #include "core/SHA1.h"
 #include "core/Base64.h"
 #include "core/Rand.h"
+#include "core/Url.h"
+#include "core/MemoryStream.h"
 
 #include <tracy/Tracy.hpp>
 
@@ -15,7 +17,6 @@ namespace core::websocket
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		EventSocket2 m_socket;
-		Buffer m_buffer;
 		size_t m_maxHandshakeSize = 1ULL * 1024ULL;
 		Client3* m_client = nullptr;
 		bool m_success = false;
@@ -25,7 +26,6 @@ namespace core::websocket
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
-			  m_buffer(allocator),
 			  m_maxHandshakeSize(maxHandshakeSize),
 			  m_client(client)
 		{}
@@ -45,7 +45,9 @@ namespace core::websocket
 			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
 			{
 				ZoneScopedN("ReadEvent");
-				auto totalHandshakeBuffer = m_buffer.count() + readEvent->bytes().count();
+				auto& buffer = m_client->m_buffer;
+
+				auto totalHandshakeBuffer = buffer.count() + readEvent->bytes().count();
 				if (totalHandshakeBuffer > m_maxHandshakeSize)
 				{
 					// TODO: maybe wait until data is sent
@@ -53,9 +55,9 @@ namespace core::websocket
 					(void)m_socket.write(R"(HTTP/1.1 400 Invalid\r\nerror: too large\r\ncontent-length: 0\r\n\r\n)"_sv, nullptr);
 					return stop();
 				}
-				m_buffer.push(readEvent->bytes());
+				buffer.push(readEvent->bytes());
 
-				auto handshakeString = StringView{m_buffer};
+				auto handshakeString = StringView{buffer};
 				if (handshakeString.endsWith("\r\n\r\n"_sv))
 				{
 					auto handshakeResult = Handshake::parse(handshakeString, m_allocator);
@@ -82,6 +84,114 @@ namespace core::websocket
 						return stop();
 					}
 
+					buffer.clear();
+					m_success = true;
+					return stop();
+				}
+				else
+				{
+					return m_socket.read(sharedFromThis());
+				}
+			}
+			return {};
+		}
+	};
+
+	class ClientHandshakeThread3: public EventThread2
+	{
+		Allocator* m_allocator = nullptr;
+		Log* m_log = nullptr;
+		EventSocket2 m_socket;
+		size_t m_maxHandshakeSize = 1ULL * 1024ULL;
+		Client3* m_client = nullptr;
+		std::byte m_key[16] = {};
+		Url m_url;
+		bool m_success = false;
+	public:
+		ClientHandshakeThread3(EventLoop2* loop, Client3* client, EventSocket2 socket, size_t maxHandshakeSize, Span<const std::byte> key, Url url, Log* log, Allocator* allocator)
+			: EventThread2(loop),
+			  m_allocator(allocator),
+			  m_log(log),
+			  m_socket(socket),
+			  m_maxHandshakeSize(maxHandshakeSize),
+			  m_client(client),
+			  m_url(std::move(url))
+		{
+			assert(key.sizeInBytes() == sizeof(m_key));
+			::memcpy(m_key, key.data(), key.sizeInBytes());
+		}
+
+		~ClientHandshakeThread3() override
+		{
+			m_client->handshakeDone(m_success);
+		}
+
+		HumanError handle(Event2* event) override
+		{
+			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
+			{
+				ZoneScopedN("StartEvent");
+				MemoryStream request{m_allocator};
+
+				auto base64Key = Base64::encode(Span<std::byte>{m_key, sizeof(m_key)}, m_allocator);
+				auto pathResult = m_url.pathWithQueryAndFragment(m_allocator);
+				if (pathResult.isError())
+					return pathResult.releaseError();
+				auto path = pathResult.releaseValue();
+
+				strf(&request, "GET {} HTTP/1.1\r\n"_sv, path);
+				strf(&request, "content-length: 0\r\n"_sv);
+				strf(&request, "upgrade: websocket\r\n"_sv);
+				strf(&request, "sec-websocket-version: 13\r\n"_sv);
+				strf(&request, "connection: upgrade\r\n"_sv);
+				strf(&request, "sec-websocket-key: {}\r\n"_sv, base64Key);
+				strf(&request, "Host: {}:{}\r\n"_sv, m_url.host(), m_url.port());
+				strf(&request, "\r\n"_sv);
+
+				auto requestAsString = request.releaseString();
+				if (auto err = m_socket.write(Span<const std::byte>{requestAsString}, nullptr))
+					return err;
+				return m_socket.read(sharedFromThis());
+			}
+			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
+			{
+				ZoneScopedN("ReadEvent");
+				auto& buffer = m_client->m_buffer;
+
+				auto totalHandshakeBuffer = buffer.count() + readEvent->bytes().count();
+				if (totalHandshakeBuffer > m_maxHandshakeSize)
+				{
+					m_log->error("handshake size is too long, size: {}bytes, max: {}bytes"_sv, totalHandshakeBuffer, m_maxHandshakeSize);
+					return stop();
+				}
+				buffer.push(readEvent->bytes());
+
+				auto handshakeString = StringView{buffer};
+				if (auto responseEnd = handshakeString.find("\r\n\r\n"_sv); responseEnd != SIZE_MAX)
+				{
+					auto handshakeResult = Handshake::parseResponse(handshakeString, m_allocator);
+					if (handshakeResult.isError())
+					{
+						m_log->error("failed to parse handshake response, {}"_sv, handshakeResult.releaseError());
+						return stop();
+					}
+					auto handshake = handshakeResult.releaseValue();
+
+					core::SHA1Hasher hasher;
+					hasher.hash(Base64::encode(Span<std::byte>{m_key, sizeof(m_key)}, m_allocator));
+					hasher.hash("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"_sv);
+					auto secHash = hasher.final();
+					auto base64SecHash = Base64::encode(secHash.asBytes(), m_allocator);
+					if (base64SecHash != handshake.key())
+					{
+						m_log->error("invalid hanshaked key response"_sv);
+						return stop();
+					}
+
+					// +4 for the last \r\n\r\n
+					auto responseSize = responseEnd + 4;
+					::memmove(buffer.data(), buffer.data() + responseSize, buffer.count() - responseSize);
+					buffer.resize(buffer.count() - responseSize);
 					m_success = true;
 					return stop();
 				}
@@ -99,10 +209,63 @@ namespace core::websocket
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
 		EventSocket2 m_socket;
-		Buffer m_buffer;
 		MessageParser m_messageParser;
 		Shared<EventThread2> m_handler;
 		Client3* m_client = nullptr;
+
+		HumanError handleReadBuffer(Buffer& buffer)
+		{
+			auto bytes = Span<const std::byte>{buffer};
+			while (bytes.count() > 0)
+			{
+				auto parserResult = m_messageParser.consume(bytes);
+				if (parserResult.isError())
+				{
+					auto errorEvent = unique_from<ErrorEvent>(m_allocator, m_client->sharedFromThis(), 1002, parserResult.releaseError());
+					(void) m_handler->send(std::move(errorEvent));
+					return stop();
+				}
+				auto consumedBytes = parserResult.value();
+
+				// if we didn't consume any bytes we just wait for more bytes
+				if (consumedBytes == 0 && m_messageParser.hasMessage() == false)
+					break;
+
+				if (consumedBytes > 0)
+					bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
+
+				if (m_messageParser.hasMessage())
+				{
+					auto msg = m_messageParser.message();
+
+					if (msg.type == Message::TYPE_TEXT && StringView{msg.payload}.isValidUtf8() == false)
+					{
+						auto errorEvent = unique_from<ErrorEvent>(m_allocator, m_client->sharedFromThis(), 1007, errf(m_allocator, "invalid utf8"_sv));
+						(void) m_handler->send(std::move(errorEvent));
+						return stop();
+					}
+
+					bool isClose = msg.type == Message::TYPE_CLOSE;
+					auto messageEvent = unique_from<MessageEvent>(m_allocator, m_client->sharedFromThis(), std::move(msg));
+					if (auto err = m_handler->send(std::move(messageEvent)))
+						return err;
+
+					if (isClose)
+						return stop();
+				}
+			}
+
+			if (bytes.count() == 0)
+			{
+				buffer.clear();
+			}
+			else
+			{
+				::memmove(buffer.data(), bytes.data(), bytes.count());
+				buffer.resize(bytes.count());
+			}
+			return {};
+		}
 
 	public:
 		ReadMessageThread3(EventLoop2* loop, Client3* client, const Shared<EventThread2>& handler, EventSocket2 socket, size_t maxMessageSize, Log* log, Allocator* allocator)
@@ -110,7 +273,6 @@ namespace core::websocket
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
-			  m_buffer(allocator),
 			  m_messageParser(allocator, maxMessageSize),
 			  m_handler(handler),
 			  m_client(client)
@@ -126,65 +288,33 @@ namespace core::websocket
 			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
 			{
 				ZoneScopedN("StartEvent");
-				return m_socket.read(sharedFromThis());
+				auto& buffer = m_client->m_buffer;
+				if (buffer.count() > 0)
+				{
+					if (auto err = handleReadBuffer(buffer))
+						return err;
+				}
+
+				if (stopped() == false)
+					return m_socket.read(sharedFromThis());
+
+				return {};
 			}
 			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
 			{
 				ZoneScopedN("ReadEvent");
-				m_buffer.push(readEvent->bytes());
+				auto& buffer = m_client->m_buffer;
+				buffer.push(readEvent->bytes());
 
-				auto bytes = Span<const std::byte>{m_buffer};
-				while (bytes.count() > 0)
+				if (auto err = handleReadBuffer(buffer))
+					return err;
+
+				if (stopped() == false)
 				{
-					auto parserResult = m_messageParser.consume(bytes);
-					if (parserResult.isError())
-					{
-						auto errorEvent = unique_from<ErrorEvent>(m_allocator, m_client->sharedFromThis(), 1002, parserResult.releaseError());
-						(void) m_handler->send(std::move(errorEvent));
+					if (auto err = m_socket.read(sharedFromThis()))
 						return stop();
-					}
-					auto consumedBytes = parserResult.value();
-
-					// if we didn't consume any bytes we just wait for more bytes
-					if (consumedBytes == 0 && m_messageParser.hasMessage() == false)
-						break;
-
-					if (consumedBytes > 0)
-						bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
-
-					if (m_messageParser.hasMessage())
-					{
-						auto msg = m_messageParser.message();
-
-						if (msg.type == Message::TYPE_TEXT && StringView{msg.payload}.isValidUtf8() == false)
-						{
-							auto errorEvent = unique_from<ErrorEvent>(m_allocator, m_client->sharedFromThis(), 1007, errf(m_allocator, "invalid utf8"_sv));
-							(void) m_handler->send(std::move(errorEvent));
-							return stop();
-						}
-
-						bool isClose = msg.type == Message::TYPE_CLOSE;
-						auto messageEvent = unique_from<MessageEvent>(m_allocator, m_client->sharedFromThis(), std::move(msg));
-						if (auto err = m_handler->send(std::move(messageEvent)))
-							return err;
-
-						if (isClose)
-							return stop();
-					}
 				}
 
-				if (bytes.count() == 0)
-				{
-					m_buffer.clear();
-				}
-				else
-				{
-					::memmove(m_buffer.data(), bytes.data(), bytes.count());
-					m_buffer.resize(bytes.count());
-				}
-
-				if (auto err = m_socket.read(sharedFromThis()))
-					return stop();
 				return {};
 			}
 			return {};
@@ -201,7 +331,7 @@ namespace core::websocket
 				payload = payload.slice(0, 125);
 		}
 
-		bool shouldMask = false;
+		bool shouldMask = m_server == nullptr;
 		std::byte mask[4] = {};
 		if (shouldMask)
 		{
@@ -280,7 +410,15 @@ namespace core::websocket
 		ZoneScoped;
 		if (success)
 		{
-			m_server->clientHandshakeDone(sharedFromThis());
+			if (m_server)
+			{
+				m_server->clientHandshakeDone(sharedFromThis());
+			}
+			else
+			{
+				auto newConn = unique_from<NewConnection3>(m_allocator, sharedFromThis());
+				(void)m_handler->send(std::move(newConn));
+			}
 		}
 		else
 		{
@@ -291,14 +429,23 @@ namespace core::websocket
 	void Client3::connectionClosed()
 	{
 		ZoneScoped;
-		m_server->clientClosed(sharedFromThis());
+		if (m_server)
+		{
+			m_server->clientClosed(sharedFromThis());
+		}
+		else
+		{
+			auto disconnected = unique_from<DisconnectedEvent>(m_allocator, sharedFromThis());
+			(void)m_handler->send(std::move(disconnected));
+		}
 	}
 
 	Client3::Client3(EventSocket2 socket, size_t maxMessageSize, Log* log, Allocator* allocator)
 		: m_allocator(allocator),
 		  m_log(log),
 		  m_socket(socket),
-		  m_maxMessageSize(maxMessageSize)
+		  m_maxMessageSize(maxMessageSize),
+		  m_buffer(allocator)
 	{}
 
 	Shared<Client3> Client3::acceptFromServer(
@@ -314,6 +461,38 @@ namespace core::websocket
 		auto res = shared_from<Client3>(allocator, socket, maxMessageSize, log, allocator);
 		res->m_server = server;
 		loop->startThread<ServerHandshakeThread3>(loop, res.get(), socket, maxHandshakeSize, log, allocator);
+		return res;
+	}
+
+	Result<Shared<Client3>> Client3::connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, const Shared<EventThread2>& handler, Log* log, Allocator* allocator)
+	{
+		ZoneScoped;
+		auto parsedUrlResult = core::Url::parse(url, allocator);
+		if (parsedUrlResult.isError())
+			return parsedUrlResult.releaseError();
+		auto parsedUrl = parsedUrlResult.releaseValue();
+
+		std::byte key[16] = {};
+		if (Rand::cryptoRand(Span<std::byte>{key, sizeof(key)}) == false)
+			return errf(allocator, "failed to generate random key"_sv);
+
+		auto socket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
+		if (socket == nullptr)
+			return errf(allocator, "failed to open socket"_sv);
+
+		auto connected = socket->connect(parsedUrl.host(), parsedUrl.port());
+		if (connected)
+			return errf(allocator, "failed to connect to {}"_sv, url);
+
+		auto loop = handler->eventLoop();
+		auto socketSourceResult = loop->registerSocket(std::move(socket));
+		if (socketSourceResult.isError())
+			return socketSourceResult.releaseError();
+		auto socketSource = socketSourceResult.releaseValue();
+
+		auto res = shared_from<Client3>(allocator, socketSource, maxMessageSize, log, allocator);
+		res->m_handler = handler;
+		loop->startThread<ClientHandshakeThread3>(loop, res.get(), socketSource, maxHandshakeSize, Span<const std::byte>{key, sizeof(key)}, std::move(parsedUrl), log, allocator);
 		return res;
 	}
 

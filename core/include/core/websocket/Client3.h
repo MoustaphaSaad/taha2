@@ -10,12 +10,14 @@ namespace core::websocket
 {
 	class Server3;
 	class ServerHandshakeThread3;
+	class ClientHandshakeThread3;
 	class ReadMessageThread3;
 
 	class Client3: public SharedFromThis<Client3>
 	{
 		friend class Server3;
 		friend class ServerHandshakeThread3;
+		friend class ClientHandshakeThread3;
 		friend class ReadMessageThread3;
 
 		template<typename T, typename ... TArgs>
@@ -27,6 +29,8 @@ namespace core::websocket
 		EventSocket2 m_socket;
 		size_t m_maxMessageSize = 64ULL * 1024ULL * 1024ULL;
 		Server3* m_server = nullptr;
+		Buffer m_buffer;
+		Shared<EventThread2> m_handler;
 
 		HumanError writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> payload);
 		HumanError writeCloseWithCode(uint16_t code, StringView reason);
@@ -43,6 +47,7 @@ namespace core::websocket
 			Allocator* allocator
 		);
 	public:
+		CORE_EXPORT static Result<Shared<Client3>> connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, const Shared<EventThread2>& handler, Log* log, Allocator* allocator);
 		CORE_EXPORT HumanError startReadingMessages(const Shared<EventThread2>& handler);
 
 		CORE_EXPORT HumanError writeText(StringView payload);
@@ -92,5 +97,16 @@ namespace core::websocket
 		{
 			return m_client->writeClose(m_errorCode, m_error.message());
 		}
+	};
+
+	class DisconnectedEvent: public Event2
+	{
+		Shared<Client3> m_client;
+	public:
+		DisconnectedEvent(const Shared<Client3>& client)
+			: m_client(client)
+		{}
+
+		const Shared<Client3>& client() const { return m_client; }
 	};
 }
