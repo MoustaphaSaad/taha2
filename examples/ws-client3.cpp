@@ -256,9 +256,14 @@ public:
 			ZoneScopedN("TestDriver::ReportUpdatedEvent");
 			++m_currentTest;
 			if (m_currentTest < m_testsCount)
+			{
 				return startTestClient();
+			}
 			else
+			{
+				m_client = nullptr;
 				return stop();
+			}
 		}
 		return {};
 	}
