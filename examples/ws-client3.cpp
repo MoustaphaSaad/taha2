@@ -172,7 +172,6 @@ class TestDriver: public core::EventThread2
 	size_t m_testsCount = sizeof(TESTS) / sizeof(*TESTS);
 	core::StringView m_baseUrl;
 	core::Shared<core::websocket::Client3> m_client;
-	core::ThreadedEventLoop2* m_threadedEventLoop = nullptr;
 
 	core::HumanError startTestClient()
 	{
@@ -225,24 +224,22 @@ class TestDriver: public core::EventThread2
 	}
 
 public:
-	TestDriver(core::EventLoop2* loop, core::StringView baseUrl, core::ThreadedEventLoop2* threadedEventLoop, core::Log* log, core::Allocator* allocator)
+	TestDriver(core::EventLoop2* loop, core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
 		: core::EventThread2(loop),
 		  m_allocator(allocator),
 		  m_log(log),
-		  m_baseUrl(baseUrl),
-		  m_threadedEventLoop(threadedEventLoop)
+		  m_baseUrl(baseUrl)
 	{}
 
 	~TestDriver() override
 	{
-		m_threadedEventLoop->stop();
+		eventLoop()->stopAllLoops();
 	}
 
 	core::HumanError handle(core::Event2* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
-			// TODO: stop the entire loop on error exit
 			ZoneScopedN("TestDriver::StartEvent");
 			return startTestClient();
 		}
@@ -291,7 +288,7 @@ int main(int argc, char** argv)
 	EVENT_LOOP = threadedEventLoop.get();
 
 	auto loop = threadedEventLoop->next();
-	loop->startThread<TestDriver>(loop, url, threadedEventLoop.get(), &log, &allocator);
+	loop->startThread<TestDriver>(loop, url, &log, &allocator);
 
 	auto err = threadedEventLoop->run();
 	if (err)

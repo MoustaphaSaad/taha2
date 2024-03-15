@@ -452,6 +452,18 @@ namespace core
 			}
 		}
 
+		void stopAllLoops() override
+		{
+			if (m_parentThreadedEventLoop)
+			{
+				m_parentThreadedEventLoop->stop();
+			}
+			else
+			{
+				stop();
+			}
+		}
+
 		Result<EventSocket2> registerSocket(Unique<Socket> socket) override
 		{
 			ZoneScoped;

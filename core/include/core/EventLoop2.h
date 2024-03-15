@@ -119,6 +119,7 @@ namespace core
 
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
+		virtual void stopAllLoops() = 0;
 		virtual Result<EventSocket2> registerSocket(Unique<Socket> socket) = 0;
 		virtual EventLoop2* next() = 0;
 
