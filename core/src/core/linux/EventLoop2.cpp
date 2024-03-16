@@ -677,4 +677,9 @@ namespace core
 		auto linuxEventLoop = (LinuxEventLoop2*)m_eventLoop;
 		return linuxEventLoop->stopThread(weakFromThis());
 	}
+
+	bool EventThread2::stopped() const
+	{
+		return m_stopped.test();
+	}
 }
