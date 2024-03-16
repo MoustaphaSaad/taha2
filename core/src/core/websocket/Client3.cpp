@@ -429,10 +429,11 @@ namespace core::websocket
 	void Client3::connectionClosed()
 	{
 		ZoneScoped;
-		if (m_server)
-			m_server->clientClosed(sharedFromThis());
 		auto disconnected = unique_from<DisconnectedEvent>(m_allocator, sharedFromThis());
 		(void)m_handler->send(std::move(disconnected));
+
+		if (m_server)
+			m_server->clientClosed(sharedFromThis());
 	}
 
 	Client3::Client3(EventSocket2 socket, size_t maxMessageSize, Log* log, Allocator* allocator)
@@ -495,6 +496,7 @@ namespace core::websocket
 	{
 		ZoneScoped;
 		auto loop = handler->eventLoop();
+		m_handler = handler;
 		loop->startThread<ReadMessageThread3>(loop, this, handler, m_socket, m_maxMessageSize, m_log, m_allocator);
 		return {};
 	}
