@@ -102,15 +102,17 @@ namespace core
 
 		struct WriteOp: Op
 		{
-			WriteOp(Buffer&& buffer_, const Weak<EventThread2>& thread_)
+			WriteOp(Buffer&& buffer_, const Weak<EventThread2>& thread_, const Shared<EventSource2>& source_)
 				: buffer(std::move(buffer_)),
 				  thread(thread_),
-				  remainingBytes(buffer)
+				  remainingBytes(buffer),
+				  source(source_)
 			{}
 
 			Buffer buffer;
 			Weak<EventThread2> thread;
 			Span<const std::byte> remainingBytes;
+			Shared<EventSource2> source;
 		};
 
 		class OpSet
@@ -267,7 +269,7 @@ namespace core
 			}
 		};
 
-		class SocketSource: public EventSource2
+		class SocketSource: public EventSource2, public SharedFromThis<SocketSource>
 		{
 			LinuxEventLoop2* m_eventLoop = nullptr;
 			Unique<Socket> m_socket;
@@ -280,6 +282,13 @@ namespace core
 				  m_pollIn(eventLoop->m_allocator),
 				  m_pollOut(eventLoop->m_allocator)
 			{}
+
+			~SocketSource() override
+			{
+				m_socket = nullptr;
+				auto& sources = m_eventLoop->m_sources;
+				sources.remove(this);
+			}
 
 			HumanError accept(const Shared<EventThread2>& thread) override
 			{
@@ -305,7 +314,7 @@ namespace core
 
 				Buffer buffer{allocator};
 				buffer.push(bytes);
-				auto op = unique_from<WriteOp>(allocator, std::move(buffer), thread);
+				auto op = unique_from<WriteOp>(allocator, std::move(buffer), thread, sharedFromThis());
 				m_pollOut.push(std::move(op));
 				return {};
 			}
@@ -528,7 +537,10 @@ namespace core
 					}
 					else
 					{
-						assert(false);
+						// due to how the code is structured, a polling thread may get an event as ready (especially because we use level triggered)
+						// and said thread will pause execution while another thread will destroy the source, then polling thread will resume
+						// thus going into this else clause, so an assert is not useful here
+						// assert(false);
 					}
 				}
 			}
