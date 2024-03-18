@@ -13,8 +13,8 @@ target_link_libraries(single-threaded-echo-server core)
 add_executable(multi-threaded-echo-server multi-threaded-echo-server.cpp)
 target_link_libraries(multi-threaded-echo-server core)
 
-add_executable(ws-server2 ws-server2.cpp)
-target_link_libraries(ws-server2 core)
+add_executable(ws-server ws-server.cpp)
+target_link_libraries(ws-server core)
 
-add_executable(ws-client3 ws-client3.cpp)
-target_link_libraries(ws-client3 core)
+add_executable(ws-client ws-client.cpp)
+target_link_libraries(ws-client core)

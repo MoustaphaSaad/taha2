@@ -35,9 +35,9 @@ target_sources(core PRIVATE
 	include/core/Base64.h
 	include/core/SHA1.h
 	include/core/Rand.h
-	include/core/EventLoop2.h
+	include/core/EventLoop.h
 	include/core/ExecutionQueue.h
-	include/core/ThreadedEventLoop2.h
+	include/core/ThreadedEventLoop.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
@@ -77,7 +77,7 @@ if (WIN32)
 			src/core/winos/IMutex.h
 			src/core/winos/Socket.cpp
 			src/core/winos/Rand.cpp
-			src/core/winos/EventLoop2.cpp
+			src/core/winos/EventLoop.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
@@ -108,7 +108,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/IMutex.h
 			src/core/linux/Socket.cpp
 			src/core/linux/Rand.cpp
-			src/core/linux/EventLoop2.cpp
+			src/core/linux/EventLoop.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()
