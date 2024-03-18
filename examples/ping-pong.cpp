@@ -7,7 +7,7 @@
 
 #include <signal.h>
 
-core::EventLoop2* LOOP;
+core::EventLoop* LOOP;
 
 void signalHandler(int signal)
 {
@@ -17,38 +17,38 @@ void signalHandler(int signal)
 	}
 }
 
-class PingEvent: public core::Event2
+class PingEvent: public core::Event
 {
 public:
-	core::Shared<core::EventThread2> pingThread = nullptr;
+	core::Shared<core::EventThread> pingThread = nullptr;
 
-	explicit PingEvent(const core::Shared<core::EventThread2>& thread)
+	explicit PingEvent(const core::Shared<core::EventThread>& thread)
 		: pingThread(thread)
 	{}
 };
 
-class PongEvent: public core::Event2
+class PongEvent: public core::Event
 {
 public:
-	core::Shared<core::EventThread2> pongThread = nullptr;
+	core::Shared<core::EventThread> pongThread = nullptr;
 
-	explicit PongEvent(const core::Shared<core::EventThread2>& thread)
+	explicit PongEvent(const core::Shared<core::EventThread>& thread)
 		: pongThread(thread)
 	{}
 };
 
-class PongThread: public core::EventThread2
+class PongThread: public core::EventThread
 {
 	core::Allocator* m_allocator = nullptr;
 	core::Log* m_log = nullptr;
 public:
-	explicit PongThread(core::EventLoop2* eventThreadPool, core::Log* log, core::Allocator* allocator)
-		: core::EventThread2(eventThreadPool),
+	explicit PongThread(core::EventLoop* eventThreadPool, core::Log* log, core::Allocator* allocator)
+		: core::EventThread(eventThreadPool),
 		  m_allocator(allocator),
 		  m_log(log)
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
@@ -69,18 +69,18 @@ public:
 	}
 };
 
-class PingThread: public core::EventThread2
+class PingThread: public core::EventThread
 {
 	core::Allocator* m_allocator = nullptr;
 	core::Log* m_log = nullptr;
 public:
-	explicit PingThread(core::EventLoop2* eventThreadPool, core::Log* log, core::Allocator* allocator)
-		: core::EventThread2(eventThreadPool),
+	explicit PingThread(core::EventLoop* eventThreadPool, core::Log* log, core::Allocator* allocator)
+		: core::EventThread(eventThreadPool),
 		  m_allocator(allocator),
 		  m_log(log)
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
@@ -100,7 +100,7 @@ public:
 		}
 	}
 
-	core::HumanError sendPing(const core::Shared<core::EventThread2>& thread)
+	core::HumanError sendPing(const core::Shared<core::EventThread>& thread)
 	{
 		return thread->send(core::unique_from<PingEvent>(m_allocator, sharedFromThis()));
 	}
@@ -113,7 +113,7 @@ int main()
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
 
-	auto eventLoopResult = core::EventLoop2::create(&log, &allocator);
+	auto eventLoopResult = core::EventLoop::create(&log, &allocator);
 	if (eventLoopResult.isError())
 	{
 		log.critical("failed to create event thread pool, {}"_sv, eventLoopResult.releaseError());

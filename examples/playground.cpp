@@ -7,7 +7,7 @@
 
 #include <signal.h>
 
-core::EventLoop2* LOOP;
+core::EventLoop* LOOP;
 
 void signalHandler(int signal)
 {
@@ -17,22 +17,22 @@ void signalHandler(int signal)
 	}
 }
 
-class EchoThread: public core::EventThread2
+class EchoThread: public core::EventThread
 {
-	core::EventSocket2 m_socket;
+	core::EventSocket m_socket;
 public:
-	explicit EchoThread(core::EventSocket2 socket, core::EventLoop2* eventLoop)
-		: EventThread2(eventLoop),
+	explicit EchoThread(core::EventSocket socket, core::EventLoop* eventLoop)
+		: EventThread(eventLoop),
 		  m_socket(std::move(socket))
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
 			return m_socket.read(sharedFromThis());
 		}
-		else if (auto readEvent = dynamic_cast<core::ReadEvent2*>(event))
+		else if (auto readEvent = dynamic_cast<core::ReadEvent*>(event))
 		{
 			if (auto err = m_socket.write(readEvent->bytes(), nullptr))
 				return err;
@@ -42,16 +42,16 @@ public:
 	}
 };
 
-class AcceptThread: public core::EventThread2
+class AcceptThread: public core::EventThread
 {
-	core::EventSocket2 m_socket;
+	core::EventSocket m_socket;
 public:
-	explicit AcceptThread(core::EventSocket2 socket, core::EventLoop2* eventLoop)
-		: EventThread2(eventLoop),
+	explicit AcceptThread(core::EventSocket socket, core::EventLoop* eventLoop)
+		: EventThread(eventLoop),
 		  m_socket(std::move(socket))
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
@@ -76,7 +76,7 @@ int main()
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
 
-	auto eventLoopResult = core::EventLoop2::create(&log, &allocator);
+	auto eventLoopResult = core::EventLoop::create(&log, &allocator);
 	if (eventLoopResult.isError())
 	{
 		log.critical("failed to create event thread pool, {}"_sv, eventLoopResult.releaseError());

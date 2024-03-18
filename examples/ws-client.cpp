@@ -7,15 +7,15 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
 #include <core/ThreadedEventLoop.h>
-#include <core/websocket/Client3.h>
+#include <core/websocket/Client.h>
 #include <core/Unique.h>
 
 #include <tracy/Tracy.hpp>
 
 #include <signal.h>
-#include "core/websocket/Server3.h"
+#include "core/websocket/Server.h"
 
-core::ThreadedEventLoop2* EVENT_LOOP = nullptr;
+core::ThreadedEventLoop* EVENT_LOOP = nullptr;
 
 static const char* TESTS[] = {
 	"1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.1.5", "1.1.6", "1.1.7", "1.1.8",
@@ -69,23 +69,23 @@ void signalHandler(int signal)
 		EVENT_LOOP->stop();
 }
 
-class TestFinishedEvent: public core::Event2
+class TestFinishedEvent: public core::Event
 {};
 
-class ClientHandler: public core::EventThread2
+class ClientHandler: public core::EventThread
 {
 	core::Allocator* m_allocator = nullptr;
-	core::Shared<core::EventThread2> m_testDriver;
+	core::Shared<core::EventThread> m_testDriver;
 public:
-	ClientHandler(core::EventLoop2* loop, core::Shared<core::EventThread2> testDriver, core::Allocator* allocator)
-		: core::EventThread2(loop),
+	ClientHandler(core::EventLoop* loop, core::Shared<core::EventThread> testDriver, core::Allocator* allocator)
+		: core::EventThread(loop),
 		  m_allocator(allocator),
 		  m_testDriver(std::move(testDriver))
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
-		if (auto newConn = dynamic_cast<core::websocket::NewConnection3*>(event))
+		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
 		{
 			ZoneScopedN("NewConnection");
 			return newConn->client()->startReadingMessages(sharedFromThis());
@@ -122,23 +122,23 @@ public:
 	}
 };
 
-class ReportUpdatedEvent: public core::Event2
+class ReportUpdatedEvent: public core::Event
 {};
 
-class UpdateReportHandler: public core::EventThread2
+class UpdateReportHandler: public core::EventThread
 {
 	core::Allocator* m_allocator = nullptr;
-	core::Shared<core::EventThread2> m_testDriver;
+	core::Shared<core::EventThread> m_testDriver;
 public:
-	UpdateReportHandler(core::EventLoop2* loop, core::Shared<core::EventThread2> testDriver, core::Allocator* allocator)
-		: core::EventThread2(loop),
+	UpdateReportHandler(core::EventLoop* loop, core::Shared<core::EventThread> testDriver, core::Allocator* allocator)
+		: core::EventThread(loop),
 		  m_allocator(allocator),
 		  m_testDriver(std::move(testDriver))
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
-		if (auto newConn = dynamic_cast<core::websocket::NewConnection3*>(event))
+		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
 		{
 			ZoneScopedN("NewConnection");
 			return newConn->client()->startReadingMessages(sharedFromThis());
@@ -164,14 +164,14 @@ public:
 	}
 };
 
-class TestDriver: public core::EventThread2
+class TestDriver: public core::EventThread
 {
 	core::Allocator* m_allocator = nullptr;
 	core::Log* m_log = nullptr;
 	size_t m_currentTest = 0;
 	size_t m_testsCount = sizeof(TESTS) / sizeof(*TESTS);
 	core::StringView m_baseUrl;
-	core::Shared<core::websocket::Client3> m_client;
+	core::Shared<core::websocket::Client> m_client;
 
 	core::HumanError startTestClient()
 	{
@@ -180,7 +180,7 @@ class TestDriver: public core::EventThread2
 		auto urlWithPath = core::strf(m_allocator, "{}/runCase?casetuple={}&agent=taha2"_sv, m_baseUrl, testname);
 		auto loop = eventLoop()->next();
 		auto handler = loop->startThread<ClientHandler>(loop, sharedFromThis(), m_allocator);
-		auto clientResult = core::websocket::Client3::connect(
+		auto clientResult = core::websocket::Client::connect(
 			urlWithPath,
 			2ULL * 1024ULL,
 			64ULL * 1024ULL * 1024ULL,
@@ -204,7 +204,7 @@ class TestDriver: public core::EventThread2
 		auto urlWithPath = core::strf(m_allocator, "{}/updateReports?agent=taha2"_sv, m_baseUrl);
 		auto loop = eventLoop()->next();
 		auto handler = loop->startThread<UpdateReportHandler>(loop, sharedFromThis(), m_allocator);
-		auto clientResult = core::websocket::Client3::connect(
+		auto clientResult = core::websocket::Client::connect(
 			urlWithPath,
 			2ULL * 1024ULL,
 			64ULL * 1024ULL * 1024ULL,
@@ -224,8 +224,8 @@ class TestDriver: public core::EventThread2
 	}
 
 public:
-	TestDriver(core::EventLoop2* loop, core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
-		: core::EventThread2(loop),
+	TestDriver(core::EventLoop* loop, core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
+		: core::EventThread(loop),
 		  m_allocator(allocator),
 		  m_log(log),
 		  m_baseUrl(baseUrl)
@@ -236,7 +236,7 @@ public:
 		eventLoop()->stopAllLoops();
 	}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
@@ -278,7 +278,7 @@ int main(int argc, char** argv)
 	core::FastLeak allocator;
 	core::Log log{&allocator};
 
-	auto threadedEventLoopResult = core::ThreadedEventLoop2::create(&log, &allocator);
+	auto threadedEventLoopResult = core::ThreadedEventLoop::create(&log, &allocator);
 	if (threadedEventLoopResult.isError())
 	{
 		log.critical("failed to create threaded event loop, {}"_sv, threadedEventLoopResult.releaseError());

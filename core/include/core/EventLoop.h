@@ -9,16 +9,16 @@
 
 namespace core
 {
-	class Event2
+	class Event
 	{
 	public:
-		virtual ~Event2() = default;
+		virtual ~Event() = default;
 	};
 
-	class StartEvent2: public Event2
+	class StartEvent2: public Event
 	{};
 
-	class AcceptEvent2: public Event2
+	class AcceptEvent2: public Event
 	{
 		Unique<Socket> m_socket;
 	public:
@@ -29,17 +29,17 @@ namespace core
 		[[nodiscard]] Unique<Socket> releaseSocket() { return std::move(m_socket); }
 	};
 
-	class ReadEvent2: public Event2
+	class ReadEvent: public Event
 	{
 		Buffer m_backingBuffer;
 		Span<const std::byte> m_bytes;
 	public:
-		ReadEvent2(Span<const std::byte> bytes, Allocator* allocator)
+		ReadEvent(Span<const std::byte> bytes, Allocator* allocator)
 			: m_backingBuffer(allocator),
 			  m_bytes(bytes)
 		{}
 
-		explicit ReadEvent2(Buffer&& bytes)
+		explicit ReadEvent(Buffer&& bytes)
 			: m_backingBuffer(std::move(bytes)),
 			  m_bytes(m_backingBuffer)
 		{}
@@ -47,81 +47,81 @@ namespace core
 		Span<const std::byte> bytes() const { return m_bytes; }
 	};
 
-	class WriteEvent2: public Event2
+	class WriteEvent: public Event
 	{
 		size_t m_writtenBytes = 0;
 	public:
-		explicit WriteEvent2(size_t writtenBytes)
+		explicit WriteEvent(size_t writtenBytes)
 			: m_writtenBytes(writtenBytes)
 		{}
 
 		size_t writtenBytes() const { return m_writtenBytes; }
 	};
 
-	class EventThread2;
+	class EventThread;
 
-	class EventSource2
+	class EventSource
 	{
 	public:
-		virtual ~EventSource2() = default;
+		virtual ~EventSource() = default;
 
-		virtual HumanError accept(const Shared<EventThread2>& thread) = 0;
-		virtual HumanError read(const Shared<EventThread2>& thread) = 0;
-		virtual HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread) = 0;
+		virtual HumanError accept(const Shared<EventThread>& thread) = 0;
+		virtual HumanError read(const Shared<EventThread>& thread) = 0;
+		virtual HumanError write(Span<const std::byte> bytes, const Shared<EventThread>& thread) = 0;
 	};
 
-	class EventSocket2
+	class EventSocket
 	{
-		Shared<EventSource2> m_socketSource;
+		Shared<EventSource> m_socketSource;
 	public:
-		explicit EventSocket2(const Shared<EventSource2>& socket)
+		explicit EventSocket(const Shared<EventSource>& socket)
 			: m_socketSource(socket)
 		{}
 
-		HumanError accept(const Shared<EventThread2>& thread)
+		HumanError accept(const Shared<EventThread>& thread)
 		{
 			return m_socketSource->accept(thread);
 		}
 
-		HumanError read(const Shared<EventThread2>& thread)
+		HumanError read(const Shared<EventThread>& thread)
 		{
 			return m_socketSource->read(thread);
 		}
 
-		HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread)
+		HumanError write(Span<const std::byte> bytes, const Shared<EventThread>& thread)
 		{
 			return m_socketSource->write(bytes, thread);
 		}
 	};
 
-	class ThreadedEventLoop2;
+	class ThreadedEventLoop;
 
-	class EventLoop2
+	class EventLoop
 	{
-		virtual void addThread(const Shared<EventThread2>& thread) = 0;
+		virtual void addThread(const Shared<EventThread>& thread) = 0;
 
 	protected:
 		Allocator* m_allocator = nullptr;
-		ThreadedEventLoop2* m_parentThreadedEventLoop = nullptr;
+		ThreadedEventLoop* m_parentThreadedEventLoop = nullptr;
 	public:
-		CORE_EXPORT static Result<Unique<EventLoop2>> create(ThreadedEventLoop2* parent, Log* log, Allocator* allocator);
-		static Result<Unique<EventLoop2>> create(Log* log, Allocator* allocator)
+		CORE_EXPORT static Result<Unique<EventLoop>> create(ThreadedEventLoop* parent, Log* log, Allocator* allocator);
+		static Result<Unique<EventLoop>> create(Log* log, Allocator* allocator)
 		{
 			return create(nullptr, log, allocator);
 		}
 
-		EventLoop2(ThreadedEventLoop2* threadedEventLoop, Allocator* allocator)
+		EventLoop(ThreadedEventLoop* threadedEventLoop, Allocator* allocator)
 			: m_allocator(allocator),
 			  m_parentThreadedEventLoop(threadedEventLoop)
 		{}
 
-		virtual ~EventLoop2() = default;
+		virtual ~EventLoop() = default;
 
 		virtual HumanError run() = 0;
 		virtual void stop() = 0;
 		virtual void stopAllLoops() = 0;
-		virtual Result<EventSocket2> registerSocket(Unique<Socket> socket) = 0;
-		virtual EventLoop2* next() = 0;
+		virtual Result<EventSocket> registerSocket(Unique<Socket> socket) = 0;
+		virtual EventLoop* next() = 0;
 
 		template<typename T, typename ... TArgs>
 		Shared<T> startThread(TArgs&& ... args)
@@ -132,20 +132,20 @@ namespace core
 		}
 	};
 
-	class EventThread2: public SharedFromThis<EventThread2>
+	class EventThread: public SharedFromThis<EventThread>
 	{
-		EventLoop2* m_eventLoop = nullptr;
+		EventLoop* m_eventLoop = nullptr;
 		std::atomic_flag m_stopped;
 	public:
-		explicit EventThread2(EventLoop2* eventLoop)
+		explicit EventThread(EventLoop* eventLoop)
 			: m_eventLoop(eventLoop)
 		{}
 
-		virtual ~EventThread2() = default;
+		virtual ~EventThread() = default;
 
-		EventLoop2* eventLoop() const { return m_eventLoop; }
-		virtual HumanError handle(Event2* event) = 0;
-		CORE_EXPORT HumanError send(Unique<Event2> event);
+		EventLoop* eventLoop() const { return m_eventLoop; }
+		virtual HumanError handle(Event* event) = 0;
+		CORE_EXPORT HumanError send(Unique<Event> event);
 		CORE_EXPORT HumanError stop();
 		CORE_EXPORT bool stopped() const;
 	};

@@ -41,8 +41,8 @@ target_sources(core PRIVATE
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
-	include/core/websocket/Server3.h
-	include/core/websocket/Client3.h
+	include/core/websocket/Server.h
+	include/core/websocket/Client.h
 	src/core/websocket/Internal.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
@@ -60,8 +60,8 @@ target_sources(core PRIVATE
 	src/core/SHA1.cpp
 	src/core/websocket/Handshake.cpp
 	src/core/websocket/MessageParser.cpp
-	src/core/websocket/Server3.cpp
-	src/core/websocket/Client3.cpp
+	src/core/websocket/Server.cpp
+	src/core/websocket/Client.cpp
 )
 
 if (WIN32)

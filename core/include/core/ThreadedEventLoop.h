@@ -9,7 +9,7 @@
 
 namespace core
 {
-	class ThreadedEventLoop2
+	class ThreadedEventLoop
 	{
 		template<typename TPtr, typename... TArgs>
 		friend inline Shared<TPtr>
@@ -17,22 +17,22 @@ namespace core
 
 		Allocator* m_allocator = nullptr;
 		size_t m_threadsCount = 0;
-		Array<Unique<EventLoop2>> m_eventLoops;
+		Array<Unique<EventLoop>> m_eventLoops;
 		std::atomic<size_t> m_nextIndex = 0;
 
-		ThreadedEventLoop2(Allocator* allocator, size_t threadsCount)
+		ThreadedEventLoop(Allocator* allocator, size_t threadsCount)
 			: m_allocator(allocator),
 			  m_threadsCount(threadsCount),
 			  m_eventLoops(allocator)
 		{}
 	public:
-		static Result<Shared<ThreadedEventLoop2>> create(Log* log, Allocator* allocator, size_t threadsCount = Thread::hardware_concurrency())
+		static Result<Shared<ThreadedEventLoop>> create(Log* log, Allocator* allocator, size_t threadsCount = Thread::hardware_concurrency())
 		{
-			auto res = shared_from<ThreadedEventLoop2>(allocator, allocator, threadsCount);
+			auto res = shared_from<ThreadedEventLoop>(allocator, allocator, threadsCount);
 			res->m_eventLoops.reserve(threadsCount);
 			for (size_t i = 0; i < threadsCount; ++i)
 			{
-				auto loopResult = EventLoop2::create(res.get(), log, allocator);
+				auto loopResult = EventLoop::create(res.get(), log, allocator);
 				if (loopResult.isError())
 					return loopResult.releaseError();
 				res->m_eventLoops.push(loopResult.releaseValue());
@@ -73,7 +73,7 @@ namespace core
 				event->stop();
 		}
 
-		EventLoop2* next()
+		EventLoop* next()
 		{
 			return m_eventLoops[m_nextIndex.fetch_add(1) % m_threadsCount].get();
 		}

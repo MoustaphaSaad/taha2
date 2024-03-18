@@ -15,7 +15,7 @@
 
 namespace core
 {
-	class LinuxEventLoop2: public EventLoop2
+	class LinuxEventLoop: public EventLoop
 	{
 		struct Op
 		{
@@ -42,7 +42,7 @@ namespace core
 
 		struct SendEventOp: Op
 		{
-			SendEventOp(int eventfd_, Unique<Event2> event_, const Weak<EventThread2>& thread_)
+			SendEventOp(int eventfd_, Unique<Event> event_, const Weak<EventThread>& thread_)
 				: eventfd(eventfd_),
 				  event(std::move(event_)),
 				  thread(thread_)
@@ -58,13 +58,13 @@ namespace core
 			}
 
 			int eventfd = -1;
-			Unique<Event2> event;
-			Weak<EventThread2> thread;
+			Unique<Event> event;
+			Weak<EventThread> thread;
 		};
 
 		struct StopThreadOp: Op
 		{
-			StopThreadOp(int eventfd_, const Weak<EventThread2>& thread_)
+			StopThreadOp(int eventfd_, const Weak<EventThread>& thread_)
 				: eventfd(eventfd_),
 				  thread(thread_)
 			{}
@@ -79,30 +79,30 @@ namespace core
 			}
 
 			int eventfd = -1;
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 		};
 
 		struct AcceptOp: Op
 		{
-			explicit AcceptOp(const Weak<EventThread2>& thread_)
+			explicit AcceptOp(const Weak<EventThread>& thread_)
 				: thread(thread_)
 			{}
 
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 		};
 
 		struct ReadOp: Op
 		{
-			explicit ReadOp(const Weak<EventThread2>& thread_)
+			explicit ReadOp(const Weak<EventThread>& thread_)
 				: thread(thread_)
 			{}
 
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 		};
 
 		struct WriteOp: Op
 		{
-			WriteOp(Buffer&& buffer_, const Weak<EventThread2>& thread_, const Shared<EventSource2>& source_)
+			WriteOp(Buffer&& buffer_, const Weak<EventThread>& thread_, const Shared<EventSource>& source_)
 				: buffer(std::move(buffer_)),
 				  thread(thread_),
 				  remainingBytes(buffer),
@@ -110,9 +110,9 @@ namespace core
 			{}
 
 			Buffer buffer;
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 			Span<const std::byte> remainingBytes;
-			Shared<EventSource2> source;
+			Shared<EventSource> source;
 		};
 
 		class OpSet
@@ -172,21 +172,21 @@ namespace core
 		class ThreadSet
 		{
 			Mutex m_mutex;
-			Map<EventThread2*, Shared<EventThread2>> m_threads;
+			Map<EventThread*, Shared<EventThread>> m_threads;
 		public:
 			explicit ThreadSet(Allocator* allocator)
 				: m_mutex(allocator),
 				  m_threads(allocator)
 			{}
 
-			void push(const Shared<EventThread2>& thread)
+			void push(const Shared<EventThread>& thread)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				auto handle = thread.get();
 				m_threads.insert(handle, thread);
 			}
 
-			void pop(EventThread2* handle)
+			void pop(EventThread* handle)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				m_threads.remove(handle);
@@ -202,27 +202,27 @@ namespace core
 		class SourceSet
 		{
 			Mutex m_mutex;
-			Map<EventSource2*, Weak<EventSource2>> m_sources;
+			Map<EventSource*, Weak<EventSource>> m_sources;
 		public:
 			explicit SourceSet(Allocator* allocator)
 				: m_mutex(allocator),
 				  m_sources(allocator)
 			{}
 
-			void push(const Shared<EventSource2>& source)
+			void push(const Shared<EventSource>& source)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				auto key = source.get();
 				m_sources.insert(key, source);
 			}
 
-			void remove(EventSource2* source)
+			void remove(EventSource* source)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				m_sources.remove(source);
 			}
 
-			Shared<EventSource2> pop(EventSource2* source)
+			Shared<EventSource> pop(EventSource* source)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				auto it = m_sources.lookup(source);
@@ -269,14 +269,14 @@ namespace core
 			}
 		};
 
-		class SocketSource: public EventSource2, public SharedFromThis<SocketSource>
+		class SocketSource: public EventSource, public SharedFromThis<SocketSource>
 		{
-			LinuxEventLoop2* m_eventLoop = nullptr;
+			LinuxEventLoop* m_eventLoop = nullptr;
 			Unique<Socket> m_socket;
 			OpQueue m_pollIn;
 			OpQueue m_pollOut;
 		public:
-			SocketSource(Unique<Socket> socket, LinuxEventLoop2* eventLoop)
+			SocketSource(Unique<Socket> socket, LinuxEventLoop* eventLoop)
 				: m_socket(std::move(socket)),
 				  m_eventLoop(eventLoop),
 				  m_pollIn(eventLoop->m_allocator),
@@ -290,7 +290,7 @@ namespace core
 				sources.remove(this);
 			}
 
-			HumanError accept(const Shared<EventThread2>& thread) override
+			HumanError accept(const Shared<EventThread>& thread) override
 			{
 				auto allocator = m_eventLoop->m_allocator;
 
@@ -299,7 +299,7 @@ namespace core
 				return {};
 			}
 
-			HumanError read(const Shared<EventThread2>& thread) override
+			HumanError read(const Shared<EventThread>& thread) override
 			{
 				auto allocator = m_eventLoop->m_allocator;
 
@@ -308,7 +308,7 @@ namespace core
 				return {};
 			}
 
-			HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread) override
+			HumanError write(Span<const std::byte> bytes, const Shared<EventThread>& thread) override
 			{
 				auto allocator = m_eventLoop->m_allocator;
 
@@ -342,13 +342,13 @@ namespace core
 						{
 							if (m_eventLoop == thread->eventLoop())
 							{
-								AcceptEvent2 acceptEvent{std::move(acceptedSocket)};
+								AcceptEvent acceptEvent{std::move(acceptedSocket)};
 								if (auto err = thread->handle(&acceptEvent))
 									return err;
 							}
 							else
 							{
-								auto acceptEvent = unique_from<AcceptEvent2>(allocator, std::move(acceptedSocket));
+								auto acceptEvent = unique_from<AcceptEvent>(allocator, std::move(acceptedSocket));
 								if (auto err = thread->send(std::move(acceptEvent)))
 									return err;
 							}
@@ -370,7 +370,7 @@ namespace core
 						{
 							if (m_eventLoop == thread->eventLoop())
 							{
-								ReadEvent2 readEvent{Span<const std::byte>{line, (size_t)readBytes}, allocator};
+								ReadEvent readEvent{Span<const std::byte>{line, (size_t)readBytes}, allocator};
 								if (auto err = thread->handle(&readEvent))
 									return err;
 							}
@@ -378,7 +378,7 @@ namespace core
 							{
 								Buffer buffer{allocator};
 								buffer.push(Span<const std::byte>{line, (size_t)readBytes});
-								auto readEvent = unique_from<ReadEvent2>(allocator, std::move(buffer));
+								auto readEvent = unique_from<ReadEvent>(allocator, std::move(buffer));
 								if (auto err = thread->send(std::move(readEvent)))
 									return err;
 							}
@@ -416,13 +416,13 @@ namespace core
 							{
 								if (m_eventLoop == thread->eventLoop())
 								{
-									WriteEvent2 writeEvent{writeOp->buffer.count()};
+									WriteEvent writeEvent{writeOp->buffer.count()};
 									if (auto err = thread->handle(&writeEvent))
 										return err;
 								}
 								else
 								{
-									auto writeEvent = unique_from<WriteEvent2>(allocator, writeOp->buffer.count());
+									auto writeEvent = unique_from<WriteEvent>(allocator, writeOp->buffer.count());
 									if (auto err = thread->send(std::move(writeEvent)))
 										return err;
 								}
@@ -436,12 +436,12 @@ namespace core
 			}
 		};
 
-		void addThread(const Shared<EventThread2>& thread) override
+		void addThread(const Shared<EventThread>& thread) override
 		{
 			ZoneScoped;
 			m_threads.push(thread);
 
-			auto startEvent = unique_from<StartEvent2>(m_allocator);
+			auto startEvent = unique_from<StartEvent>(m_allocator);
 			[[maybe_unused]] auto err = sendEventToThread(std::move(startEvent), thread);
 			assert(!err);
 		}
@@ -452,8 +452,8 @@ namespace core
 		ThreadSet m_threads;
 		SourceSet m_sources;
 	public:
-		LinuxEventLoop2(int epoll, ThreadedEventLoop2* parent, Log* log, Allocator* allocator)
-			: EventLoop2(parent, allocator),
+		LinuxEventLoop(int epoll, ThreadedEventLoop* parent, Log* log, Allocator* allocator)
+			: EventLoop(parent, allocator),
 			  m_log(log),
 			  m_epoll(epoll),
 			  m_ops(allocator),
@@ -461,7 +461,7 @@ namespace core
 			  m_sources(allocator)
 		{}
 
-		~LinuxEventLoop2() override
+		~LinuxEventLoop() override
 		{
 			if (m_epoll != -1)
 			{
@@ -481,7 +481,7 @@ namespace core
 			{
 				int numEntries = 0;
 				{
-					ZoneScopedN("EventLoop2::epoll_wait");
+					ZoneScopedN("EventLoop::epoll_wait");
 					numEntries = epoll_wait(m_epoll, events, MAX_EVENTS, -1);
 					if (numEntries == -1)
 					{
@@ -519,7 +519,7 @@ namespace core
 								m_threads.pop(thread.get());
 						}
 					}
-					else if (auto source = m_sources.pop((EventSource2*)event.data.ptr))
+					else if (auto source = m_sources.pop((EventSource*)event.data.ptr))
 					{
 						if (auto socketSource = dynamic_cast<SocketSource*>(source.get()))
 						{
@@ -583,7 +583,7 @@ namespace core
 			}
 		}
 
-		Result<EventSocket2> registerSocket(Unique<Socket> socket) override
+		Result<EventSocket> registerSocket(Unique<Socket> socket) override
 		{
 			auto fd = socket->fd();
 
@@ -608,17 +608,17 @@ namespace core
 				return errf(m_allocator, "failed to register socket, ErrorCode({})"_sv, errno);
 
 			m_sources.push(res);
-			return EventSocket2{res};
+			return EventSocket{res};
 		}
 
-		EventLoop2* next() override
+		EventLoop* next() override
 		{
 			if (m_parentThreadedEventLoop)
 				return m_parentThreadedEventLoop->next();
 			return this;
 		}
 
-		HumanError sendEventToThread(Unique<Event2> event, const Weak<EventThread2>& thread)
+		HumanError sendEventToThread(Unique<Event> event, const Weak<EventThread>& thread)
 		{
 			auto fd = eventfd(0, 0);
 			if (fd == -1)
@@ -642,7 +642,7 @@ namespace core
 			return {};
 		}
 
-		HumanError stopThread(const Weak<EventThread2>& thread)
+		HumanError stopThread(const Weak<EventThread>& thread)
 		{
 			auto fd = eventfd(0, 0);
 			if (fd == -1)
@@ -667,30 +667,30 @@ namespace core
 		}
 	};
 
-	Result<Unique<EventLoop2>> EventLoop2::create(ThreadedEventLoop2* parent, Log *log, Allocator *allocator)
+	Result<Unique<EventLoop>> EventLoop::create(ThreadedEventLoop* parent, Log *log, Allocator *allocator)
 	{
 		auto epoll = epoll_create1(0);
 		if (epoll == -1)
 			return errf(allocator, "failed to create epoll, ErrorCode({})"_sv, errno);
 
-		return unique_from<LinuxEventLoop2>(allocator, epoll, parent, log, allocator);
+		return unique_from<LinuxEventLoop>(allocator, epoll, parent, log, allocator);
 	}
 
-	HumanError EventThread2::send(Unique<Event2> event)
+	HumanError EventThread::send(Unique<Event> event)
 	{
 		ZoneScoped;
-		auto linuxEventLoop = (LinuxEventLoop2*)m_eventLoop;
+		auto linuxEventLoop = (LinuxEventLoop*)m_eventLoop;
 		return linuxEventLoop->sendEventToThread(std::move(event), weakFromThis());
 	}
 
-	HumanError EventThread2::stop()
+	HumanError EventThread::stop()
 	{
 		ZoneScoped;
-		auto linuxEventLoop = (LinuxEventLoop2*)m_eventLoop;
+		auto linuxEventLoop = (LinuxEventLoop*)m_eventLoop;
 		return linuxEventLoop->stopThread(weakFromThis());
 	}
 
-	bool EventThread2::stopped() const
+	bool EventThread::stopped() const
 	{
 		return m_stopped.test();
 	}

@@ -12,7 +12,7 @@
 
 namespace core
 {
-	class WinOSEventLoop2: public EventLoop2
+	class WinOSEventLoop: public EventLoop
 	{
 		struct Op: OVERLAPPED
 		{
@@ -36,42 +36,42 @@ namespace core
 
 		struct SendEventOp: Op
 		{
-			SendEventOp(Unique<Event2> event_, const Weak<EventThread2>& thread_)
+			SendEventOp(Unique<Event> event_, const Weak<EventThread>& thread_)
 				: Op(INVALID_HANDLE_VALUE),
 				  event(std::move(event_)),
 				  thread(thread_)
 			{}
 
-			Unique<Event2> event;
-			Weak<EventThread2> thread;
+			Unique<Event> event;
+			Weak<EventThread> thread;
 		};
 
 		struct StopThreadOp: Op
 		{
-			StopThreadOp(const Weak<EventThread2>& thread_)
+			StopThreadOp(const Weak<EventThread>& thread_)
 				: Op(INVALID_HANDLE_VALUE),
 				  thread(thread_)
 			{}
 
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 		};
 
 		struct AcceptOp: Op
 		{
-			AcceptOp(Unique<Socket> acceptSocket_, const Weak<EventThread2>& thread_)
+			AcceptOp(Unique<Socket> acceptSocket_, const Weak<EventThread>& thread_)
 				: Op(INVALID_HANDLE_VALUE),
 				  acceptSocket(std::move(acceptSocket_)),
 				  thread(thread_)
 			{}
 
 			Unique<Socket> acceptSocket;
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 			std::byte buffer[2 * (sizeof(SOCKADDR_IN) + 16)] = {};
 		};
 
 		struct ReadOp: Op
 		{
-			ReadOp(HANDLE handle_, const Weak<EventThread2>& thread_)
+			ReadOp(HANDLE handle_, const Weak<EventThread>& thread_)
 				: Op(handle_),
 				  thread(thread_)
 			{
@@ -82,12 +82,12 @@ namespace core
 			DWORD flags = 0;
 			std::byte line[1024] = {};
 			WSABUF wsaBuf{};
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 		};
 
 		struct WriteOp: Op
 		{
-			WriteOp(HANDLE handle_, Buffer&& buffer_, const Weak<EventThread2>& thread_)
+			WriteOp(HANDLE handle_, Buffer&& buffer_, const Weak<EventThread>& thread_)
 				: Op(handle_),
 				  buffer(std::move(buffer_)),
 				  thread(thread_)
@@ -98,7 +98,7 @@ namespace core
 
 			Buffer buffer;
 			WSABUF wsaBuf{};
-			Weak<EventThread2> thread;
+			Weak<EventThread> thread;
 		};
 
 		class OpSet
@@ -158,21 +158,21 @@ namespace core
 		class ThreadSet
 		{
 			Mutex m_mutex;
-			Map<EventThread2*, Shared<EventThread2>> m_threads;
+			Map<EventThread*, Shared<EventThread>> m_threads;
 		public:
 			explicit ThreadSet(Allocator* allocator)
 				: m_mutex(allocator),
 				  m_threads(allocator)
 			{}
 
-			void push(const Shared<EventThread2>& thread)
+			void push(const Shared<EventThread>& thread)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				auto handle = thread.get();
 				m_threads.insert(handle, thread);
 			}
 
-			void pop(EventThread2* handle)
+			void pop(EventThread* handle)
 			{
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				m_threads.remove(handle);
@@ -185,17 +185,17 @@ namespace core
 			}
 		};
 
-		class SocketSource: public EventSource2
+		class SocketSource: public EventSource
 		{
-			WinOSEventLoop2* m_eventLoop = nullptr;
+			WinOSEventLoop* m_eventLoop = nullptr;
 			Unique<Socket> m_socket;
 		public:
-			SocketSource(Unique<Socket> socket, WinOSEventLoop2* eventLoop)
+			SocketSource(Unique<Socket> socket, WinOSEventLoop* eventLoop)
 				: m_socket(std::move(socket)),
 				  m_eventLoop(eventLoop)
 			{}
 
-			HumanError accept(const Shared<EventThread2>& thread) override
+			HumanError accept(const Shared<EventThread>& thread) override
 			{
 				auto& allocator = m_eventLoop->m_allocator;
 				auto& acceptEx = m_eventLoop->m_acceptEx;
@@ -228,7 +228,7 @@ namespace core
 				return {};
 			}
 
-			HumanError read(const Shared<EventThread2>& thread) override
+			HumanError read(const Shared<EventThread>& thread) override
 			{
 				auto& allocator = m_eventLoop->m_allocator;
 				auto& ops = m_eventLoop->m_ops;
@@ -258,7 +258,7 @@ namespace core
 				return {};
 			}
 
-			HumanError write(Span<const std::byte> bytes, const Shared<EventThread2>& thread) override
+			HumanError write(Span<const std::byte> bytes, const Shared<EventThread>& thread) override
 			{
 				auto& allocator = m_eventLoop->m_allocator;
 				auto& ops = m_eventLoop->m_ops;
@@ -290,7 +290,7 @@ namespace core
 			}
 		};
 
-		void addThread(const Shared<EventThread2>& thread) override
+		void addThread(const Shared<EventThread>& thread) override
 		{
 			ZoneScoped;
 			m_threads.push(thread);
@@ -306,8 +306,8 @@ namespace core
 		OpSet m_ops;
 		ThreadSet m_threads;
 	public:
-		WinOSEventLoop2(HANDLE completionPort, LPFN_ACCEPTEX acceptEx, ThreadedEventLoop2* parent, Log* log, Allocator* allocator)
-			: EventLoop2(parent, allocator),
+		WinOSEventLoop(HANDLE completionPort, LPFN_ACCEPTEX acceptEx, ThreadedEventLoop* parent, Log* log, Allocator* allocator)
+			: EventLoop(parent, allocator),
 			  m_log(log),
 			  m_completionPort(completionPort),
 			  m_acceptEx(acceptEx),
@@ -315,7 +315,7 @@ namespace core
 			  m_threads(allocator)
 		{}
 
-		~WinOSEventLoop2() override
+		~WinOSEventLoop() override
 		{
 			if (m_completionPort != INVALID_HANDLE_VALUE)
 			{
@@ -397,7 +397,7 @@ namespace core
 							{
 								if (thread->eventLoop() == this)
 								{
-									ReadEvent2 readEvent{Span<const std::byte>{(const std::byte*)readOp->line, (size_t)bytesTransferred}, m_allocator};
+									ReadEvent readEvent{Span<const std::byte>{(const std::byte*)readOp->line, (size_t)bytesTransferred}, m_allocator};
 									if (auto err = thread->handle(&readEvent))
 										return err;
 								}
@@ -405,7 +405,7 @@ namespace core
 								{
 									Buffer buffer{m_allocator};
 									buffer.push(Span<const std::byte>{(const std::byte*)readOp->line, (size_t)bytesTransferred});
-									auto readEvent = unique_from<ReadEvent2>(m_allocator, std::move(buffer));
+									auto readEvent = unique_from<ReadEvent>(m_allocator, std::move(buffer));
 									if (auto err = thread->send(std::move(readEvent)))
 										return err;
 								}
@@ -418,13 +418,13 @@ namespace core
 							{
 								if (thread->eventLoop() == this)
 								{
-									WriteEvent2 writeEvent{bytesTransferred};
+									WriteEvent writeEvent{bytesTransferred};
 									if (auto err = thread->handle(&writeEvent))
 										return err;
 								}
 								else
 								{
-									auto writeEvent = unique_from<WriteEvent2>(m_allocator, bytesTransferred);
+									auto writeEvent = unique_from<WriteEvent>(m_allocator, bytesTransferred);
 									if (auto err = thread->send(std::move(writeEvent)))
 										return err;
 								}
@@ -464,7 +464,7 @@ namespace core
 			}
 		}
 
-		Result<EventSocket2> registerSocket(Unique<Socket> socket) override
+		Result<EventSocket> registerSocket(Unique<Socket> socket) override
 		{
 			ZoneScoped;
 			if (socket == nullptr)
@@ -483,17 +483,17 @@ namespace core
 				return errf(m_allocator, "failed to register socket in completion port"_sv);
 
 			auto res = shared_from<SocketSource>(m_allocator, std::move(socket), this);
-			return EventSocket2{res};
+			return EventSocket{res};
 		}
 
-		EventLoop2* next() override
+		EventLoop* next() override
 		{
 			if (m_parentThreadedEventLoop)
 				return m_parentThreadedEventLoop->next();
 			return this;
 		}
 
-		HumanError sendEventToThread(Unique<Event2> event, const Weak<EventThread2>& thread)
+		HumanError sendEventToThread(Unique<Event> event, const Weak<EventThread>& thread)
 		{
 			auto op = unique_from<SendEventOp>(m_allocator, std::move(event), thread);
 			auto handle = op.get();
@@ -506,7 +506,7 @@ namespace core
 			return {};
 		}
 
-		HumanError stopThread(const Weak<EventThread2>& thread)
+		HumanError stopThread(const Weak<EventThread>& thread)
 		{
 			auto op = unique_from<StopThreadOp>(m_allocator, thread);
 			auto handle = op.get();
@@ -521,7 +521,7 @@ namespace core
 		}
 	};
 
-	Result<Unique<EventLoop2>> EventLoop2::create(ThreadedEventLoop2* parent, Log *log, Allocator *allocator)
+	Result<Unique<EventLoop>> EventLoop::create(ThreadedEventLoop* parent, Log *log, Allocator *allocator)
 	{
 		auto completionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 		if (completionPort == NULL)
@@ -548,27 +548,27 @@ namespace core
 		if (res == SOCKET_ERROR)
 			return errf(allocator, "failed to get AcceptEx function pointer, ErrorCode({})"_sv, res);
 
-		return unique_from<WinOSEventLoop2>(allocator, completionPort, acceptEx, parent, log, allocator);
+		return unique_from<WinOSEventLoop>(allocator, completionPort, acceptEx, parent, log, allocator);
 	}
 
-	HumanError EventThread2::send(Unique<Event2> event)
+	HumanError EventThread::send(Unique<Event> event)
 	{
 		ZoneScoped;
-		auto linuxEventLoop = (WinOSEventLoop2*)m_eventLoop;
+		auto linuxEventLoop = (WinOSEventLoop*)m_eventLoop;
 		return linuxEventLoop->sendEventToThread(std::move(event), weakFromThis());
 	}
 
-	HumanError EventThread2::stop()
+	HumanError EventThread::stop()
 	{
 		ZoneScoped;
-		auto linuxEventLoop = (WinOSEventLoop2*)m_eventLoop;
+		auto linuxEventLoop = (WinOSEventLoop*)m_eventLoop;
 		auto err = linuxEventLoop->stopThread(weakFromThis());
 		if (!err)
 			m_stopped.test_and_set();
 		return err;
 	}
 
-	bool EventThread2::stopped() const
+	bool EventThread::stopped() const
 	{
 		return m_stopped.test();
 	}

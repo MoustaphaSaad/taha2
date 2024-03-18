@@ -1,24 +1,24 @@
-#include "core/websocket/Server3.h"
-#include "core/websocket/Client3.h"
+#include "core/websocket/Server.h"
+#include "core/websocket/Client.h"
 
 namespace core::websocket
 {
-	class AcceptThread3: public EventThread2
+	class AcceptThread: public EventThread
 	{
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
-		EventSocket2 m_socket;
-		Server3* m_server = nullptr;
+		EventSocket m_socket;
+		Server* m_server = nullptr;
 	public:
-		AcceptThread3(Server3* server, EventSocket2 socket, EventLoop2* loop, Log* log, Allocator* allocator)
-			: EventThread2(loop),
+		AcceptThread(Server* server, EventSocket socket, EventLoop* loop, Log* log, Allocator* allocator)
+			: EventThread(loop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
 			  m_server(server)
 		{}
 
-		HumanError handle(Event2* event) override
+		HumanError handle(Event* event) override
 		{
 			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
 			{
@@ -33,24 +33,24 @@ namespace core::websocket
 		}
 	};
 
-	Server3::ClientSet::ClientSet(Allocator *allocator)
+	Server::ClientSet::ClientSet(Allocator *allocator)
 		: m_mutex(allocator),
 		  m_clients(allocator)
 	{}
 
-	void Server3::ClientSet::push(const Shared<Client3>& client)
+	void Server::ClientSet::push(const Shared<Client>& client)
 	{
 		auto lock = Lock<Mutex>::lock(m_mutex);
 		m_clients.insert(client);
 	}
 
-	void Server3::ClientSet::pop(const Shared<Client3>& client)
+	void Server::ClientSet::pop(const Shared<Client>& client)
 	{
 		auto lock = Lock<Mutex>::lock(m_mutex);
 		m_clients.remove(client);
 	}
 
-	void Server3::clientConnected(Unique<Socket> socket)
+	void Server::clientConnected(Unique<Socket> socket)
 	{
 		auto loop = m_acceptThread->eventLoop()->next();
 		auto socketResult = loop->registerSocket(std::move(socket));
@@ -60,7 +60,7 @@ namespace core::websocket
 			return;
 		}
 
-		auto client = Client3::acceptFromServer(
+		auto client = Client::acceptFromServer(
 			this,
 			loop,
 			socketResult.releaseValue(),
@@ -72,29 +72,29 @@ namespace core::websocket
 		m_clientSet.push(std::move(client));
 	}
 
-	void Server3::clientHandshakeDone(const Shared<Client3>& client)
+	void Server::clientHandshakeDone(const Shared<Client>& client)
 	{
-		auto newConn = unique_from<NewConnection3>(m_allocator, client);
+		auto newConn = unique_from<NewConnection>(m_allocator, client);
 		(void) m_handler->send(std::move(newConn));
 	}
 
-	void Server3::clientClosed(const Shared<Client3>& client)
+	void Server::clientClosed(const Shared<Client>& client)
 	{
 		m_clientSet.pop(client);
 	}
 
-	Server3::Server3(Log *log, Allocator *allocator)
+	Server::Server(Log *log, Allocator *allocator)
 		: m_allocator(allocator),
 		  m_log(log),
 		  m_clientSet(allocator)
 	{}
 
-	Unique<Server3> Server3::create(Log* log, Allocator* allocator)
+	Unique<Server> Server::create(Log* log, Allocator* allocator)
 	{
-		return unique_from<Server3>(allocator, log, allocator);
+		return unique_from<Server>(allocator, log, allocator);
 	}
 
-	HumanError Server3::start(const ServerConfig3& config, EventLoop2* loop)
+	HumanError Server::start(const ServerConfig& config, EventLoop* loop)
 	{
 		auto socket = Socket::open(m_allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 		if (socket == nullptr)
@@ -116,7 +116,7 @@ namespace core::websocket
 		m_handler = config.handler;
 		m_maxHandshakeSize = config.maxHandshakeSize;
 		m_maxMessageSize = config.maxMessageSize;
-		m_acceptThread = loop->startThread<AcceptThread3>(this, eventSocket, loop, m_log, m_allocator);
+		m_acceptThread = loop->startThread<AcceptThread>(this, eventSocket, loop, m_log, m_allocator);
 		return {};
 	}
 }

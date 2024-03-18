@@ -1,5 +1,5 @@
-#include "core/websocket/Client3.h"
-#include "core/websocket/Server3.h"
+#include "core/websocket/Client.h"
+#include "core/websocket/Server.h"
 #include "core/websocket/Handshake.h"
 #include "core/Buffer.h"
 #include "core/SHA1.h"
@@ -12,17 +12,17 @@
 
 namespace core::websocket
 {
-	class ServerHandshakeThread3: public EventThread2
+	class ServerHandshakeThread: public EventThread
 	{
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
-		EventSocket2 m_socket;
+		EventSocket m_socket;
 		size_t m_maxHandshakeSize = 1ULL * 1024ULL;
-		Client3* m_client = nullptr;
+		Client* m_client = nullptr;
 		bool m_success = false;
 	public:
-		ServerHandshakeThread3(EventLoop2* loop, Client3* client, EventSocket2 socket, size_t maxHandshakeSize, Log* log, Allocator* allocator)
-			: EventThread2(loop),
+		ServerHandshakeThread(EventLoop* loop, Client* client, EventSocket socket, size_t maxHandshakeSize, Log* log, Allocator* allocator)
+			: EventThread(loop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
@@ -30,19 +30,19 @@ namespace core::websocket
 			  m_client(client)
 		{}
 
-		~ServerHandshakeThread3() override
+		~ServerHandshakeThread() override
 		{
 			m_client->handshakeDone(m_success);
 		}
 
-		HumanError handle(Event2* event) override
+		HumanError handle(Event* event) override
 		{
 			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
 			{
 				ZoneScopedN("StartEvent");
 				return m_socket.read(sharedFromThis());
 			}
-			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
+			else if (auto readEvent = dynamic_cast<ReadEvent*>(event))
 			{
 				ZoneScopedN("ReadEvent");
 				auto& buffer = m_client->m_buffer;
@@ -97,19 +97,19 @@ namespace core::websocket
 		}
 	};
 
-	class ClientHandshakeThread3: public EventThread2
+	class ClientHandshakeThread: public EventThread
 	{
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
-		EventSocket2 m_socket;
+		EventSocket m_socket;
 		size_t m_maxHandshakeSize = 1ULL * 1024ULL;
-		Client3* m_client = nullptr;
+		Client* m_client = nullptr;
 		std::byte m_key[16] = {};
 		Url m_url;
 		bool m_success = false;
 	public:
-		ClientHandshakeThread3(EventLoop2* loop, Client3* client, EventSocket2 socket, size_t maxHandshakeSize, Span<const std::byte> key, Url url, Log* log, Allocator* allocator)
-			: EventThread2(loop),
+		ClientHandshakeThread(EventLoop* loop, Client* client, EventSocket socket, size_t maxHandshakeSize, Span<const std::byte> key, Url url, Log* log, Allocator* allocator)
+			: EventThread(loop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
@@ -121,12 +121,12 @@ namespace core::websocket
 			::memcpy(m_key, key.data(), key.sizeInBytes());
 		}
 
-		~ClientHandshakeThread3() override
+		~ClientHandshakeThread() override
 		{
 			m_client->handshakeDone(m_success);
 		}
 
-		HumanError handle(Event2* event) override
+		HumanError handle(Event* event) override
 		{
 			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
 			{
@@ -153,7 +153,7 @@ namespace core::websocket
 					return err;
 				return m_socket.read(sharedFromThis());
 			}
-			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
+			else if (auto readEvent = dynamic_cast<ReadEvent*>(event))
 			{
 				ZoneScopedN("ReadEvent");
 				auto& buffer = m_client->m_buffer;
@@ -204,14 +204,14 @@ namespace core::websocket
 		}
 	};
 
-	class ReadMessageThread3: public EventThread2
+	class ReadMessageThread: public EventThread
 	{
 		Allocator* m_allocator = nullptr;
 		Log* m_log = nullptr;
-		EventSocket2 m_socket;
+		EventSocket m_socket;
 		MessageParser m_messageParser;
-		Shared<EventThread2> m_handler;
-		Client3* m_client = nullptr;
+		Shared<EventThread> m_handler;
+		Client* m_client = nullptr;
 
 		HumanError handleReadBuffer(Buffer& buffer)
 		{
@@ -268,8 +268,8 @@ namespace core::websocket
 		}
 
 	public:
-		ReadMessageThread3(EventLoop2* loop, Client3* client, const Shared<EventThread2>& handler, EventSocket2 socket, size_t maxMessageSize, Log* log, Allocator* allocator)
-			: EventThread2(loop),
+		ReadMessageThread(EventLoop* loop, Client* client, const Shared<EventThread>& handler, EventSocket socket, size_t maxMessageSize, Log* log, Allocator* allocator)
+			: EventThread(loop),
 			  m_allocator(allocator),
 			  m_log(log),
 			  m_socket(socket),
@@ -278,12 +278,12 @@ namespace core::websocket
 			  m_client(client)
 		{}
 
-		~ReadMessageThread3() override
+		~ReadMessageThread() override
 		{
 			m_client->connectionClosed();
 		}
 
-		HumanError handle(Event2* event) override
+		HumanError handle(Event* event) override
 		{
 			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
 			{
@@ -300,7 +300,7 @@ namespace core::websocket
 
 				return {};
 			}
-			else if (auto readEvent = dynamic_cast<ReadEvent2*>(event))
+			else if (auto readEvent = dynamic_cast<ReadEvent*>(event))
 			{
 				ZoneScopedN("ReadEvent");
 				auto& buffer = m_client->m_buffer;
@@ -321,7 +321,7 @@ namespace core::websocket
 		}
 	};
 
-	HumanError Client3::writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> payload)
+	HumanError Client::writeFrame(FrameHeader::OPCODE opcode, Span<const std::byte> payload)
 	{
 		ZoneScoped;
 		if (FrameHeader::isCtrlOpcode(opcode))
@@ -393,7 +393,7 @@ namespace core::websocket
 		}
 	}
 
-	HumanError Client3::writeCloseWithCode(uint16_t code, StringView reason)
+	HumanError Client::writeCloseWithCode(uint16_t code, StringView reason)
 	{
 		ZoneScoped;
 		std::byte buf[125];
@@ -405,7 +405,7 @@ namespace core::websocket
 		return writeFrame(FrameHeader::OPCODE_CLOSE, {buf, payloadSize});
 	}
 
-	void Client3::handshakeDone(bool success)
+	void Client::handshakeDone(bool success)
 	{
 		ZoneScoped;
 		if (success)
@@ -416,7 +416,7 @@ namespace core::websocket
 			}
 			else
 			{
-				auto newConn = unique_from<NewConnection3>(m_allocator, sharedFromThis());
+				auto newConn = unique_from<NewConnection>(m_allocator, sharedFromThis());
 				(void)m_handler->send(std::move(newConn));
 			}
 		}
@@ -426,7 +426,7 @@ namespace core::websocket
 		}
 	}
 
-	void Client3::connectionClosed()
+	void Client::connectionClosed()
 	{
 		ZoneScoped;
 		auto disconnected = unique_from<DisconnectedEvent>(m_allocator, sharedFromThis());
@@ -436,7 +436,7 @@ namespace core::websocket
 			m_server->clientClosed(sharedFromThis());
 	}
 
-	Client3::Client3(EventSocket2 socket, size_t maxMessageSize, Log* log, Allocator* allocator)
+	Client::Client(EventSocket socket, size_t maxMessageSize, Log* log, Allocator* allocator)
 		: m_allocator(allocator),
 		  m_log(log),
 		  m_socket(socket),
@@ -444,23 +444,23 @@ namespace core::websocket
 		  m_buffer(allocator)
 	{}
 
-	Shared<Client3> Client3::acceptFromServer(
-		Server3* server,
-		EventLoop2* loop,
-		EventSocket2 socket,
-		size_t maxHandshakeSize,
-		size_t maxMessageSize,
-		Log* log,
-		Allocator* allocator)
+	Shared<Client> Client::acceptFromServer(
+			Server* server,
+			EventLoop* loop,
+			EventSocket socket,
+			size_t maxHandshakeSize,
+			size_t maxMessageSize,
+			Log* log,
+			Allocator* allocator)
 	{
 		ZoneScoped;
-		auto res = shared_from<Client3>(allocator, socket, maxMessageSize, log, allocator);
+		auto res = shared_from<Client>(allocator, socket, maxMessageSize, log, allocator);
 		res->m_server = server;
-		loop->startThread<ServerHandshakeThread3>(loop, res.get(), socket, maxHandshakeSize, log, allocator);
+		loop->startThread<ServerHandshakeThread>(loop, res.get(), socket, maxHandshakeSize, log, allocator);
 		return res;
 	}
 
-	Result<Shared<Client3>> Client3::connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, const Shared<EventThread2>& handler, Log* log, Allocator* allocator)
+	Result<Shared<Client>> Client::connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, const Shared<EventThread>& handler, Log* log, Allocator* allocator)
 	{
 		ZoneScoped;
 		auto parsedUrlResult = core::Url::parse(url, allocator);
@@ -486,52 +486,52 @@ namespace core::websocket
 			return socketSourceResult.releaseError();
 		auto socketSource = socketSourceResult.releaseValue();
 
-		auto res = shared_from<Client3>(allocator, socketSource, maxMessageSize, log, allocator);
+		auto res = shared_from<Client>(allocator, socketSource, maxMessageSize, log, allocator);
 		res->m_handler = handler;
-		loop->startThread<ClientHandshakeThread3>(loop, res.get(), socketSource, maxHandshakeSize, Span<const std::byte>{key, sizeof(key)}, std::move(parsedUrl), log, allocator);
+		loop->startThread<ClientHandshakeThread>(loop, res.get(), socketSource, maxHandshakeSize, Span<const std::byte>{key, sizeof(key)}, std::move(parsedUrl), log, allocator);
 		return res;
 	}
 
-	HumanError Client3::startReadingMessages(const Shared<EventThread2>& handler)
+	HumanError Client::startReadingMessages(const Shared<EventThread>& handler)
 	{
 		ZoneScoped;
 		auto loop = handler->eventLoop();
 		m_handler = handler;
-		loop->startThread<ReadMessageThread3>(loop, this, handler, m_socket, m_maxMessageSize, m_log, m_allocator);
+		loop->startThread<ReadMessageThread>(loop, this, handler, m_socket, m_maxMessageSize, m_log, m_allocator);
 		return {};
 	}
 
-	HumanError Client3::writeText(StringView payload)
+	HumanError Client::writeText(StringView payload)
 	{
 		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_TEXT, payload);
 	}
 
-	HumanError Client3::writeBinary(Span<const std::byte> payload)
+	HumanError Client::writeBinary(Span<const std::byte> payload)
 	{
 		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_BINARY, payload);
 	}
 
-	HumanError Client3::writePing(Span<const std::byte> payload)
+	HumanError Client::writePing(Span<const std::byte> payload)
 	{
 		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_PING, payload);
 	}
 
-	HumanError Client3::writePong(Span<const std::byte> payload)
+	HumanError Client::writePong(Span<const std::byte> payload)
 	{
 		ZoneScoped;
 		return writeFrame(FrameHeader::OPCODE_PONG, payload);
 	}
 
-	HumanError Client3::writeClose(uint16_t errorCode, StringView optionalReason)
+	HumanError Client::writeClose(uint16_t errorCode, StringView optionalReason)
 	{
 		ZoneScoped;
 		return writeCloseWithCode(errorCode, optionalReason);
 	}
 
-	HumanError Client3::defaultMessageHandler(const Message& message)
+	HumanError Client::defaultMessageHandler(const Message& message)
 	{
 		ZoneScoped;
 		if (message.type == Message::TYPE_CLOSE)

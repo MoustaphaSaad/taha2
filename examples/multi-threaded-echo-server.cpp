@@ -7,7 +7,7 @@
 
 #include <signal.h>
 
-core::ThreadedEventLoop2* LOOP;
+core::ThreadedEventLoop* LOOP;
 
 void signalHandler(int signal)
 {
@@ -17,23 +17,23 @@ void signalHandler(int signal)
 	}
 }
 
-class EchoThread: public core::EventThread2
+class EchoThread: public core::EventThread
 {
-	core::EventSocket2 m_socket;
+	core::EventSocket m_socket;
 public:
-	explicit EchoThread(core::EventSocket2 socket, core::EventLoop2* eventLoop)
-		: EventThread2(eventLoop),
+	explicit EchoThread(core::EventSocket socket, core::EventLoop* eventLoop)
+		: EventThread(eventLoop),
 		  m_socket(std::move(socket))
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
 			ZoneScopedN("EchoThread::StartEvent");
 			return m_socket.read(sharedFromThis());
 		}
-		else if (auto readEvent = dynamic_cast<core::ReadEvent2*>(event))
+		else if (auto readEvent = dynamic_cast<core::ReadEvent*>(event))
 		{
 			ZoneScopedN("EchoThread::ReadEvent");
 			if (readEvent->bytes().count() == 0)
@@ -49,18 +49,18 @@ public:
 	}
 };
 
-class AcceptThread: public core::EventThread2
+class AcceptThread: public core::EventThread
 {
-	core::EventSocket2 m_socket;
-	core::Shared<core::ThreadedEventLoop2> m_threadedEventLoop;
+	core::EventSocket m_socket;
+	core::Shared<core::ThreadedEventLoop> m_threadedEventLoop;
 public:
-	explicit AcceptThread(core::EventSocket2 socket, core::EventLoop2* eventLoop, core::Shared<core::ThreadedEventLoop2> threadedEventLoop)
-		: EventThread2(eventLoop),
+	explicit AcceptThread(core::EventSocket socket, core::EventLoop* eventLoop, core::Shared<core::ThreadedEventLoop> threadedEventLoop)
+		: EventThread(eventLoop),
 		  m_socket(std::move(socket)),
 		  m_threadedEventLoop(threadedEventLoop)
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
 		{
@@ -88,7 +88,7 @@ int main()
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
 
-	auto eventLoopResult = core::ThreadedEventLoop2::create(&log, &allocator);
+	auto eventLoopResult = core::ThreadedEventLoop::create(&log, &allocator);
 	if (eventLoopResult.isError())
 	{
 		log.critical("failed to create event thread pool, {}"_sv, eventLoopResult.releaseError());

@@ -1,15 +1,15 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
 #include <core/ThreadedEventLoop.h>
-#include <core/websocket/Server3.h>
-#include <core/websocket/Client3.h>
+#include <core/websocket/Server.h>
+#include <core/websocket/Client.h>
 #include <core/Url.h>
 
 #include <tracy/Tracy.hpp>
 
 #include <signal.h>
 
-core::ThreadedEventLoop2* EVENT_LOOP = nullptr;
+core::ThreadedEventLoop* EVENT_LOOP = nullptr;
 void signalHandler(int signal)
 {
 	if (signal == SIGINT)
@@ -18,14 +18,14 @@ void signalHandler(int signal)
 	}
 }
 
-class ClientHandler: public core::EventThread2
+class ClientHandler: public core::EventThread
 {
 public:
-	ClientHandler(core::EventLoop2* eventLoop)
-		: EventThread2(eventLoop)
+	ClientHandler(core::EventLoop* eventLoop)
+		: EventThread(eventLoop)
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
 		if (auto messageEvent = dynamic_cast<core::websocket::MessageEvent*>(event))
 		{
@@ -52,18 +52,18 @@ public:
 	}
 };
 
-class ServerHandler: public core::EventThread2
+class ServerHandler: public core::EventThread
 {
 	core::Log* m_log = nullptr;
 public:
-	ServerHandler(core::EventLoop2* eventLoop, core::Log* log)
-		: EventThread2(eventLoop),
+	ServerHandler(core::EventLoop* eventLoop, core::Log* log)
+		: EventThread(eventLoop),
 		  m_log(log)
 	{}
 
-	core::HumanError handle(core::Event2* event) override
+	core::HumanError handle(core::Event* event) override
 	{
-		if (auto newConn = dynamic_cast<core::websocket::NewConnection3*>(event))
+		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
 		{
 			ZoneScopedN("NewConnection");
 			auto loop = eventLoop()->next();
@@ -93,7 +93,7 @@ int main(int argc, char** argv)
 	}
 	auto parsedUrl = parsedUrlResult.releaseValue();
 
-	auto threadedEventLoopResult = core::ThreadedEventLoop2::create(&log, &allocator);
+	auto threadedEventLoopResult = core::ThreadedEventLoop::create(&log, &allocator);
 	if (threadedEventLoopResult.isError())
 	{
 		log.critical("failed to create threaded event loop, {}"_sv, threadedEventLoopResult.releaseError());
@@ -102,12 +102,12 @@ int main(int argc, char** argv)
 	auto threadedEventLoop = threadedEventLoopResult.releaseValue();
 	EVENT_LOOP = threadedEventLoop.get();
 
-	auto server = core::websocket::Server3::create(&log, &allocator);
+	auto server = core::websocket::Server::create(&log, &allocator);
 
 	auto eventLoop = threadedEventLoop->next();
 	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, &log);
 
-	core::websocket::ServerConfig3 config {
+	core::websocket::ServerConfig config {
 		.host = parsedUrl.host(),
 		.port = parsedUrl.port(),
 		.maxHandshakeSize = 64ULL * 1024ULL * 1024ULL,
