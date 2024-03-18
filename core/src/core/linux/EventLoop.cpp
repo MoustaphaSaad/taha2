@@ -1,5 +1,4 @@
 #include "core/EventLoop.h"
-#include "core/ThreadedEventLoop.h"
 #include "core/Mutex.h"
 #include "core/Hash.h"
 #include "core/Queue.h"
