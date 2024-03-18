@@ -6,7 +6,7 @@
 
 #include <core/FastLeak.h>
 #include <core/Log.h>
-#include <core/ThreadedEventLoop.h>
+#include <core/EventLoop.h>
 #include <core/websocket/Client.h>
 #include <core/Unique.h>
 

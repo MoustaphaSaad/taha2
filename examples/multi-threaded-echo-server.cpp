@@ -1,7 +1,7 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
 #include <core/Thread.h>
-#include <core/ThreadedEventLoop.h>
+#include <core/EventLoop.h>
 
 #include <tracy/Tracy.hpp>
 

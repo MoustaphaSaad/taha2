@@ -37,7 +37,6 @@ target_sources(core PRIVATE
 	include/core/Rand.h
 	include/core/EventLoop.h
 	include/core/ExecutionQueue.h
-	include/core/ThreadedEventLoop.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
