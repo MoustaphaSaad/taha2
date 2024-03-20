@@ -37,6 +37,7 @@ target_sources(core PRIVATE
 	include/core/Rand.h
 	include/core/EventLoop.h
 	include/core/ExecutionQueue.h
+	include/core/Stacktrace.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
@@ -117,7 +118,8 @@ CPMGetPackage(fmt)
 CPMGetPackage(spdlog)
 CPMGetPackage(libressl)
 CPMGetPackage(tracy)
-target_link_libraries(core PUBLIC utf8proc fmt spdlog ssl crypto tls TracyClient)
+CPMGetPackage(cpptrace-lib)
+target_link_libraries(core PUBLIC utf8proc fmt spdlog ssl crypto tls TracyClient cpptrace-lib)
 target_link_libraries(core
 	PRIVATE
 		"$<$<PLATFORM_ID:Windows>:bcrypt;ws2_32>"
