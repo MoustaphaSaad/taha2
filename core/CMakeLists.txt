@@ -44,7 +44,6 @@ target_sources(core PRIVATE
 	include/core/websocket/Message.h
 	include/core/websocket/Server.h
 	include/core/websocket/Client.h
-	src/core/websocket/Internal.h
 	src/core/StringView.cpp
 	src/core/Mallocator.cpp
 	src/core/FastLeak.cpp
