@@ -1,10 +1,10 @@
 #pragma once
 
 #include "core/Allocator.h"
+#include "core/Assert.h"
 
 #include <type_traits>
 #include <new>
-#include <cassert>
 #include <utility>
 
 namespace core
@@ -123,13 +123,13 @@ namespace core
 
 		T& operator[](size_t i)
 		{
-			assert(i < m_count);
+			coreAssert(i < m_count);
 			return m_ptr[i];
 		}
 
 		const T& operator[](size_t i) const
 		{
-			assert(i < m_count);
+			coreAssert(i < m_count);
 			return m_ptr[i];
 		}
 
@@ -164,7 +164,7 @@ namespace core
 
 		void pop()
 		{
-			assert(m_count > 0);
+			coreAssert(m_count > 0);
 			m_ptr[m_count - 1].~T();
 			m_allocator->release(m_ptr + m_count - 1, sizeof(T));
 			--m_count;

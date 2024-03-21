@@ -1,7 +1,7 @@
 #include "core/Thread.h"
+#include "core/Assert.h"
 
 #include <Windows.h>
-#include <cassert>
 
 namespace core
 {
@@ -33,14 +33,14 @@ namespace core
 		if (m_thread)
 		{
 			[[maybe_unused]] auto res = CloseHandle(m_thread->handle);
-			assert(res == TRUE);
+			coreAssert(res == TRUE);
 		}
 	}
 
 	void Thread::join()
 	{
 		[[maybe_unused]] auto res = WaitForSingleObject(m_thread->handle, INFINITE);
-		assert(res == WAIT_OBJECT_0);
+		coreAssert(res == WAIT_OBJECT_0);
 	}
 
 	int Thread::hardware_concurrency()

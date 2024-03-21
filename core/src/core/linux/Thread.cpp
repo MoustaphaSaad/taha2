@@ -1,7 +1,7 @@
 #include "core/Thread.h"
+#include "core/Assert.h"
 
 #include <pthread.h>
-#include <cassert>
 #include <unistd.h>
 
 namespace core
@@ -24,7 +24,7 @@ namespace core
 		m_thread = unique_from<IThread>(allocator);
 		m_thread->func = std::move(func);
 		[[maybe_unused]] auto res = pthread_create(&m_thread->handle, nullptr, thread_start, m_thread.get());
-		assert(res == 0);
+		coreAssert(res == 0);
 	}
 
 	Thread::Thread(Thread&& other) = default;
@@ -34,7 +34,7 @@ namespace core
 	void Thread::join()
 	{
 		[[maybe_unused]] auto res = pthread_join(m_thread->handle, nullptr);
-		assert(res == 0);
+		coreAssert(res == 0);
 	}
 
 	int Thread::hardware_concurrency()

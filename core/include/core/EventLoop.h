@@ -7,6 +7,7 @@
 #include "core/Shared.h"
 #include "core/Socket.h"
 #include "core/Thread.h"
+#include "core/Assert.h"
 
 namespace core
 {
@@ -186,7 +187,7 @@ namespace core
 		{
 			constexpr int MAX_EVENT_LOOPS = 128;
 			HumanError errors[MAX_EVENT_LOOPS];
-			assert(m_threadsCount <= MAX_EVENT_LOOPS);
+			coreAssert(m_threadsCount <= MAX_EVENT_LOOPS);
 
 			Array<Thread> threads{m_allocator};
 			threads.reserve(m_eventLoops.count());

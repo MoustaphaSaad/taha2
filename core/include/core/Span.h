@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cassert>
+#include "core/Assert.h"
+
 #include <cstddef>
 
 namespace core
@@ -31,13 +32,13 @@ namespace core
 
 		T& operator[](size_t index)
 		{
-			assert(index < m_count);
+			coreAssert(index < m_count);
 			return m_ptr[index];
 		}
 
 		const T& operator[](size_t index) const
 		{
-			assert(index < m_count);
+			coreAssert(index < m_count);
 			return m_ptr[index];
 		}
 
@@ -49,7 +50,7 @@ namespace core
 
 		Span<T> slice(size_t offset, size_t count)
 		{
-			assert(offset + count <= m_count);
+			coreAssert(offset + count <= m_count);
 			return Span<T>(m_ptr + offset, count);
 		}
 

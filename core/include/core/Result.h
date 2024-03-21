@@ -2,9 +2,9 @@
 
 #include "core/String.h"
 #include "core/StringView.h"
+#include "core/Assert.h"
 
 #include <utility>
-#include <cassert>
 
 #include <fmt/core.h>
 
@@ -54,7 +54,7 @@ namespace core
 				((E*)m_storage)->~E();
 				break;
 			default:
-				assert(false);
+				coreUnreachable();
 				break;
 			}
 			m_state = STATE_EMPTY;
@@ -74,7 +74,7 @@ namespace core
 				::new (m_storage) E(*(E*)other.m_storage);
 				break;
 			default:
-				assert(false);
+				coreUnreachable();
 				break;
 			}
 		}
@@ -93,7 +93,7 @@ namespace core
 				::new (m_storage) E(std::move(*(E*)other.m_storage));
 				break;
 			default:
-				assert(false);
+				coreUnreachable();
 				break;
 			}
 			other.m_state = STATE_EMPTY;
@@ -152,35 +152,35 @@ namespace core
 
 		T& value()
 		{
-			assert(m_state == STATE_VALUE);
+			coreAssert(m_state == STATE_VALUE);
 			return *reinterpret_cast<T*>(m_storage);
 		}
 		const T& value() const
 		{
-			assert(m_state == STATE_VALUE);
+			coreAssert(m_state == STATE_VALUE);
 			return *reinterpret_cast<T*>(m_storage);
 		}
 
 		E& error()
 		{
-			assert(m_state == STATE_ERROR);
+			coreAssert(m_state == STATE_ERROR);
 			return *reinterpret_cast<E*>(m_storage);
 		}
 		const E& error() const
 		{
-			assert(m_state == STATE_ERROR);
+			coreAssert(m_state == STATE_ERROR);
 			return *reinterpret_cast<E*>(m_storage);
 		}
 
 		T releaseValue()
 		{
-			assert(m_state == STATE_VALUE);
+			coreAssert(m_state == STATE_VALUE);
 			m_state = STATE_EMPTY;
 			return std::move(*reinterpret_cast<T*>(m_storage));
 		}
 		E releaseError()
 		{
-			assert(m_state == STATE_ERROR);
+			coreAssert(m_state == STATE_ERROR);
 			m_state = STATE_EMPTY;
 			return std::move(*reinterpret_cast<E*>(m_storage));
 		}

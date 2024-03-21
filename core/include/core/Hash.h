@@ -2,10 +2,10 @@
 
 #include "core/Allocator.h"
 #include "core/HashFunction.h"
+#include "core/Assert.h"
 
 #include <cstdint>
 #include <cstring>
-#include <cassert>
 #include <new>
 #include <utility>
 
@@ -249,7 +249,7 @@ namespace core
 					break;
 				}
 				default:
-					assert(false);
+					coreUnreachable();
 					return {};
 				}
 
@@ -487,7 +487,7 @@ namespace core
 			}
 			default:
 			{
-				assert(false);
+				coreUnreachable();
 				return;
 			}
 			}
@@ -769,7 +769,7 @@ namespace core
 					break;
 				}
 				default:
-					assert(false);
+					coreUnreachable();
 					return {};
 				}
 
@@ -1007,7 +1007,7 @@ namespace core
 			}
 			default:
 			{
-				assert(false);
+				coreUnreachable();
 				return;
 			}
 			}

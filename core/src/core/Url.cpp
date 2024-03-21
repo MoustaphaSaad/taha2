@@ -584,7 +584,7 @@ namespace core
 
 	StringView UrlQuery::get(const KeyIterator it) const
 	{
-		assert(it != m_keyToIndex.end());
+		coreAssert(it != m_keyToIndex.end());
 		return m_keyValues[it->value].value;
 	}
 

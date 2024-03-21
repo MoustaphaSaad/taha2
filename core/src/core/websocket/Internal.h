@@ -24,7 +24,7 @@ namespace core::websocket
 		{
 			if (FrameHeader::isCtrlOpcode(opcode))
 			{
-				assert(payload.sizeInBytes() <= 125);
+				coreAssert(payload.sizeInBytes() <= 125);
 				if (payload.sizeInBytes() > 125)
 					payload = payload.slice(0, 125);
 			}
@@ -210,7 +210,7 @@ namespace core::websocket
 						}
 						else
 						{
-							assert(false);
+							coreUnreachable();
 						}
 					}
 				}

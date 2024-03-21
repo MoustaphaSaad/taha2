@@ -14,6 +14,7 @@ option(ADDRESS_SANITIZER "Enables address sanitizer" OFF)
 option(THREAD_SANITIZER "Enables thread sanitizer" OFF)
 option(UNDEFINED_SANITIZER "Enables undefined behavior sanitizer" OFF)
 option(ENABLE_ASM "Enables inline assembly code embedded in libressl" ON)
+option(ENABLE_ASSERTS "Enables assert checks" ON)
 
 if (ADDRESS_SANITIZER AND THREAD_SANITIZER)
 	message(FATAL_ERROR "address sanitizer and thread sanitizer cannot run at the same time")

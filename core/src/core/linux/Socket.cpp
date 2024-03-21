@@ -1,13 +1,12 @@
 #include "core/Socket.h"
 #include "core/String.h"
+#include "core/Assert.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/unistd.h>
 #include <fcntl.h>
 #include <netdb.h>
-
-#include <assert.h>
 
 namespace core
 {
@@ -32,7 +31,7 @@ namespace core
 			if (m_handle != -1)
 			{
 				[[maybe_unused]] auto err = ::close(m_handle);
-				assert(err != -1);
+				coreAssert(err != -1);
 				m_handle = -1;
 			}
 		}
@@ -160,7 +159,7 @@ namespace core
 			case AF_INET: return FAMILY_IPV4;
 			case AF_INET6: return FAMILY_IPV6;
 			default:
-				assert(false);
+				coreUnreachable();
 				return FAMILY(0);
 			}
 		}
@@ -172,7 +171,7 @@ namespace core
 			case SOCK_STREAM: return TYPE_TCP;
 			case SOCK_DGRAM: return TYPE_UDP;
 			default:
-				assert(false);
+				coreUnreachable();
 				return TYPE(0);
 			}
 		}
@@ -221,7 +220,7 @@ namespace core
 			osFamily = AF_INET6;
 			break;
 		default:
-			assert(false);
+			coreUnreachable();
 			break;
 		}
 
@@ -238,7 +237,7 @@ namespace core
 			osProtocol = IPPROTO_UDP;
 			break;
 		default:
-			assert(false);
+			coreUnreachable();
 			break;
 		}
 

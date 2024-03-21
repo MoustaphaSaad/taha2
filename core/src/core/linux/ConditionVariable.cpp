@@ -3,8 +3,6 @@
 
 #include <pthread.h>
 
-#include <cassert>
-
 namespace core
 {
 	struct ConditionVariable::IConditionVariable
@@ -16,7 +14,7 @@ namespace core
 	{
 		m_condition_variable = unique_from<IConditionVariable>(allocator);
 		[[maybe_unused]] auto res = pthread_cond_init(&m_condition_variable->cv, nullptr);
-		assert(res == 0);
+		coreAssert(res == 0);
 	}
 
 	ConditionVariable::ConditionVariable(ConditionVariable&& other) = default;
@@ -27,7 +25,7 @@ namespace core
 		if (m_condition_variable)
 		{
 			[[maybe_unused]] auto res = pthread_cond_destroy(&m_condition_variable->cv);
-			assert(res == 0);
+			coreAssert(res == 0);
 		}
 	}
 

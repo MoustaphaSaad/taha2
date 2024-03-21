@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/Allocator.h"
+#include "core/Assert.h"
 
-#include <cassert>
 #include <new>
 #include <utility>
 
@@ -149,31 +149,31 @@ namespace core
 
 		T& back()
 		{
-			assert(m_tail);
+			coreAssert(m_tail);
 			return m_tail->value;
 		}
 
 		const T& back() const
 		{
-			assert(m_tail);
+			coreAssert(m_tail);
 			return m_tail->value;
 		}
 
 		T& front()
 		{
-			assert(m_head);
+			coreAssert(m_head);
 			return m_head->value;
 		}
 
 		const T& front() const
 		{
-			assert(m_head);
+			coreAssert(m_head);
 			return m_head->value;
 		}
 
 		void pop_back()
 		{
-			assert(m_tail);
+			coreAssert(m_tail);
 			auto node = m_tail;
 			m_tail = m_tail->prev;
 			if (m_tail)
@@ -188,7 +188,7 @@ namespace core
 
 		void pop_front()
 		{
-			assert(m_head);
+			coreAssert(m_head);
 			auto node = m_head;
 			m_head = m_head->next;
 			if (m_head)

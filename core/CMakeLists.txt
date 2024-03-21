@@ -38,6 +38,7 @@ target_sources(core PRIVATE
 	include/core/EventLoop.h
 	include/core/ExecutionQueue.h
 	include/core/Stacktrace.h
+	include/core/Assert.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
@@ -58,6 +59,7 @@ target_sources(core PRIVATE
 	src/core/Url.cpp
 	src/core/Base64.cpp
 	src/core/SHA1.cpp
+	src/core/Assert.cpp
 	src/core/websocket/Handshake.cpp
 	src/core/websocket/MessageParser.cpp
 	src/core/websocket/Server.cpp
@@ -129,6 +131,11 @@ target_link_libraries(core
 target_compile_definitions(core
 	PUBLIC
 		"$<$<CONFIG:DEBUG>:DEBUG>"
+		-DTAHA_ENABLE_ASSERTS=$<BOOL:${ENABLE_ASSERTS}>
+		$<$<CXX_COMPILER_ID:Clang>:TAHA_COMPILER_CLANG=1>
+		$<$<CXX_COMPILER_ID:AppleClang>:TAHA_COMPILER_CLANG=1>
+		$<$<CXX_COMPILER_ID:GNU>:TAHA_COMPILER_GNU=1>
+		$<$<CXX_COMPILER_ID:MSVC>:TAHA_COMPILER_MSVC=1>
 )
 
 target_compile_features(core PUBLIC cxx_std_20)

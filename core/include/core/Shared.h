@@ -2,9 +2,9 @@
 
 #include "core/Allocator.h"
 #include "core/HashFunction.h"
+#include "core/Assert.h"
 
 #include <atomic>
-#include <cassert>
 #include <new>
 
 namespace core
@@ -43,7 +43,7 @@ namespace core
 		SharedControlBlock* m_control = nullptr;
 		T* m_ptr = nullptr;
 
-		Allocator* getAllocator()
+		Allocator* getAllocator() const
 		{
 			if (m_control == nullptr)
 				return nullptr;

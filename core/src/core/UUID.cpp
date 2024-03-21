@@ -30,7 +30,7 @@ namespace core
 	{
 		UUID uuid;
 		auto ok = Rand::cryptoRand(Span<std::byte>{(std::byte*)&uuid.data, sizeof(uuid.data)});
-		assert(ok);
+		coreAssert(ok);
 		// version 4
 		uuid.data.bytes[6] = (uuid.data.bytes[6] & 0x0f) | 0x40;
 		// variant is 10

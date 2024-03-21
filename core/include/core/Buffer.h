@@ -1,13 +1,13 @@
 #pragma once
 
 #include "core/Exports.h"
+#include "core/Assert.h"
 #include "core/Allocator.h"
 #include "core/StringView.h"
 #include "core/Span.h"
 
 #include <cstddef>
 #include <utility>
-#include <cassert>
 
 namespace core
 {
@@ -70,13 +70,13 @@ namespace core
 
 		std::byte& operator[](size_t i)
 		{
-			assert(i < m_count);
+			coreAssert(i < m_count);
 			return m_ptr[i];
 		}
 
 		const std::byte& operator[](size_t i) const
 		{
-			assert(i < m_count);
+			coreAssert(i < m_count);
 			return m_ptr[i];
 		}
 

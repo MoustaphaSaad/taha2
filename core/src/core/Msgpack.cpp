@@ -130,7 +130,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(writer.allocator(), "integer is too big"_sv);
 		}
 	}
@@ -165,7 +165,7 @@ namespace core::msgpack
 			}
 			else
 			{
-				assert(false);
+				coreUnreachable();
 				return errf(writer.allocator(), "integer is too big"_sv);
 			}
 		}
@@ -197,7 +197,7 @@ namespace core::msgpack
 			}
 			else
 			{
-				assert(false);
+				coreUnreachable();
 				return errf(writer.allocator(), "integer is too small"_sv);
 			}
 		}
@@ -244,7 +244,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(writer.allocator(), "string is too long"_sv);
 		}
 	}
@@ -271,7 +271,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(writer.allocator(), "blob is too big"_sv);
 		}
 	}
@@ -419,7 +419,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(m_allocator, "invalid string prefix: {:x}"_sv, prefix);
 		}
 	}
@@ -444,7 +444,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(m_allocator, "invalid array prefix: {:x}"_sv, prefix);
 		}
 	}
@@ -469,7 +469,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(m_allocator, "invalid map prefix: {:x}"_sv, prefix);
 		}
 	}
@@ -496,7 +496,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(m_allocator, "invalid bin prefix: {:x}"_sv, prefix);
 		}
 	}
@@ -693,7 +693,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(m_allocator, "invalid prefix: {:x}"_sv, prefix);
 		}
 
@@ -973,7 +973,7 @@ namespace core::msgpack
 
 	String Value::release_string()
 	{
-		assert(m_kind == KIND_STRING);
+		coreAssert(m_kind == KIND_STRING);
 		auto allocator = m_string->allocator();
 		auto res = std::move(*m_string);
 		allocator->release(m_string, sizeof(*m_string));
@@ -983,7 +983,7 @@ namespace core::msgpack
 
 	Buffer Value::release_bytes()
 	{
-		assert(m_kind == KIND_BYTES);
+		coreAssert(m_kind == KIND_BYTES);
 		auto allocator = m_bytes->allocator();
 		auto res = std::move(*m_bytes);
 		allocator->release(m_bytes, sizeof(*m_bytes));
@@ -993,7 +993,7 @@ namespace core::msgpack
 
 	Array<Value> Value::release_array()
 	{
-		assert(m_kind == KIND_ARRAY);
+		coreAssert(m_kind == KIND_ARRAY);
 		auto allocator = m_array->allocator();
 		auto res = std::move(*m_array);
 		allocator->release(m_array, sizeof(*m_array));
@@ -1003,7 +1003,7 @@ namespace core::msgpack
 
 	Map<String, Value> Value::release_map()
 	{
-		assert(m_kind == KIND_MAP);
+		coreAssert(m_kind == KIND_MAP);
 		auto allocator = m_map->allocator();
 		auto res = std::move(*m_map);
 		allocator->release(m_map, sizeof(*m_map));
@@ -1048,7 +1048,7 @@ namespace core::msgpack
 			break;
 		}
 		default:
-			assert(false);
+			coreUnreachable();
 			break;
 		}
 		m_kind = KIND_NULL;
@@ -1109,7 +1109,7 @@ namespace core::msgpack
 			break;
 		}
 		default:
-			assert(false);
+			coreUnreachable();
 			break;
 		}
 	}
@@ -1153,7 +1153,7 @@ namespace core::msgpack
 			other.m_map = nullptr;
 			break;
 		default:
-			assert(false);
+			coreUnreachable();
 			break;
 		}
 		other.m_kind = KIND_NULL;
@@ -1184,7 +1184,7 @@ namespace core::msgpack
 		case Value::KIND_MAP:
 			return msgpack(writer, value.as_map());
 		default:
-			assert(false);
+			coreUnreachable();
 			return errf(writer.allocator(), "invalid value kind: {}"_sv, (int)value.kind());
 		}
 	}
@@ -1315,7 +1315,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			assert(false);
+			coreUnreachable();
 			return errf(reader.allocator(), "invalid prefix: {:x}"_sv, prefix);
 		}
 

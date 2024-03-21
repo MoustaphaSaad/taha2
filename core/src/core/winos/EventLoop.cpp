@@ -296,7 +296,7 @@ namespace core
 
 			auto startEvent = unique_from<StartEvent2>(m_allocator);
 			[[maybe_unused]] auto err = sendEventToThread(std::move(startEvent), thread);
-			assert(!err);
+			coreAssert(!err);
 		}
 
 		Log* m_log = nullptr;
@@ -319,7 +319,7 @@ namespace core
 			if (m_completionPort != INVALID_HANDLE_VALUE)
 			{
 				[[maybe_unused]] auto res = CloseHandle(m_completionPort);
-				assert(SUCCEEDED(res));
+				coreAssert(SUCCEEDED(res));
 			}
 		}
 
@@ -431,7 +431,7 @@ namespace core
 						}
 						else
 						{
-							assert(false);
+							coreUnreachable();
 							return errf(m_allocator, "unknown op type"_sv);
 						}
 					}
@@ -447,7 +447,7 @@ namespace core
 			if (m_ops.tryPush(std::move(op)))
 			{
 				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (OVERLAPPED*)handle);
-				assert(SUCCEEDED(res));
+				coreAssert(SUCCEEDED(res));
 			}
 		}
 
@@ -500,7 +500,7 @@ namespace core
 			if (m_ops.tryPush(std::move(op)))
 			{
 				[[maybe_unused]] auto res = PostQueuedCompletionStatus(m_completionPort, 0, NULL, (OVERLAPPED*)handle);
-				assert(SUCCEEDED(res));
+				coreAssert(SUCCEEDED(res));
 			}
 			return {};
 		}

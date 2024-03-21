@@ -4,6 +4,7 @@
 #include "core/Queue.h"
 #include "core/Func.h"
 #include "core/Mutex.h"
+#include "core/Assert.h"
 
 namespace core
 {
@@ -45,7 +46,7 @@ namespace core
 		bool signalFuncExecutionFinishedAndTryPop(Func<void()>& func)
 		{
 			auto lock = Lock<Mutex>::lock(m_mutex);
-			assert(m_scheduled == true);
+			coreAssert(m_scheduled == true);
 			if (m_queue.count() > 0)
 			{
 				func = std::move(m_queue.front());

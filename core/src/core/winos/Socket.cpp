@@ -1,10 +1,9 @@
 #include "core/Socket.h"
 #include "core/String.h"
+#include "core/Assert.h"
 
 #include <WinSock2.h>
 #include <WS2tcpip.h>
-
-#include <assert.h>
 
 namespace core
 {
@@ -14,8 +13,8 @@ namespace core
 		{
 			WSADATA wsaData;
 			auto err = WSAStartup(MAKEWORD(2, 2), &wsaData);
-			assert(err == 0);
-			assert(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
+			coreAssert(err == 0);
+			coreAssert(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
 		}
 
 		~WinOSSocketInitializer()
@@ -46,7 +45,7 @@ namespace core
 			if (m_handle != INVALID_SOCKET)
 			{
 				[[maybe_unused]] auto res = ::closesocket(m_handle);
-				assert(res == 0);
+				coreAssert(res == 0);
 			}
 		}
 
@@ -173,7 +172,7 @@ namespace core
 			case AF_INET: return FAMILY_IPV4;
 			case AF_INET6: return FAMILY_IPV6;
 			default:
-				assert(false);
+				coreUnreachable();
 				return FAMILY(0);
 			}
 		}
@@ -185,7 +184,7 @@ namespace core
 			case SOCK_STREAM: return TYPE_TCP;
 			case SOCK_DGRAM: return TYPE_UDP;
 			default:
-				assert(false);
+				coreUnreachable();
 				return TYPE(0);
 			}
 		}
@@ -234,7 +233,7 @@ namespace core
 			osFamily = AF_INET6;
 			break;
 		default:
-			assert(false);
+			coreUnreachable();
 			break;
 		}
 
@@ -251,7 +250,7 @@ namespace core
 			osProtocol = IPPROTO_UDP;
 			break;
 		default:
-			assert(false);
+			coreUnreachable();
 			break;
 		}
 

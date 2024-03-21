@@ -117,7 +117,7 @@ namespace core::websocket
 			  m_client(client),
 			  m_url(std::move(url))
 		{
-			assert(key.sizeInBytes() == sizeof(m_key));
+			coreAssert(key.sizeInBytes() == sizeof(m_key));
 			::memcpy(m_key, key.data(), key.sizeInBytes());
 		}
 
@@ -326,7 +326,7 @@ namespace core::websocket
 		ZoneScoped;
 		if (FrameHeader::isCtrlOpcode(opcode))
 		{
-			assert(payload.sizeInBytes() <= 125);
+			coreAssert(payload.sizeInBytes() <= 125);
 			if (payload.sizeInBytes() > 125)
 				payload = payload.slice(0, 125);
 		}

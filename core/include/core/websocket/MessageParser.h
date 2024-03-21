@@ -3,6 +3,7 @@
 #include "core/websocket/Message.h"
 #include "core/Buffer.h"
 #include "core/Result.h"
+#include "core/Assert.h"
 
 #include <cstdint>
 
@@ -70,7 +71,7 @@ namespace core::websocket
 
 		Frame frame()
 		{
-			assert(m_state == STATE_END);
+			coreAssert(m_state == STATE_END);
 			return Frame{.header = m_header, .payload = std::move(m_payload)};
 		}
 

@@ -2,8 +2,7 @@
 
 #include "core/Mutex.h"
 #include "core/ConditionVariable.h"
-
-#include <cassert>
+#include "core/Assert.h"
 
 namespace core
 {
@@ -24,7 +23,7 @@ namespace core
 
 		void add(int count)
 		{
-			assert(count > 0);
+			coreAssert(count > 0);
 
 			auto lock = Lock<Mutex>::lock(m_mutex);
 			m_count += count;
@@ -34,7 +33,7 @@ namespace core
 		{
 			auto lock = Lock<Mutex>::lock(m_mutex);
 			m_count--;
-			assert(m_count >= 0);
+			coreAssert(m_count >= 0);
 			if (m_count == 0)
 			{
 				m_condition_variable.notify_all();
@@ -46,7 +45,7 @@ namespace core
 			auto lock = Lock<Mutex>::lock(m_mutex);
 			while (m_count > 0)
 				m_condition_variable.wait(m_mutex);
-			assert(m_count == 0);
+			coreAssert(m_count == 0);
 		}
 	};
 }

@@ -30,6 +30,8 @@ namespace core
 
 		explicit Log(Shared<spdlog::logger> logger) : m_logger(std::move(logger)) {}
 
+		Allocator* allocator() const { return m_logger.allocator(); }
+
 		void setLevel(level level)
 		{
 			m_logger->set_level(level);

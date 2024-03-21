@@ -4,11 +4,11 @@
 #include "core/Rune.h"
 #include "core/Array.h"
 #include "core/Span.h"
+#include "core/Assert.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
 
-#include <cassert>
 #include <cstring>
 #include <cstdint>
 
@@ -96,7 +96,7 @@ namespace core
 			: m_begin(begin)
 			, m_count(end - begin)
 		{
-			assert(begin <= end);
+			coreAssert(begin <= end);
 		}
 
 		StringView(const Span<const std::byte>& span)
@@ -121,7 +121,7 @@ namespace core
 
 		const char& operator[](size_t i) const
 		{
-			assert(i < m_count);
+			coreAssert(i < m_count);
 			return m_begin[i];
 		}
 
@@ -155,7 +155,7 @@ namespace core
 		StringRunes runes() const { return StringRunes{m_begin, m_begin + m_count}; }
 		StringView slice(size_t start, size_t end) const
 		{
-			assert(start <= end && end - start <= m_count);
+			coreAssert(start <= end && end - start <= m_count);
 			return StringView{m_begin + start, end - start};
 		}
 

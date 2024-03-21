@@ -32,7 +32,7 @@ namespace core
 				if (eventfd != -1)
 				{
 					[[maybe_unused]] auto res = ::close(eventfd);
-					assert(res == 0);
+					coreAssert(res == 0);
 				}
 			}
 
@@ -52,7 +52,7 @@ namespace core
 				if (eventfd != -1)
 				{
 					[[maybe_unused]] auto res = ::close(eventfd);
-					assert(res == 0);
+					coreAssert(res == 0);
 				}
 			}
 
@@ -73,7 +73,7 @@ namespace core
 				if (eventfd != -1)
 				{
 					[[maybe_unused]] auto res = ::close(eventfd);
-					assert(res == 0);
+					coreAssert(res == 0);
 				}
 			}
 
@@ -243,7 +243,7 @@ namespace core
 
 			void push(Unique<Op> op)
 			{
-				assert(op != nullptr);
+				coreAssert(op != nullptr);
 				auto lock = Lock<Mutex>::lock(m_mutex);
 				m_ops.push_back(std::move(op));
 			}
@@ -442,7 +442,7 @@ namespace core
 
 			auto startEvent = unique_from<StartEvent>(m_allocator);
 			[[maybe_unused]] auto err = sendEventToThread(std::move(startEvent), thread);
-			assert(!err);
+			coreAssert(!err);
 		}
 
 		Log* m_log = nullptr;
@@ -465,7 +465,7 @@ namespace core
 			if (m_epoll != -1)
 			{
 				[[maybe_unused]] auto res = ::close(m_epoll);
-				assert(res == 0);
+				coreAssert(res == 0);
 				m_epoll = -1;
 			}
 		}
@@ -538,8 +538,8 @@ namespace core
 					{
 						// due to how the code is structured, a polling thread may get an event as ready (especially because we use level triggered)
 						// and said thread will pause execution while another thread will destroy the source, then polling thread will resume
-						// thus going into this else clause, so an assert is not useful here
-						// assert(false);
+						// thus going into this else clause, so an unreachable is not useful here
+						// coreUnreachable();
 					}
 				}
 			}
@@ -550,7 +550,7 @@ namespace core
 			ZoneScoped;
 
 			auto fd = eventfd(0, 0);
-			assert(fd != -1);
+			coreAssert(fd != -1);
 			auto op = unique_from<CloseOp>(m_allocator, fd);
 			auto handle = op.get();
 
@@ -560,11 +560,11 @@ namespace core
 				sub.events = EPOLLIN | EPOLLONESHOT;
 				sub.data.ptr = handle;
 				[[maybe_unused]] auto ok = epoll_ctl(m_epoll, EPOLL_CTL_ADD, fd, &sub);
-				assert(ok != -1);
+				coreAssert(ok != -1);
 
 				int64_t v = 1;
 				[[maybe_unused]] auto res = ::write(fd, &v, sizeof(v));
-				assert(res == sizeof(v));
+				coreAssert(res == sizeof(v));
 			}
 
 			m_ops.close();

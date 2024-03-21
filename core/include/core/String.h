@@ -4,12 +4,12 @@
 #include "core/Allocator.h"
 #include "core/Rune.h"
 #include "core/StringView.h"
+#include "core/Assert.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
 
 #include <cstring>
-#include <cassert>
 #include <utility>
 
 namespace core
@@ -83,13 +83,13 @@ namespace core
 
 		char& operator[](size_t i)
 		{
-			assert(i < m_count);
+			coreAssert(i < m_count);
 			return m_ptr[i];
 		}
 
 		const char& operator[](size_t i) const
 		{
-			assert(i < m_count);
+			coreAssert(i < m_count);
 			return m_ptr[i];
 		}
 

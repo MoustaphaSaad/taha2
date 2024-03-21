@@ -1,10 +1,9 @@
 #include "core/VirtualMem.h"
+#include "core/Assert.h"
 
 #include <tracy/Tracy.hpp>
 
 #include <sys/mman.h>
-
-#include <cassert>
 
 namespace core
 {
@@ -18,13 +17,13 @@ namespace core
 	void VirtualMem::commit(void* ptr, size_t size)
 	{
 		[[maybe_unused]] auto res = mprotect(ptr, size, PROT_READ | PROT_WRITE);
-		assert(res == 0);
+		coreAssert(res == 0);
 	}
 
 	void VirtualMem::release(void* ptr, size_t size)
 	{
 		[[maybe_unused]] auto res = mprotect(ptr, size, PROT_NONE);
-		assert(res == 0);
+		coreAssert(res == 0);
 	}
 
 	void VirtualMem::free(void* ptr, size_t size)

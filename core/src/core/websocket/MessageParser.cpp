@@ -179,7 +179,7 @@ namespace core::websocket
 				result.type = Message::TYPE_PONG;
 				break;
 			default:
-				assert(false);
+				coreUnreachable();
 				return errf(m_allocator, "invalid opcode"_sv);
 			}
 			result.payload = std::move(frame.payload);
@@ -205,7 +205,7 @@ namespace core::websocket
 					m_fragmentedMessage.type = Message::TYPE_BINARY;
 					break;
 				default:
-					assert(false);
+					coreUnreachable();
 					return errf(m_allocator, "invalid opcode"_sv);
 				}
 			}

@@ -1,13 +1,12 @@
 #include "core/MemoryStream.h"
-
-#include <cassert>
+#include "core/Assert.h"
 
 namespace core
 {
 	size_t MemoryStream::read(void* buffer, size_t size)
 	{
-		assert(m_cursor >= 0);
-		assert((size_t)m_cursor <= m_buffer.count());
+		coreAssert(m_cursor >= 0);
+		coreAssert((size_t)m_cursor <= m_buffer.count());
 		auto remaining_size = m_buffer.count() - m_cursor;
 		auto read_size = size < remaining_size ? size : remaining_size;
 		::memcpy(buffer, m_buffer.data() + m_cursor, read_size);
@@ -17,7 +16,7 @@ namespace core
 
 	size_t MemoryStream::write(const void* buffer, size_t size)
 	{
-		assert(m_cursor >= 0);
+		coreAssert(m_cursor >= 0);
 		m_buffer.resize(m_cursor + size);
 		memcpy(m_buffer.data() + m_cursor, buffer, size);
 		m_cursor += (int64_t)size;

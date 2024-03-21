@@ -1,6 +1,6 @@
 #include "core/File.h"
+#include "core/Assert.h"
 
-#include <cassert>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -17,7 +17,7 @@ namespace core
 			if (m_handle != -1 && m_closeHandle)
 			{
 				[[maybe_unused]] auto res = ::close(m_handle);
-				assert(res == 0);
+				coreAssert(res == 0);
 				m_handle = -1;
 			}
 		}
