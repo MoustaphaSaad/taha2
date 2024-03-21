@@ -37,7 +37,7 @@ namespace core::websocket
 
 		HumanError handle(Event* event) override
 		{
-			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
+			if (auto startEvent = dynamic_cast<StartEvent*>(event))
 			{
 				ZoneScopedN("StartEvent");
 				return m_socket.read(sharedFromThis());
@@ -128,7 +128,7 @@ namespace core::websocket
 
 		HumanError handle(Event* event) override
 		{
-			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
+			if (auto startEvent = dynamic_cast<StartEvent*>(event))
 			{
 				ZoneScopedN("StartEvent");
 				MemoryStream request{m_allocator};
@@ -285,7 +285,7 @@ namespace core::websocket
 
 		HumanError handle(Event* event) override
 		{
-			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
+			if (auto startEvent = dynamic_cast<StartEvent*>(event))
 			{
 				ZoneScopedN("StartEvent");
 				auto& buffer = m_client->m_buffer;

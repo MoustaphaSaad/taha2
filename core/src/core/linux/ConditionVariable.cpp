@@ -1,5 +1,6 @@
 #include "core/ConditionVariable.h"
 #include "core/linux/IMutex.h"
+#include "core/Assert.h"
 
 #include <pthread.h>
 

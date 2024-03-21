@@ -238,7 +238,7 @@ public:
 
 	core::HumanError handle(core::Event* event) override
 	{
-		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
 		{
 			ZoneScopedN("TestDriver::StartEvent");
 			return startTestClient();

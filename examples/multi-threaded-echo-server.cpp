@@ -28,7 +28,7 @@ public:
 
 	core::HumanError handle(core::Event* event) override
 	{
-		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
 		{
 			ZoneScopedN("EchoThread::StartEvent");
 			return m_socket.read(sharedFromThis());
@@ -62,12 +62,12 @@ public:
 
 	core::HumanError handle(core::Event* event) override
 	{
-		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
 		{
 			ZoneScopedN("AcceptThread::StartEvent");
 			return m_socket.accept(sharedFromThis());
 		}
-		else if (auto acceptEvent = dynamic_cast<core::AcceptEvent2*>(event))
+		else if (auto acceptEvent = dynamic_cast<core::AcceptEvent*>(event))
 		{
 			ZoneScopedN("AcceptThread::AcceptEvent");
 			auto loop = m_threadedEventLoop->next();

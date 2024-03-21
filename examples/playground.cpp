@@ -28,7 +28,7 @@ public:
 
 	core::HumanError handle(core::Event* event) override
 	{
-		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
 		{
 			return m_socket.read(sharedFromThis());
 		}
@@ -53,11 +53,11 @@ public:
 
 	core::HumanError handle(core::Event* event) override
 	{
-		if (auto startEvent = dynamic_cast<core::StartEvent2*>(event))
+		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
 		{
 			return m_socket.accept(sharedFromThis());
 		}
-		else if (auto acceptEvent = dynamic_cast<core::AcceptEvent2*>(event))
+		else if (auto acceptEvent = dynamic_cast<core::AcceptEvent*>(event))
 		{
 			auto socketResult = eventLoop()->registerSocket(acceptEvent->releaseSocket());
 			if (socketResult.isError())

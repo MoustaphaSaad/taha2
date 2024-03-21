@@ -17,14 +17,14 @@ namespace core
 		virtual ~Event() = default;
 	};
 
-	class StartEvent2: public Event
+	class StartEvent: public Event
 	{};
 
-	class AcceptEvent2: public Event
+	class AcceptEvent: public Event
 	{
 		Unique<Socket> m_socket;
 	public:
-		explicit AcceptEvent2(Unique<Socket> socket)
+		explicit AcceptEvent(Unique<Socket> socket)
 			: m_socket(std::move(socket))
 		{}
 

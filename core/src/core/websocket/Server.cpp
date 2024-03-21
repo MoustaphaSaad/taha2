@@ -20,11 +20,11 @@ namespace core::websocket
 
 		HumanError handle(Event* event) override
 		{
-			if (auto startEvent = dynamic_cast<StartEvent2*>(event))
+			if (auto startEvent = dynamic_cast<StartEvent*>(event))
 			{
 				return m_socket.accept(sharedFromThis());
 			}
-			else if (auto acceptEvent = dynamic_cast<AcceptEvent2*>(event))
+			else if (auto acceptEvent = dynamic_cast<AcceptEvent*>(event))
 			{
 				m_server->clientConnected(acceptEvent->releaseSocket());
 				return m_socket.accept(sharedFromThis());
