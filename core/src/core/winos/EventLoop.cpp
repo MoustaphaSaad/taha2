@@ -294,7 +294,7 @@ namespace core
 			ZoneScoped;
 			m_threads.push(thread);
 
-			auto startEvent = unique_from<StartEvent2>(m_allocator);
+			auto startEvent = unique_from<StartEvent>(m_allocator);
 			[[maybe_unused]] auto err = sendEventToThread(std::move(startEvent), thread);
 			coreAssert(!err);
 		}
@@ -377,13 +377,13 @@ namespace core
 							{
 								if (thread->eventLoop() == this)
 								{
-									AcceptEvent2 acceptEvent{std::move(acceptOp->acceptSocket)};
+									AcceptEvent acceptEvent{std::move(acceptOp->acceptSocket)};
 									if (auto err = thread->handle(&acceptEvent))
 										return err;
 								}
 								else
 								{
-									auto acceptEvent = unique_from<AcceptEvent2>(m_allocator, std::move(acceptOp->acceptSocket));
+									auto acceptEvent = unique_from<AcceptEvent>(m_allocator, std::move(acceptOp->acceptSocket));
 									if (auto err = thread->send(std::move(acceptEvent)))
 										return err;
 								}
