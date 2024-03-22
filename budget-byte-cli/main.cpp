@@ -2,6 +2,8 @@
 #include <core/Log.h>
 #include <core/StringView.h>
 
+#include <budget-byte/Ledger.h>
+
 auto HELP = R"""(budget-byte-cli the cli interface for budget byte financial tracker
 budget-byte-cli path/to/ledger/file command [options]
 COMMANDS:
@@ -62,7 +64,13 @@ int main(int argc, char** argv)
 	}
 	else if (args.command() == "init"_sv)
 	{
-		log.debug("creating ledger file: {}"_sv, args.file());
+		auto ledgerResult = budget::Ledger::open(args.file(), &allocator);
+		if (ledgerResult.isError())
+		{
+			log.critical("failed to create ledger file, {}"_sv, ledgerResult.releaseError());
+			return EXIT_FAILURE;
+		}
+		log.info("ledger file {} created"_sv, args.file());
 		return EXIT_SUCCESS;
 	}
 	return EXIT_SUCCESS;
