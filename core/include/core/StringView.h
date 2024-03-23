@@ -278,9 +278,9 @@ namespace core
 			return trimPredicate([&](Rune r) { return cutset.find(r) != SIZE_MAX; });
 		}
 
-		StringView trim() const;
+		CORE_EXPORT StringView trim() const;
 
-		bool isValidUtf8() const;
+		CORE_EXPORT bool isValidUtf8() const;
 	};
 }
 

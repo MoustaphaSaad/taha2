@@ -7,6 +7,8 @@
 
 #include <sqlite3.h>
 
+#include <chrono>
+
 namespace budget
 {
 	class Ledger
@@ -14,9 +16,23 @@ namespace budget
 		core::Allocator* m_allocator = nullptr;
 		core::String m_path;
 		sqlite3* m_db = nullptr;
+		sqlite3_stmt* m_addTransactionStmt = nullptr;
+		sqlite3_stmt* m_addAccountStmt = nullptr;
 
 		void destroy()
 		{
+			if (m_addAccountStmt)
+			{
+				sqlite3_finalize(m_addAccountStmt);
+				m_addAccountStmt = nullptr;
+			}
+
+			if (m_addTransactionStmt)
+			{
+				sqlite3_finalize(m_addTransactionStmt);
+				m_addTransactionStmt = nullptr;
+			}
+
 			if (m_db)
 			{
 				sqlite3_close_v2(m_db);
@@ -26,8 +42,15 @@ namespace budget
 
 		void moveFrom(Ledger&& other)
 		{
+			m_allocator = other.m_allocator;
+			m_path = std::move(other.m_path);
 			m_db = other.m_db;
+			m_addTransactionStmt = other.m_addTransactionStmt;
+			m_addAccountStmt = other.m_addAccountStmt;
+			other.m_allocator = nullptr;
 			other.m_db = nullptr;
+			other.m_addTransactionStmt = nullptr;
+			other.m_addAccountStmt = nullptr;
 		}
 
 		Ledger(sqlite3* db, core::String path, core::Allocator* allocator);
@@ -64,5 +87,15 @@ namespace budget
 		{
 			destroy();
 		}
+
+		BUDGET_BYTE_EXPORT core::HumanError addAccount(core::StringView name);
+
+		BUDGET_BYTE_EXPORT core::HumanError addTransaction(
+			uint64_t amount,
+			core::StringView src_account,
+			core::StringView dst_account,
+			std::chrono::year_month_day date,
+			core::StringView notes = ""_sv
+		);
 	};
 }
