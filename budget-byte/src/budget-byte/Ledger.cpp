@@ -24,21 +24,20 @@ namespace budget
 			PRAGMA user_version = 1;
 
 			CREATE TABLE IF NOT EXISTS "accounts" (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				name TEXT UNIQUE NOT NULL,
+				name TEXT PRIMARY KEY,
 				balance INTEGER NOT NULL
 			);
 
 			CREATE TABLE IF NOT EXISTS "ledger" (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				amount INTEGER NOT NULL,
-				src_id INTEGER NOT NULL,
-				dst_id INTEGER NOT NULL,
+				src TEXT NOT NULL,
+				dst TEXT NOT NULL,
 				date TEXT NOT NULL,
 				notes TEXT,
-				FOREIGN KEY(src_id) REFERENCES accounts(id),
-				FOREIGN KEY(dst_id) REFERENCES accounts(id)
-				CHECK (src_id <> dst_id)
+				FOREIGN KEY(src) REFERENCES accounts(name),
+				FOREIGN KEY(dst) REFERENCES accounts(name)
+				CHECK (src <> dst)
 			);
 
 			INSERT OR IGNORE INTO accounts(name, balance) VALUES('init', 0);
