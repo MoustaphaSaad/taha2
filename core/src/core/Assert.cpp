@@ -22,13 +22,13 @@ namespace core
 		return res;
 	}
 
-	void __reportAssert(const char* expr, const char* msg, const std::source_location location)
+	void __reportAssert(const char* expr, const char* msg, const char* file, const char* function, int line)
 	{
 		auto log = __ASSERT_LOG;
 		if (msg)
-			log->critical("Assertion Failure: {}, message: {}, in file: {}, function: {}, line: {}"_sv, expr, msg, location.file_name(), location.function_name(), location.line());
+			log->critical("Assertion Failure: {}, message: {}, in file: {}, function: {}, line: {}"_sv, expr, msg, file, function, line);
 		else
-			log->critical("Assertion Failure: {}, in file: {}, function: {}, line: {}"_sv, expr, location.file_name(), location.function_name(), location.line());
+			log->critical("Assertion Failure: {}, in file: {}, function: {}, line: {}"_sv, expr, file, function, line);
 
 		log->critical("{}"_sv, Stacktrace::current(1, 20).toString(log->allocator(), false));
 	}
