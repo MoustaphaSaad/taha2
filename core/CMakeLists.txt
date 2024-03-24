@@ -94,6 +94,7 @@ elseif (APPLE)
 			src/core/macos/IMutex.h
 			src/core/macos/Socket.cpp
 			src/core/macos/Rand.cpp
+			src/core/macos/EventLoop.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
