@@ -120,7 +120,7 @@ namespace budget
 		if (rc != SQLITE_OK)
 			return core::errf(m_allocator, "failed to add transaction, {}"_sv, sqlite3_errstr(rc));
 
-		auto dateStr = core::strf(m_allocator, "{:%Y-%m-%d}"_sv, std::chrono::local_days{date});
+		auto dateStr = core::strf(m_allocator, "{:%Y-%m-%d}"_sv, std::chrono::sys_days{date});
 		rc = sqlite3_bind_text(m_addTransactionStmt, 4, dateStr.data(), (int)dateStr.count(), SQLITE_STATIC);
 		if (rc != SQLITE_OK)
 			return core::errf(m_allocator, "failed to add transaction, {}"_sv, sqlite3_errstr(rc));

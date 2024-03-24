@@ -7,6 +7,10 @@
 
 #include <fmt/chrono.h>
 
+#include <sstream>
+
+#include <date/date.h>
+
 auto HELP = R"""(budget-byte-cli the cli interface for budget byte financial tracker
 budget-byte-cli path/to/ledger/file command [options]
 COMMANDS:
@@ -192,18 +196,31 @@ int main(int argc, char** argv)
 		}
 
 		uint64_t parsedAmount = 0;
-		auto res = std::from_chars(amount.begin(), amount.end(), parsedAmount);
-		if (res.ec != std::errc())
+		errno = 0;
+		char* endPtr = nullptr;
+		parsedAmount = std::strtoull(amount.begin(), &endPtr, 10);
+		if ((errno == ERANGE && (parsedAmount == ULLONG_MAX || parsedAmount == 0)) ||
+			(errno != 0 && parsedAmount == 0))
 		{
-			log.critical("failed to parse amount value as positive integer"_sv);
+			log.critical("failed to read number {}"_sv, amount);
+			return EXIT_FAILURE;
+		}
+		else if (endPtr == amount.begin())
+		{
+			log.critical("no digits found in number {}"_sv, amount);
+			return EXIT_FAILURE;
+		}
+		else if (endPtr != amount.end())
+		{
+			log.critical("failed to parse the entire number {}"_sv, amount);
 			return EXIT_FAILURE;
 		}
 
-		std::chrono::year_month_day parsedDate = std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now());
+		date::year_month_day parsedDate = date::floor<date::days>(std::chrono::system_clock::now());
 		if (date.count() > 0)
 		{
 			std::istringstream str{date.data()};
-			str >> std::chrono::parse("%F", parsedDate);
+			str >> date::parse("%F", parsedDate);
 			if (str.fail())
 			{
 				log.critical("failed to parse date {}, it should be in YYYY-MM-DD format"_sv, date);
@@ -211,14 +228,19 @@ int main(int argc, char** argv)
 			}
 		}
 
-		err = ledger.addTransaction(parsedAmount, src, dst, parsedDate, notes);
+		std::chrono::year_month_day stdDate{
+			std::chrono::year{(int)parsedDate.year()},
+			std::chrono::month{(unsigned)parsedDate.month()},
+			std::chrono::day{(unsigned)parsedDate.day()}
+		};
+		err = ledger.addTransaction(parsedAmount, src, dst, stdDate, notes);
 		if (err)
 		{
 			log.critical("{}"_sv, err);
 			return EXIT_FAILURE;
 		}
 
-		auto tm = std::chrono::local_days{parsedDate};
+		auto tm = std::chrono::sys_days{stdDate};
 		log.info("Success, amount = {}, src = {}, dst = {}, date = {:%Y-%m-%d}, notes = {}"_sv, parsedAmount, src, dst, tm, notes);
 		return EXIT_SUCCESS;
 	}

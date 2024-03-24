@@ -24,6 +24,8 @@ CPMDeclarePackage(fmt
   GIT_REPOSITORY git@github.com:fmtlib/fmt.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "FMT_USE_LOCAL_TIME ON"
 )
 
 CPMDeclarePackage(spdlog
@@ -66,6 +68,14 @@ CPMDeclarePackage(cpptrace-lib
   NAME cpptrace-lib
   GIT_TAG v0.5.0
   GIT_REPOSITORY git@github.com:jeremy-rifkin/cpptrace.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+)
+
+CPMDeclarePackage(date
+  NAME date
+  GIT_TAG v3.0.1
+  GIT_REPOSITORY git@github.com:HowardHinnant/date.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
 )

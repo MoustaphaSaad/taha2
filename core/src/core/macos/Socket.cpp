@@ -4,13 +4,13 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/unistd.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <unistd.h>
 
 namespace core
 {
-	class LinuxSocket: public Socket
+	class MacSocket: public Socket
 	{
 		Allocator* m_allocator = nullptr;
 		int m_handle = -1;
@@ -18,7 +18,7 @@ namespace core
 		int m_type = 0;
 		int m_protocol = 0;
 	public:
-		LinuxSocket(Allocator* allocator, int handle, int family, int type, int protocol)
+		MacSocket(Allocator* allocator, int handle, int family, int type, int protocol)
 			: m_allocator(allocator),
 			  m_handle(handle),
 			  m_family(family),
@@ -111,7 +111,7 @@ namespace core
 			if (handle == -1)
 				return nullptr;
 
-			return unique_from<LinuxSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
+			return unique_from<MacSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
 		}
 
 		bool shutdown(SHUTDOWN how) override
@@ -235,6 +235,6 @@ namespace core
 		if (handle == -1)
 			return nullptr;
 
-		return unique_from<LinuxSocket>(allocator, allocator, handle, osFamily, osType, osProtocol);
+		return unique_from<MacSocket>(allocator, allocator, handle, osFamily, osType, osProtocol);
 	}
 }
