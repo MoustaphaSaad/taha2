@@ -12,7 +12,7 @@ namespace core
 		Func<void()> func;
 	};
 
-	Thread::Thread(Allocator* allocator, Func<void()> func)
+	Thread::Thread(Allocator* allocator, Func<void()> func, size_t stackSize)
 	{
 		auto thread_start = +[](void* user_data) -> void*
 		{
@@ -21,9 +21,18 @@ namespace core
 			return 0;
 		};
 
+		pthread_attr_t attr{};
+		[[maybe_unused]] auto res = pthread_attr_init(&attr);
+		coreAssert(res == 0);
+		if (stackSize != 0)
+		{
+			res = pthread_attr_setstacksize(&attr, stackSize);
+			coreAssert(res == 0);
+		}
+
 		m_thread = unique_from<IThread>(allocator);
 		m_thread->func = std::move(func);
-		[[maybe_unused]] auto res = pthread_create(&m_thread->handle, nullptr, thread_start, m_thread.get());
+		res = pthread_create(&m_thread->handle, &attr, thread_start, m_thread.get());
 		coreAssert(res == 0);
 	}
 
