@@ -39,6 +39,7 @@ target_sources(core PRIVATE
 	include/core/ExecutionQueue.h
 	include/core/Stacktrace.h
 	include/core/Assert.h
+	include/core/Chan.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h

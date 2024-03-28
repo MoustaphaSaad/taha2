@@ -98,7 +98,11 @@ namespace core
 			}
 			other.m_state = STATE_EMPTY;
 		}
+
+		Result() = default;
 	public:
+
+		static Result createEmpty() { return Result{}; }
 
 		template<typename U>
 		Result(U&& value)
@@ -149,6 +153,8 @@ namespace core
 		}
 
 		bool isError() const { return m_state == STATE_ERROR; }
+		bool isValue() const { return m_state == STATE_VALUE; }
+		bool isEmpty() const { return m_state == STATE_EMPTY; }
 
 		T& value()
 		{

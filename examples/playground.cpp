@@ -1,132 +1,68 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
 #include <core/Thread.h>
-#include <core/EventLoop.h>
+#include <core/Chan.h>
 
-#include <tracy/Tracy.hpp>
-
-#include <signal.h>
-
-core::EventLoop* LOOP;
-
-void signalHandler(int signal)
+void evenIntegerProducer(core::Shared<core::Chan<int>> out, core::Log* log)
 {
-	if (signal == SIGINT)
+	for (int i = 2; i <= 100; i += 2)
 	{
-		LOOP->stop();
+		log->debug("sending {}"_sv, i);
+		out->send(&i);
+		log->debug("sent {}"_sv, i);
+	}
+	out->close();
+}
+
+void oddIntegerProducer(core::Shared<core::Chan<int>> out, core::Log* log)
+{
+	for (int i = 1; i <= 100; i += 2)
+	{
+		log->debug("sending {}"_sv, i);
+		out->send(&i);
+		log->debug("sent {}"_sv, i);
+	}
+	out->close();
+}
+
+void consumer(core::Shared<core::Chan<int>> evenNumbers, core::Shared<core::Chan<int>> oddNumbers, core::Log* log, core::Allocator* allocator)
+{
+	while (evenNumbers->isClosed() == false || oddNumbers->isClosed() == false)
+	{
+		core::Select
+		{
+		core::ReadCase{allocator, *evenNumbers} = [&](int num)
+		{
+			log->info("even consumer: {}"_sv, num);
+		},
+		core::DefaultCase{allocator} = [&]
+		{
+			log->info("default"_sv);
+		},
+		core::ReadCase{allocator, *oddNumbers} = [&](int num)
+		{
+			log->info("odd consumer: {}"_sv, num);
+		},
+		};
 	}
 }
 
-class EchoThread: public core::EventThread
-{
-	core::EventSocket m_socket;
-public:
-	explicit EchoThread(core::EventSocket socket, core::EventLoop* eventLoop)
-		: EventThread(eventLoop),
-		  m_socket(std::move(socket))
-	{}
-
-	core::HumanError handle(core::Event* event) override
-	{
-		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
-		{
-			return m_socket.read(sharedFromThis());
-		}
-		else if (auto readEvent = dynamic_cast<core::ReadEvent*>(event))
-		{
-			if (auto err = m_socket.write(readEvent->bytes(), nullptr))
-				return err;
-			return m_socket.read(sharedFromThis());
-		}
-		return {};
-	}
-};
-
-class AcceptThread: public core::EventThread
-{
-	core::EventSocket m_socket;
-public:
-	explicit AcceptThread(core::EventSocket socket, core::EventLoop* eventLoop)
-		: EventThread(eventLoop),
-		  m_socket(std::move(socket))
-	{}
-
-	core::HumanError handle(core::Event* event) override
-	{
-		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
-		{
-			return m_socket.accept(sharedFromThis());
-		}
-		else if (auto acceptEvent = dynamic_cast<core::AcceptEvent*>(event))
-		{
-			auto socketResult = eventLoop()->registerSocket(acceptEvent->releaseSocket());
-			if (socketResult.isError())
-				return socketResult.releaseError();
-			eventLoop()->startThread<EchoThread>(socketResult.releaseValue(), eventLoop());
-			return m_socket.accept(sharedFromThis());
-		}
-		return {};
-	}
-};
-
 int main()
 {
-	signal(SIGINT, signalHandler);
-
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
 
-	auto eventLoopResult = core::EventLoop::create(&log, &allocator);
-	if (eventLoopResult.isError())
-	{
-		log.critical("failed to create event thread pool, {}"_sv, eventLoopResult.releaseError());
-		return EXIT_FAILURE;
-	}
-	auto loop = eventLoopResult.releaseValue();
-	LOOP = loop.get();
+	auto evenNumbers = core::Chan<int>::create(0, &allocator);
+	core::Thread evenNumberProducerThread{&allocator, [evenNumbers, &log]{ evenIntegerProducer(evenNumbers, &log); }};
 
-	auto socket = core::Socket::open(&allocator, core::Socket::FAMILY_IPV4, core::Socket::TYPE_TCP);
-	if (socket == nullptr)
-	{
-		log.critical("failed to open socket"_sv);
-		return EXIT_FAILURE;
-	}
+	auto oddNumbers = core::Chan<int>::create(0, &allocator);
+	core::Thread oddNumberProducerThread{&allocator, [oddNumbers, &log]{ oddIntegerProducer(oddNumbers, &log); }};
 
-	auto ok = socket->bind("localhost"_sv, "8080"_sv);
-	if (ok == false)
-	{
-		log.critical("failed to bind socket"_sv);
-		return EXIT_FAILURE;
-	}
+	core::Thread consumerThread{&allocator, core::Func<void()>{&allocator, [evenNumbers, oddNumbers, &log, &allocator]{ consumer(evenNumbers, oddNumbers, &log, &allocator); }}};
 
-	ok = socket->listen();
-	if (ok == false)
-	{
-		log.critical("failed to listen socket"_sv);
-		return EXIT_FAILURE;
-	}
+	oddNumberProducerThread.join();
+	evenNumberProducerThread.join();
+	consumerThread.join();
 
-	auto eventSocketResult = loop->registerSocket(std::move(socket));
-	if (eventSocketResult.isError())
-	{
-		log.critical("failed to register socket, {}"_sv, eventSocketResult.releaseError());
-		return EXIT_FAILURE;
-	}
-	auto eventSocket = eventSocketResult.releaseValue();
-	loop->startThread<AcceptThread>(eventSocket, loop.get());
-
-	// core::Thread thread{&allocator, []{
-	// 	std::this_thread::sleep_for(std::chrono::seconds(20));
-	// 	LOOP->stop();
-	// }};
-
-	auto err = loop->run();
-	if (err)
-	{
-		log.critical("send thread pool error, {}"_sv, err);
-		return EXIT_FAILURE;
-	}
-
-	log.info("success"_sv);
 	return EXIT_SUCCESS;
 }
