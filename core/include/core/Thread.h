@@ -16,6 +16,7 @@ namespace core
 		CORE_EXPORT Thread& operator=(Thread&& other);
 		CORE_EXPORT ~Thread();
 		CORE_EXPORT void join();
+		CORE_EXPORT void detach();
 
 		CORE_EXPORT static int hardware_concurrency();
 	};

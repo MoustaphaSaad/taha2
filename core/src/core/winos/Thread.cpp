@@ -7,7 +7,7 @@ namespace core
 {
 	struct Thread::IThread
 	{
-		HANDLE handle;
+		HANDLE handle = INVALID_HANDLE_VALUE;
 		Func<void()> func;
 	};
 
@@ -30,7 +30,7 @@ namespace core
 
 	Thread::~Thread()
 	{
-		if (m_thread)
+		if (m_thread->handle != INVALID_HANDLE_VALUE)
 		{
 			[[maybe_unused]] auto res = CloseHandle(m_thread->handle);
 			coreAssert(res == TRUE);
@@ -41,6 +41,16 @@ namespace core
 	{
 		[[maybe_unused]] auto res = WaitForSingleObject(m_thread->handle, INFINITE);
 		coreAssert(res == WAIT_OBJECT_0);
+	}
+
+	void Thread::detach()
+	{
+		if (m_thread->handle != INVALID_HANDLE_VALUE)
+		{
+			[[maybe_unused]] auto res = CloseHandle(m_thread->handle);
+			coreAssert(res == TRUE);
+		}
+		m_thread->handle = INVALID_HANDLE_VALUE;
 	}
 
 	int Thread::hardware_concurrency()

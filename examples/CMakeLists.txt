@@ -18,3 +18,6 @@ target_link_libraries(ws-server core)
 
 add_executable(ws-client ws-client.cpp)
 target_link_libraries(ws-client core)
+
+add_executable(select select.cpp)
+target_link_libraries(select core)

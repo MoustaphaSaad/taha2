@@ -10,6 +10,7 @@ namespace core
 	{
 		pthread_t handle;
 		Func<void()> func;
+		bool detached = false;
 	};
 
 	Thread::Thread(Allocator* allocator, Func<void()> func, size_t stackSize)
@@ -44,6 +45,16 @@ namespace core
 	{
 		[[maybe_unused]] auto res = pthread_join(m_thread->handle, nullptr);
 		coreAssert(res == 0);
+	}
+
+	void Thread::detach()
+	{
+		if (m_thread->detached == false)
+		{
+			[[maybe_unused]] auto res = pthread_detach(m_thread->handle);
+			coreAssert(res == 0);
+		}
+		m_thread->detached = true;
 	}
 
 	int Thread::hardware_concurrency()
