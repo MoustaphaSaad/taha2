@@ -30,7 +30,7 @@ namespace core
 
 	Thread::~Thread()
 	{
-		if (m_thread->handle != INVALID_HANDLE_VALUE)
+		if (m_thread && m_thread->handle != INVALID_HANDLE_VALUE)
 		{
 			[[maybe_unused]] auto res = CloseHandle(m_thread->handle);
 			coreAssert(res == TRUE);
