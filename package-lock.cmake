@@ -80,3 +80,15 @@ CPMDeclarePackage(date
   EXCLUDE_FROM_ALL TRUE
 )
 
+CPMDeclarePackage(glfw
+  NAME glfw
+  GIT_TAG 3.4
+  GIT_REPOSITORY git@github.com:glfw/glfw.git
+  GIT_SHALLOW TRUE
+  # EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "GLFW_BUILD_EXAMPLES OFF"
+    "GLFW_BUILD_TESTS OFF"
+    "GLFW_BUILD_DOCS OFF"
+    "GLFW_INSTALL OFF"
+)

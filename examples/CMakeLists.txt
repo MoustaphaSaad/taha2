@@ -21,3 +21,7 @@ target_link_libraries(ws-client core)
 
 add_executable(select select.cpp)
 target_link_libraries(select core)
+
+CPMGetPackage(glfw)
+add_executable(window window.cpp)
+target_link_libraries(window core glfw)
