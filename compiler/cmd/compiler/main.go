@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/MoustaphaSaad/taha2/compiler/internal/minijava"
 )
 
 func main() {
@@ -26,6 +28,22 @@ func main() {
 		}
 		fmt.Println("no command found")
 		os.Exit(1)
+	} else if command == "scan" {
+		for _, file := range files {
+			unit, err := minijava.LoadUnitFromFile(file)
+			if err != nil {
+				fmt.Printf("loading unit '%s' failed, %v", file, err)
+				os.Exit(1)
+			}
+
+			err = unit.Scan()
+			if err != nil {
+				fmt.Printf("scanning unit '%s' failed, %v", file, err)
+				os.Exit(1)
+			}
+
+			fmt.Println(unit.Tokens)
+		}
 	} else {
 		if *helpFlag {
 			displayGeneralHelp()
