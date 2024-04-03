@@ -36,13 +36,11 @@ func main() {
 				os.Exit(1)
 			}
 
-			err = unit.Scan()
-			if err != nil {
-				fmt.Printf("scanning unit '%s' failed, %v", file, err)
-				os.Exit(1)
+			if !unit.Scan() {
+				fmt.Println(unit.DumpErrors())
+			} else {
+				fmt.Println(unit.DumpTokens())
 			}
-
-			fmt.Println(unit.Tokens)
 		}
 	} else {
 		if *helpFlag {
