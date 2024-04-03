@@ -293,7 +293,7 @@ func (s *Scanner) Scan() Token {
 				tkn.Type = TokenTypeComment
 			}
 		default:
-			s.unit.errf(Location{Pos: tkn.Loc.Pos, Unit: s.unit}, "illegal rune %v", c)
+			s.unit.errf(Location{Pos: tkn.Loc.Pos, Unit: s.unit}, "illegal rune '%c'", c)
 		}
 	}
 
