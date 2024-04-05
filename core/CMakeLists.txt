@@ -1,4 +1,8 @@
-add_library(core)
+add_library(core
+		include/core/OS.h
+		src/core/linux/OS.cpp
+		src/core/winos/OS.cpp
+        src/core/macos/OS.cpp)
 
 target_sources(core PRIVATE
 	include/core/Allocator.h
@@ -40,6 +44,7 @@ target_sources(core PRIVATE
 	include/core/Stacktrace.h
 	include/core/Assert.h
 	include/core/Chan.h
+	include/core/OS.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
@@ -80,6 +85,7 @@ if (WIN32)
 			src/core/winos/Socket.cpp
 			src/core/winos/Rand.cpp
 			src/core/winos/EventLoop.cpp
+			src/core/winos/OS.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
@@ -96,6 +102,7 @@ elseif (APPLE)
 			src/core/macos/Socket.cpp
 			src/core/macos/Rand.cpp
 			src/core/macos/EventLoop.cpp
+			src/core/macos/OS.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
@@ -112,6 +119,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/Socket.cpp
 			src/core/linux/Rand.cpp
 			src/core/linux/EventLoop.cpp
+			src/core/linux/OS.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()
