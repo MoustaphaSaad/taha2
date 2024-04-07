@@ -20,9 +20,6 @@ namespace core
 		auto handle = ::open(osName.data(), flags, S_IRWXU);
 		coreAssert(handle != -1);
 
-		auto handle = CreateMutex(0, false, (LPCWSTR)osName.data());
-		coreAssert(handle != INVALID_HANDLE_VALUE);
-
 		m_mutex = unique_from<IIPCMutex>(allocator);
 		m_mutex->handle = handle;
 	}
