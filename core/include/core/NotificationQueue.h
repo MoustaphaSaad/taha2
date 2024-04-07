@@ -3,6 +3,7 @@
 #include "core/Queue.h"
 #include "core/Func.h"
 #include "core/Mutex.h"
+#include "core/Lock.h"
 #include "core/ConditionVariable.h"
 #include "core/Shared.h"
 

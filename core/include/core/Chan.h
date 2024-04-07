@@ -3,6 +3,7 @@
 #include "core/Mallocator.h"
 #include "core/Allocator.h"
 #include "core/Mutex.h"
+#include "core/Lock.h"
 #include "core/Queue.h"
 #include "core/ConditionVariable.h"
 #include "core/Shared.h"

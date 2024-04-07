@@ -1,5 +1,6 @@
 #include "core/websocket/Server.h"
 #include "core/websocket/Client.h"
+#include "core/Lock.h"
 
 namespace core::websocket
 {

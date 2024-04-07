@@ -4,6 +4,7 @@
 #include "core/Queue.h"
 #include "core/Func.h"
 #include "core/Mutex.h"
+#include "core/Lock.h"
 #include "core/Assert.h"
 
 namespace core

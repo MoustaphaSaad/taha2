@@ -1,5 +1,6 @@
 #include "core/EventLoop.h"
 #include "core/Mutex.h"
+#include "core/Lock.h"
 #include "core/Hash.h"
 
 #include <tracy/Tracy.hpp>
