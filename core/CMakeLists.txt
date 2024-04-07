@@ -1,8 +1,4 @@
-add_library(core
-		include/core/OS.h
-		src/core/linux/OS.cpp
-		src/core/winos/OS.cpp
-        src/core/macos/OS.cpp)
+add_library(core)
 
 target_sources(core PRIVATE
 	include/core/Allocator.h
