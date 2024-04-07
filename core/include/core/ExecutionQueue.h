@@ -31,7 +31,7 @@ namespace core
 		template<typename TFunc>
 		void push(ThreadPool* pool, TFunc&& func)
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			if (m_scheduled)
 			{
 				m_queue.push_back(std::forward<TFunc>(func));
@@ -45,7 +45,7 @@ namespace core
 
 		bool signalFuncExecutionFinishedAndTryPop(Func<void()>& func)
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			coreAssert(m_scheduled == true);
 			if (m_queue.count() > 0)
 			{

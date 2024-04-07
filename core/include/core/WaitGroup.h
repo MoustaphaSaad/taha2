@@ -25,13 +25,13 @@ namespace core
 		{
 			coreAssert(count > 0);
 
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			m_count += count;
 		}
 
 		void done()
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			m_count--;
 			coreAssert(m_count >= 0);
 			if (m_count == 0)
@@ -42,7 +42,7 @@ namespace core
 
 		void wait()
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			while (m_count > 0)
 				m_condition_variable.wait(m_mutex);
 			coreAssert(m_count == 0);

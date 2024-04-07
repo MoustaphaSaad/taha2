@@ -23,8 +23,22 @@ namespace core
 	};
 
 	template<typename T>
+	class Lock;
+
+	template<typename T>
+	inline Lock<T> lockGuard(T& lockable);
+
+	template<typename T>
+	inline Lock<T> tryLockGuard(T& lockable);
+
+	template<typename T>
 	class Lock
 	{
+		template<typename U>
+		friend inline Lock<U> lockGuard(U& lockable);
+		template<typename U>
+		friend inline Lock<U> tryLockGuard(U& lockable);
+
 		T& m_lockable;
 		bool m_locked = false;
 
@@ -33,19 +47,6 @@ namespace core
 			  m_locked(locked)
 		{}
 	public:
-		static Lock lock(T& lockable)
-		{
-			lockable.lock();
-			return Lock{lockable, true};
-		}
-
-		static Lock try_lock(T& lockable)
-		{
-			if (lockable.try_lock())
-				return Lock{lockable, true};
-			return Lock(lockable, false);
-		}
-
 		~Lock()
 		{
 			if (m_locked)
@@ -54,4 +55,19 @@ namespace core
 
 		bool is_locked() const { return m_locked; }
 	};
+
+	template<typename T>
+	inline Lock<T> lockGuard(T& lockable)
+	{
+		lockable.lock();
+		return Lock<T>{lockable, true};
+	}
+
+	template<typename T>
+	inline Lock<T> tryLockGuard(T& lockable)
+	{
+		if (lockable.try_lock())
+			return Lock{lockable, true};
+		return Lock<T>{lockable, false};
+	}
 }

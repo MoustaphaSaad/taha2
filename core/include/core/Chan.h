@@ -33,7 +33,7 @@ namespace core
 
 		bool trySignalReady(size_t index)
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			if (m_event.isSignaled() || m_closed)
 				return false;
 			m_event = Event{.index = index};
@@ -43,7 +43,7 @@ namespace core
 
 		bool signalReady(size_t index)
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			while (m_event.isSignaled() && m_closed == false)
 				m_deliverCond.wait(m_mutex);
 			if (m_closed)
@@ -55,7 +55,7 @@ namespace core
 
 		bool signalClose(size_t index)
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			while (m_event.isSignaled() && m_closed == false)
 				m_deliverCond.wait(m_mutex);
 			if (m_closed)
@@ -67,7 +67,7 @@ namespace core
 
 		Event waitForEventAndClose()
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			if (m_event.isSignaled())
 			{
 				auto res = m_event;
@@ -90,7 +90,7 @@ namespace core
 
 		void close()
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			m_closed = true;
 			m_deliverCond.notify_all();
 		}
@@ -185,7 +185,7 @@ namespace core
 		{
 			if (isBuffered())
 			{
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockMutex = lockGuard(m_mutex);
 				while (m_buffer.count() == m_bufferSize)
 				{
 					m_writeWaiting.fetch_add(1);
@@ -211,8 +211,8 @@ namespace core
 			}
 			else
 			{
-				auto lockWriteMutex = Lock<Mutex>::lock(m_writeMutex);
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockWriteMutex = lockGuard(m_writeMutex);
+				auto lockMutex = lockGuard(m_mutex);
 
 				if (m_closed.load())
 					return ChanErr::Closed;
@@ -236,7 +236,7 @@ namespace core
 		{
 			if (isBuffered())
 			{
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockMutex = lockGuard(m_mutex);
 				while (m_buffer.count() == 0)
 				{
 					if (m_closed.load())
@@ -267,8 +267,8 @@ namespace core
 			}
 			else
 			{
-				auto lockReadMutex = Lock<Mutex>::lock(m_readMutex);
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockReadMutex = lockGuard(m_readMutex);
+				auto lockMutex = lockGuard(m_mutex);
 
 				while (m_closed.load() == false && m_writeWaiting.load() == 0)
 				{
@@ -314,7 +314,7 @@ namespace core
 		{
 			if (isBuffered())
 			{
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockMutex = lockGuard(m_mutex);
 				if (m_buffer.count() == m_bufferSize)
 				{
 					internalInsertWriteSelectCond(cond, index);
@@ -339,13 +339,13 @@ namespace core
 			}
 			else
 			{
-				auto lockWriteMutex = Lock<Mutex>::try_lock(m_writeMutex);
+				auto lockWriteMutex = tryLockGuard(m_writeMutex);
 				if (lockWriteMutex.is_locked() == false)
 				{
 					internalInsertWriteSelectCond(cond, index);
 					return ChanErr::Empty;
 				}
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockMutex = lockGuard(m_mutex);
 
 				if (m_closed.load())
 				{
@@ -373,7 +373,7 @@ namespace core
 		{
 			if (isBuffered())
 			{
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockMutex = lockGuard(m_mutex);
 				if (m_buffer.count() == 0)
 				{
 					internalInsertReadSelectCond(cond, index);
@@ -401,8 +401,8 @@ namespace core
 			}
 			else
 			{
-				auto lockReadMutex = Lock<Mutex>::lock(m_readMutex);
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockReadMutex = lockGuard(m_readMutex);
+				auto lockMutex = lockGuard(m_mutex);
 
 				if (m_closed.load())
 				{
@@ -434,7 +434,7 @@ namespace core
 
 		bool internalClose()
 		{
-			auto lockMutex = Lock<Mutex>::lock(m_mutex);
+			auto lockMutex = lockGuard(m_mutex);
 			if (m_closed.load())
 				return false;
 			m_closed.store(true);
@@ -451,7 +451,7 @@ namespace core
 		{
 			if (cond == nullptr)
 				return;
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			m_readSelects.remove(cond);
 			m_writeSelects.remove(cond);
 		}
@@ -472,7 +472,7 @@ namespace core
 		{
 			if (isBuffered())
 			{
-				auto lockMutex = Lock<Mutex>::lock(m_mutex);
+				auto lockMutex = lockGuard(m_mutex);
 				return m_buffer.count();
 			}
 			return 0;
@@ -480,7 +480,7 @@ namespace core
 
 		bool isClosed()
 		{
-			auto lockMutex = Lock<Mutex>::lock(m_mutex);
+			auto lockMutex = lockGuard(m_mutex);
 			return m_closed.load();
 		}
 

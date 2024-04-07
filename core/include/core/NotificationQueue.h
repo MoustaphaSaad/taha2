@@ -31,14 +31,14 @@ namespace core
 
 		void done()
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			m_done = true;
 			m_condition.notify_all();
 		}
 
 		bool pop(NotificationQueueEntry& func)
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			while (m_queue.count() == 0 && m_done == false)
 				m_condition.wait(m_mutex);
 			if (m_queue.count() == 0)
@@ -50,7 +50,7 @@ namespace core
 
 		bool tryPop(NotificationQueueEntry& func)
 		{
-			auto lock = Lock<Mutex>::try_lock(m_mutex);
+			auto lock = tryLockGuard(m_mutex);
 			if (lock.is_locked() == false || m_queue.count() == 0)
 				return false;
 			func = std::move(m_queue.front());
@@ -60,7 +60,7 @@ namespace core
 
 		bool tryPush(Func<void()>&& func, const Weak<ExecutionQueue>& execQueue)
 		{
-			auto lock = Lock<Mutex>::try_lock(m_mutex);
+			auto lock = tryLockGuard(m_mutex);
 			if (lock.is_locked() == false)
 				return false;
 			m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
@@ -70,7 +70,7 @@ namespace core
 
 		void push(Func<void()>&& func, const Weak<ExecutionQueue>& execQueue)
 		{
-			auto lock = Lock<Mutex>::lock(m_mutex);
+			auto lock = lockGuard(m_mutex);
 			m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
 			m_condition.notify_one();
 		}

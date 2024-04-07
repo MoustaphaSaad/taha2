@@ -40,13 +40,13 @@ namespace core::websocket
 
 	void Server::ClientSet::push(const Shared<Client>& client)
 	{
-		auto lock = Lock<Mutex>::lock(m_mutex);
+		auto lock = lockGuard(m_mutex);
 		m_clients.insert(client);
 	}
 
 	void Server::ClientSet::pop(const Shared<Client>& client)
 	{
-		auto lock = Lock<Mutex>::lock(m_mutex);
+		auto lock = lockGuard(m_mutex);
 		m_clients.remove(client);
 	}
 

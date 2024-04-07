@@ -127,7 +127,7 @@ namespace core
 
 			bool tryPush(Unique<Op> op)
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 
 				if (m_open == false)
 					return false;
@@ -139,7 +139,7 @@ namespace core
 
 			Unique<Op> pop(Op* op)
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 
 				auto it = m_ops.lookup(op);
 				if (it == m_ops.end())
@@ -151,19 +151,19 @@ namespace core
 
 			void close()
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				m_open = false;
 			}
 
 			void open()
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				m_open = true;
 			}
 
 			void clear()
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				m_ops.clear();
 			}
 		};
@@ -180,20 +180,20 @@ namespace core
 
 			void push(const Shared<EventThread>& thread)
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				auto handle = thread.get();
 				m_threads.insert(handle, thread);
 			}
 
 			void pop(EventThread* handle)
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				m_threads.remove(handle);
 			}
 
 			void clear()
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				m_threads.clear();
 			}
 		};
@@ -210,20 +210,20 @@ namespace core
 
 			void push(const Shared<EventSource>& source)
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				auto key = source.get();
 				m_sources.insert(key, source);
 			}
 
 			void remove(EventSource* source)
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				m_sources.remove(source);
 			}
 
 			Shared<EventSource> pop(EventSource* source)
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				auto it = m_sources.lookup(source);
 				if (it == m_sources.end())
 					return nullptr;
@@ -244,13 +244,13 @@ namespace core
 			void push(Unique<Op> op)
 			{
 				coreAssert(op != nullptr);
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				m_ops.push_back(std::move(op));
 			}
 
 			Unique<Op> pop()
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				if (m_ops.count() == 0)
 					return nullptr;
 
@@ -261,7 +261,7 @@ namespace core
 
 			Op* peek()
 			{
-				auto lock = Lock<Mutex>::lock(m_mutex);
+				auto lock = lockGuard(m_mutex);
 				if (m_ops.count() == 0)
 					return nullptr;
 				return m_ops.front().get();
