@@ -1,5 +1,5 @@
 #include "core/IPCMutex.h"
-#include "core/OSString.h"
+#include "core/String.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -16,7 +16,7 @@ namespace core
 	IPCMutex::IPCMutex(StringView name, Allocator* allocator)
 	{
 		int flags = O_WRONLY | O_CREAT | O_APPEND;
-		auto osName = OSString{name, allocator};
+		auto osName = String{name, allocator};
 		auto handle = ::open(osName.data(), flags, S_IRWXU);
 		coreAssert(handle != -1);
 
