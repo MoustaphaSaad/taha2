@@ -13,7 +13,7 @@ namespace core
 		Buffer m_buffer;
 
 		explicit OSString(Buffer buffer)
-			: m_buffer(buffer)
+			: m_buffer(std::move(buffer))
 		{}
 
 	public:

@@ -105,6 +105,7 @@ elseif (APPLE)
 			src/core/macos/OS.cpp
 			src/core/macos/IPCMutex.cpp
 			src/core/macos/Path.cpp
+			src/core/macos/Path.mm
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)

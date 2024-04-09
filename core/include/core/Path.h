@@ -22,6 +22,7 @@ namespace core
 	public:
 		CORE_EXPORT static Result<String> abs(StringView path, Allocator* allocator);
 		CORE_EXPORT static Result<String> workingDir(Allocator* allocator);
+		CORE_EXPORT static Result<String> tmpDir(Allocator* allocator);
 
 		template<typename ... TArgs>
 		static String join(Allocator* allocator, TArgs&& ... args)

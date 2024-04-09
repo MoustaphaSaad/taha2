@@ -40,4 +40,19 @@ namespace core
 		auto result = OSString::fromOSEncodedBuffer(std::move(buffer)).toUtf8(allocator);
 		return clean(result, allocator);
 	}
+
+	Result<String> Path::tmpDir(Allocator* allocator)
+	{
+		auto requiredSize = GetTempPath(0, nullptr);
+		if (requiredSize == 0)
+			return errf(allocator, "GetTempPath failed, ErrorCode({})"_sv, GetLastError());
+
+		Buffer buffer{allocator};
+		buffer.resize(requiredSize * sizeof(TCHAR));
+		requiredSize = GetTempPath(requiredSize, (LPTSTR)buffer.data());
+		if (requiredSize == 0)
+			return errf(allocator, "GetTempPath failed, ErrorCode({})"_sv, GetLastError());
+		auto result = OSString::fromOSEncodedBuffer(std::move(buffer)).toUtf8(allocator);
+		return clean(result, allocator);
+	}
 }

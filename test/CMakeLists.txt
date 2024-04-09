@@ -24,6 +24,7 @@ add_executable(unittests
 	test_sha1.cpp
 	test_stacktrace.cpp
 	test_os.cpp
+	test_path.cpp
 )
 
 CPMGetPackage(doctest)
