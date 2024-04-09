@@ -159,6 +159,16 @@ namespace core
 			return StringView{m_begin + start, end - start};
 		}
 
+		StringView sliceRight(size_t start) const
+		{
+			return slice(start, m_count);
+		}
+
+		StringView sliceLeft(size_t start) const
+		{
+			return slice(0, start);
+		}
+
 		CORE_EXPORT Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const;
 
 		bool startsWith(StringView str) const
@@ -166,7 +176,7 @@ namespace core
 			if (str.m_count > m_count)
 				return false;
 
-			return slice(0, str.m_count) == str;
+			return sliceLeft(str.m_count) == str;
 		}
 
 		bool endsWith(StringView str) const
@@ -174,7 +184,7 @@ namespace core
 			if (str.m_count > m_count)
 				return false;
 
-			return slice(m_count - str.m_count, m_count) == str;
+			return sliceRight(m_count - str.m_count) == str;
 		}
 
 		CORE_EXPORT bool equalsIgnoreCase(StringView other) const;
@@ -184,7 +194,7 @@ namespace core
 			if (other.m_count > m_count)
 				return false;
 
-			return slice(0, other.m_count).equalsIgnoreCase(other);
+			return sliceLeft(other.m_count).equalsIgnoreCase(other);
 		}
 
 		bool endsWithIgnoreCase(StringView other)
@@ -192,7 +202,7 @@ namespace core
 			if (other.m_count > m_count)
 				return false;
 
-			return slice(m_count - other.m_count, m_count).equalsIgnoreCase(other);
+			return sliceRight(m_count - other.m_count).equalsIgnoreCase(other);
 		}
 
 		template<typename TFunc>

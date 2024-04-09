@@ -68,7 +68,7 @@ public:
 			auto option = core::StringView{argv[i]};
 			if (option.startsWith("-"_sv))
 			{
-				option = option.slice(1, option.count()).trim();
+				option = option.sliceRight(1).trim();
 				if (i + 1 < argc)
 				{
 					if (res.hasOption(option))

@@ -48,10 +48,20 @@ namespace core
 		size_t count() const { return m_count; }
 		size_t sizeInBytes() const { return m_count * sizeof(T); }
 
-		Span<T> slice(size_t offset, size_t count)
+		Span<T> slice(size_t start, size_t end) const
 		{
-			coreAssert(offset + count <= m_count);
-			return Span<T>(m_ptr + offset, count);
+			coreAssert(start <= end && end - start <= m_count);
+			return Span<T>(m_ptr + start, end - start);
+		}
+
+		Span<T> sliceRight(size_t start) const
+		{
+			return slice(start, count());
+		}
+
+		Span<T> sliceLeft(size_t start) const
+		{
+			return slice(0, start);
 		}
 
 		Span<const std::byte> asBytes() const

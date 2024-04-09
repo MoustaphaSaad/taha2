@@ -232,7 +232,7 @@ namespace core::websocket
 					break;
 
 				if (consumedBytes > 0)
-					bytes = bytes.slice(consumedBytes, bytes.count() - consumedBytes);
+					bytes = bytes.sliceRight(consumedBytes);
 
 				if (m_messageParser.hasMessage())
 				{
@@ -328,7 +328,7 @@ namespace core::websocket
 		{
 			coreAssert(payload.sizeInBytes() <= 125);
 			if (payload.sizeInBytes() > 125)
-				payload = payload.slice(0, 125);
+				payload = payload.sliceLeft(125);
 		}
 
 		bool shouldMask = m_server == nullptr;
@@ -550,7 +550,7 @@ namespace core::websocket
 			if (message.payload.count() == 2)
 				return writeClose(1000);
 
-			auto payload = StringView{message.payload}.slice(2, message.payload.count());
+			auto payload = StringView{message.payload}.sliceRight(2);
 			if (payload.isValidUtf8() == false)
 				return writeClose(1007);
 
