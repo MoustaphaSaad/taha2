@@ -407,7 +407,7 @@ namespace core
 							else
 								return errf(allocator, "failed to write to socket, ErrorCode({})"_sv, errno);
 						}
-						writeOp->remainingBytes = writeOp->remainingBytes.slice(writtenBytes, writeOp->remainingBytes.count() - writtenBytes);
+						writeOp->remainingBytes = writeOp->remainingBytes.sliceRight(writtenBytes);
 
 						if (writeOp->remainingBytes.count() == 0)
 						{

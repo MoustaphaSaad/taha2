@@ -42,6 +42,7 @@ target_sources(core PRIVATE
 	include/core/Chan.h
 	include/core/OS.h
 	include/core/Lock.h
+	include/core/Path.h
 	include/core/websocket/Handshake.h
 	include/core/websocket/MessageParser.h
 	include/core/websocket/Message.h
@@ -84,6 +85,7 @@ if (WIN32)
 			src/core/winos/EventLoop.cpp
 			src/core/winos/OS.cpp
 			src/core/winos/IPCMutex.cpp
+			src/core/winos/Path.cpp
 	)
 	target_compile_definitions(core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
 elseif (APPLE)
@@ -102,6 +104,7 @@ elseif (APPLE)
 			src/core/macos/EventLoop.cpp
 			src/core/macos/OS.cpp
 			src/core/macos/IPCMutex.cpp
+			src/core/macos/Path.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 elseif (UNIX AND NOT APPLE)
@@ -120,6 +123,7 @@ elseif (UNIX AND NOT APPLE)
 			src/core/linux/EventLoop.cpp
 			src/core/linux/OS.cpp
 			src/core/linux/IPCMutex.cpp
+			src/core/linux/Path.cpp
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
 endif ()

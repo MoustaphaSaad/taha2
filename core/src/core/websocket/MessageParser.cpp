@@ -8,7 +8,7 @@ namespace core::websocket
 		size_t offset = 0;
 		while (m_state != STATE_END)
 		{
-			auto data = src.slice(offset, src.count() - offset);
+			auto data = src.sliceRight(offset);
 
 			if (m_state == STATE_PRE)
 			{
@@ -117,7 +117,7 @@ namespace core::websocket
 				if (data.count() < minLen)
 					break;
 
-				auto payload = data.slice(0, m_header.payloadLength);
+				auto payload = data.sliceLeft(m_header.payloadLength);
 
 				auto initCount = m_payload.count();
 				m_payload.push(payload);

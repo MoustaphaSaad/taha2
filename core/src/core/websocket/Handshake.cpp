@@ -27,8 +27,8 @@ namespace core::websocket
 			auto separatorIndex = headerLine.find(Rune{':'});
 			if (separatorIndex == SIZE_MAX) return errf(allocator, "cannot find header separator"_sv);
 
-			auto headerName = headerLine.slice(0, separatorIndex).trim();
-			auto headerValue = headerLine.slice(separatorIndex + 1, headerLine.count()).trim();
+			auto headerName = headerLine.sliceLeft(separatorIndex).trim();
+			auto headerValue = headerLine.sliceRight(separatorIndex + 1).trim();
 
 			if (headerName.equalsIgnoreCase("upgrade"_sv))
 			{
@@ -85,8 +85,8 @@ namespace core::websocket
 			if (colonIndex == SIZE_MAX)
 				continue;
 
-			auto key = line.slice(0, colonIndex).trim();
-			auto value = line.slice(colonIndex + 1, line.count()).trim();
+			auto key = line.sliceLeft(colonIndex).trim();
+			auto value = line.sliceRight(colonIndex + 1).trim();
 
 			if (key.equalsIgnoreCase("upgrade"_sv))
 			{

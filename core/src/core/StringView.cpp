@@ -80,7 +80,7 @@ namespace core
 		if (start >= m_count || m_count - start < target.m_count)
 			return SIZE_MAX;
 
-		auto self = slice(start, m_count);
+		auto self = sliceRight(start);
 
 		if (target.m_count == 0)
 		{
@@ -134,7 +134,7 @@ namespace core
 		if (start >= m_count || m_count - start < target.m_count)
 			return SIZE_MAX;
 
-		auto self = slice(start, m_count);
+		auto self = sliceRight(start);
 
 		if (target.m_count == 0)
 		{
@@ -175,7 +175,7 @@ namespace core
 			h += uint32_t(Rune{self.m_begin[i]}.lower());
 			h -= pow * uint32_t(Rune{self.m_begin[i - target.m_count]}.lower());
 			i += 1;
-			if (h == hash && self.slice(i - target.count(), self.count()).equalsIgnoreCase(target))
+			if (h == hash && self.sliceRight(i - target.count()).equalsIgnoreCase(target))
 			{
 				return i - target.m_count + start;
 			}

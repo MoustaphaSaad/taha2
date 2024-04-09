@@ -3,18 +3,15 @@
 namespace core
 {
 	OSString::OSString(StringView str, Allocator* allocator)
-		: m_allocator(allocator)
+		: m_buffer(allocator)
 	{
-		// +1 for the null termination
-		m_sizeInBytes = str.count() + 1;
-		m_ptr = (char*)m_allocator->alloc(m_sizeInBytes, alignof(char));
-		m_allocator->commit(m_ptr, m_sizeInBytes);
-		memcpy(m_ptr, str.begin(), m_sizeInBytes);
-		m_ptr[m_sizeInBytes - 1] = 0;
+		m_buffer.resize(str.count() + 1);
+		::memcpy(m_buffer.data(), str.data(), str.count());
+		m_buffer[str.count()] = std::byte{0};
 	}
 
 	String OSString::toUtf8(Allocator* allocator) const
 	{
-		return String{StringView{m_ptr, m_sizeInBytes - 1}, allocator};
+		return String{StringView{(const char*)m_buffer.data(), m_buffer.count() - 1}, allocator};
 	}
 }
