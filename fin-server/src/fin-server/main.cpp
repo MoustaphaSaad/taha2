@@ -1,6 +1,8 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
-#include <core/Hash.h>
+#include <core/EventLoop.h>
+
+#include <fin/Server.h>
 
 auto HELP = R"""(fin-server finapp local server
 fin-server path/to/ledger/file [OPTIONS]
@@ -96,7 +98,45 @@ int main(int argc, char** argv)
 	}
 	else
 	{
-		log.info("file: {}, create: {}"_sv, args.file(), args.create());
+		auto threadedEventLoopResult = core::ThreadedEventLoop::create(&log, &allocator);
+		if (threadedEventLoopResult.isError())
+		{
+			log.critical("failed to create event loop, {}"_sv, threadedEventLoopResult.releaseError());
+			return EXIT_FAILURE;
+		}
+		auto threadedEventLoop = threadedEventLoopResult.releaseValue();
+
+		auto lockInfoResult = fin::LockInfo::create(args.file(), &allocator);
+		if (lockInfoResult.isError())
+		{
+			log.critical("{}"_sv, lockInfoResult.releaseError());
+			return EXIT_FAILURE;
+		}
+		auto lockInfo = lockInfoResult.releaseValue();
+		log.info("absPath: {}, lockName: {}, filePath: {}"_sv, lockInfo.absPath(), lockInfo.lockName(), lockInfo.tmpFilePath());
+
+		auto serverResult = fin::Server::create(
+			args.file(),
+			"ws://localhost:9011"_sv,
+			fin::Server::FLAG::CREATE_LEDGER,
+			threadedEventLoop->next(),
+			&log,
+			&allocator
+		);
+		if (serverResult.isError())
+		{
+			log.critical("failed to create server instance, {}"_sv, serverResult.releaseError());
+			return EXIT_FAILURE;
+		}
+		auto server = serverResult.releaseValue();
+
+		auto err = threadedEventLoop->run();
+		if (err)
+		{
+			log.critical("event loop error, {}"_sv, err);
+			return EXIT_FAILURE;
+		}
+
 		return EXIT_SUCCESS;
 	}
 }
