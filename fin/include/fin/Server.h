@@ -9,6 +9,8 @@
 #include <core/Allocator.h>
 #include <core/EventLoop.h>
 #include <core/websocket/Server.h>
+#include <core/IPCMutex.h>
+#include <core/Lock.h>
 
 namespace fin
 {
@@ -16,12 +18,12 @@ namespace fin
 	{
 		core::String m_absPath;
 		core::String m_lockName;
-		core::String m_tmpFilePath;
+		core::String m_portFilePath;
 
 		LockInfo(core::String absPath, core::String lockName, core::String filePath)
 			: m_absPath(std::move(absPath)),
 			  m_lockName(std::move(lockName)),
-			  m_tmpFilePath(std::move(filePath))
+			  m_portFilePath(std::move(filePath))
 		{}
 
 	public:
@@ -29,7 +31,7 @@ namespace fin
 
 		core::StringView absPath() const { return m_absPath; }
 		core::StringView lockName() const { return m_lockName; }
-		core::StringView tmpFilePath() const { return m_tmpFilePath; }
+		core::StringView portFilePath() const { return m_portFilePath; }
 	};
 
 	class Server
@@ -41,11 +43,24 @@ namespace fin
 		core::EventLoop* m_eventLoop = nullptr;
 		core::Unique<core::websocket::Server> m_server;
 		core::Shared<core::EventThread> m_serverThread;
+		LockInfo m_lockInfo;
+		core::IPCMutex m_ipcMutex;
+		core::Lock<core::IPCMutex> m_ipcMutexLock;
 
-		Server(core::EventLoop* eventLoop, core::Unique<core::websocket::Server> server, core::Shared<core::EventThread> serverThread)
+		Server(
+			core::EventLoop* eventLoop,
+			core::Unique<core::websocket::Server> server,
+			core::Shared<core::EventThread> serverThread,
+			LockInfo lockInfo,
+			core::IPCMutex ipcMutex,
+			core::Lock<core::IPCMutex> ipcMutexLock
+		)
 			: m_eventLoop(std::move(eventLoop)),
 			  m_server(std::move(server)),
-			  m_serverThread(std::move(serverThread))
+			  m_serverThread(std::move(serverThread)),
+			  m_lockInfo(std::move(lockInfo)),
+			  m_ipcMutex(std::move(ipcMutex)),
+			  m_ipcMutexLock(std::move(ipcMutexLock))
 		{}
 
 	public:

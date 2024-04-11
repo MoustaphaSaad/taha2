@@ -19,18 +19,48 @@ namespace core
 		template<typename U>
 		friend inline Lock<U> tryLockGuard(U& lockable);
 
-		T& m_lockable;
+		T* m_lockable = nullptr;
 		bool m_locked = false;
 
 		Lock(T& lockable, bool locked)
-			: m_lockable(lockable),
+			: m_lockable(&lockable),
 			  m_locked(locked)
 		{}
+
+		void destroy()
+		{
+			if (m_lockable && m_locked)
+				m_lockable->unlock();
+		}
+
+		void moveFrom(Lock&& other)
+		{
+			m_lockable = other.m_lockable;
+			m_locked = other.m_locked;
+
+			other.m_lockable = nullptr;
+			other.m_locked = false;
+		}
 	public:
+		Lock(const Lock&) = delete;
+
+		Lock(Lock&& other)
+		{
+			moveFrom(std::move(other));
+		}
+
+		Lock& operator=(const Lock&) = delete;
+
+		Lock& operator==(Lock&& other)
+		{
+			destroy();
+			moveFrom(std::move(other));
+			return *this;
+		}
+
 		~Lock()
 		{
-			if (m_locked)
-				m_lockable.unlock();
+			destroy();
 		}
 
 		bool isLocked() const { return m_locked; }

@@ -4,6 +4,7 @@
 #include <core/SHA1.h>
 #include <core/MemoryStream.h>
 #include <core/Url.h>
+#include <core/File.h>
 
 namespace fin
 {
@@ -92,6 +93,18 @@ namespace fin
 		core::Allocator *allocator
 	)
 	{
+		auto lockInfoResult = LockInfo::create(path, allocator);
+		if (lockInfoResult.isError())
+			return lockInfoResult.releaseError();
+		auto lockInfo = lockInfoResult.releaseValue();
+
+		log->debug("{}"_sv, lockInfo.portFilePath());
+
+		auto ipcMutex = core::IPCMutex{lockInfo.lockName(), allocator};
+		auto lock = core::tryLockGuard(ipcMutex);
+		if (lock.isLocked() == false)
+			return core::errf(allocator, "failed to acquire lock on file '{}'"_sv, lockInfo.absPath());
+
 		auto parsedUrlResult = core::Url::parse(url, allocator);
 		if (parsedUrlResult.isError())
 			return parsedUrlResult.releaseError();
@@ -112,6 +125,18 @@ namespace fin
 		if (err)
 			return err;
 
-		return core::unique_from<Server>(allocator, std::move(eventLoop), std::move(server), std::move(serverHandler));
+		auto file = core::File::open(allocator, lockInfo.portFilePath(), core::File::IO_MODE_WRITE, core::File::OPEN_MODE_CREATE_OVERWRITE, core::File::SHARE_MODE_NONE);
+		if (file == nullptr)
+			return core::errf(allocator, "failed to write listening port to port file '{}'"_sv, lockInfo.portFilePath());
+		core::strf(file.get(), "{}"_sv, server->listeningPort());
+
+		return core::unique_from<Server>(allocator,
+			std::move(eventLoop),
+			std::move(server),
+			std::move(serverHandler),
+			std::move(lockInfo),
+			std::move(ipcMutex),
+			std::move(lock)
+		);
 	}
 }

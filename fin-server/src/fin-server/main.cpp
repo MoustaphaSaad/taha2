@@ -106,15 +106,6 @@ int main(int argc, char** argv)
 		}
 		auto threadedEventLoop = threadedEventLoopResult.releaseValue();
 
-		auto lockInfoResult = fin::LockInfo::create(args.file(), &allocator);
-		if (lockInfoResult.isError())
-		{
-			log.critical("{}"_sv, lockInfoResult.releaseError());
-			return EXIT_FAILURE;
-		}
-		auto lockInfo = lockInfoResult.releaseValue();
-		log.info("absPath: {}, lockName: {}, filePath: {}"_sv, lockInfo.absPath(), lockInfo.lockName(), lockInfo.tmpFilePath());
-
 		auto serverResult = fin::Server::create(
 			args.file(),
 			""_sv,
