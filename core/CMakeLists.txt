@@ -108,6 +108,8 @@ elseif (APPLE)
 			src/core/macos/Path.mm
 	)
 	target_compile_definitions(core PRIVATE _LARGEFILE64_SOURCE)
+	find_library(FOUNDATION_LIBRARY Foundation)
+	target_link_libraries(core PRIVATE ${FOUNDATION_LIBRARY})
 elseif (UNIX AND NOT APPLE)
 	target_sources(core
 		PRIVATE
