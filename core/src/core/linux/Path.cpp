@@ -40,6 +40,6 @@ namespace core
 		else if (auto p = secure_getenv("TEMPDIR"))
 			return String{StringView{p}, allocator};
 		else
-			return String{"/tmp", allocator};
+			return String{"/tmp"_sv, allocator};
 	}
 }

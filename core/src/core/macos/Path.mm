@@ -7,6 +7,6 @@ namespace core
 	Result<String> Path::tmpDir(Allocator* allocator)
 	{
 		auto tmp = NSTemporaryDirectory();
-		return String{StringView{[tmp UTFString]}, allocator};
+		return String{StringView{[tmp UTF8String]}, allocator};
 	}
 }
