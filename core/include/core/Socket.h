@@ -41,5 +41,6 @@ namespace core
 		virtual int64_t fd() = 0;
 		virtual FAMILY family() = 0;
 		virtual TYPE type() = 0;
+		virtual uint16_t listeningPort() = 0;
 	};
 }

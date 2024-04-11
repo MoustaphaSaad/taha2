@@ -166,6 +166,26 @@ namespace core
 			}
 		}
 
+		uint16_t listeningPort() override
+		{
+			sockaddr addr{};
+			socklen_t size = sizeof(addr);
+			if (getsockname(m_handle, &addr, &size) != 0)
+				return 0;
+
+			char portName[6] = {0};
+			if (getnameinfo(&addr, size, NULL, 0, portName, sizeof(portName), NI_NUMERICSERV) != 0)
+				return 0;
+
+			errno = 0;
+			auto endPtr = portName;
+			auto res = strtoul(portName, &endPtr, 10);
+			if (errno == ERANGE || endPtr != portName + strlen(portName))
+				return 0;
+			coreAssert(res <= UINT16_MAX);
+			return uint16_t(res);
+		}
+
 		size_t read(void* buffer, size_t size) override
 		{
 			auto err = ::recv(m_handle, (char*)buffer, (int)size, 0);
