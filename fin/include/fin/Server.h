@@ -63,6 +63,8 @@ namespace fin
 			core::Log* log,
 			core::Allocator* allocator
 		);
+
+		uint16_t listeningPort() const { return m_server->listeningPort(); }
 	};
 
 	inline Server::FLAG operator|(Server::FLAG f1, Server::FLAG f2)

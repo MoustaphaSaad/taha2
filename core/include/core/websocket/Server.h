@@ -55,6 +55,7 @@ namespace core::websocket
 		Log* m_log = nullptr;
 		size_t m_maxHandshakeSize = 0;
 		size_t m_maxMessageSize = 0;
+		uint16_t m_listeningPort = 0;
 		Shared<EventThread> m_acceptThread;
 		Shared<EventThread> m_handler;
 		ClientSet m_clientSet;
@@ -67,5 +68,6 @@ namespace core::websocket
 		CORE_EXPORT static Unique<Server> create(Log* log, Allocator* allocator);
 
 		CORE_EXPORT HumanError start(const ServerConfig& config, EventLoop* loop);
+		uint16_t listeningPort() const { return m_listeningPort; }
 	};
 }

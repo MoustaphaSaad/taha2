@@ -109,6 +109,8 @@ namespace core::websocket
 		if (ok == false)
 			return errf(m_allocator, "failed to listen socket"_sv);
 
+		m_listeningPort = socket->listeningPort();
+
 		auto eventSocketResult = loop->registerSocket(std::move(socket));
 		if (eventSocketResult.isError())
 			return eventSocketResult.releaseError();

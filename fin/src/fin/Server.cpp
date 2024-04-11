@@ -103,8 +103,8 @@ namespace fin
 
 		core::websocket::ServerConfig config
 		{
-			.host = parsedUrl.host(),
-			.port = parsedUrl.port(),
+			.host = parsedUrl.host().count() > 0 ? parsedUrl.host() : "localhost"_sv,
+			.port = parsedUrl.port().count() > 0 ? parsedUrl.port() : "0"_sv,
 			.maxHandshakeSize = 64ULL * 1024ULL * 1024ULL,
 			.handler = serverHandler,
 		};

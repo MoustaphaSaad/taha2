@@ -117,7 +117,7 @@ int main(int argc, char** argv)
 
 		auto serverResult = fin::Server::create(
 			args.file(),
-			"ws://localhost:9011"_sv,
+			""_sv,
 			fin::Server::FLAG::CREATE_LEDGER,
 			threadedEventLoop->next(),
 			&log,
@@ -129,6 +129,8 @@ int main(int argc, char** argv)
 			return EXIT_FAILURE;
 		}
 		auto server = serverResult.releaseValue();
+
+		log.info("listening on: {}"_sv, server->listeningPort());
 
 		auto err = threadedEventLoop->run();
 		if (err)
