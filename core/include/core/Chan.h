@@ -341,7 +341,7 @@ namespace core
 			else
 			{
 				auto lockWriteMutex = tryLockGuard(m_writeMutex);
-				if (lockWriteMutex.is_locked() == false)
+				if (lockWriteMutex.isLocked() == false)
 				{
 					internalInsertWriteSelectCond(cond, index);
 					return ChanErr::Empty;

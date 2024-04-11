@@ -35,7 +35,7 @@ namespace core
 
 		void grow(size_t new_capacity);
 
-		void ensureSpaceExists(size_t count);
+		CORE_EXPORT void ensureSpaceExists(size_t count);
 
 	public:
 		explicit String(Allocator* allocator)
@@ -103,7 +103,7 @@ namespace core
 		const char* data() const { return m_ptr; }
 		Allocator* allocator() const { return m_allocator; }
 
-		void resize(size_t new_count);
+		CORE_EXPORT void resize(size_t new_count);
 		void reserve(size_t extra_count) { ensureSpaceExists(extra_count); }
 
 		CORE_EXPORT void push(StringView str);

@@ -18,7 +18,7 @@ namespace core
 		CORE_EXPORT ~Mutex();
 
 		CORE_EXPORT void lock();
-		CORE_EXPORT bool try_lock();
+		CORE_EXPORT bool tryLock();
 		CORE_EXPORT void unlock();
 	};
 }

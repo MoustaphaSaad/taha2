@@ -25,7 +25,7 @@ namespace core
 		EnterCriticalSection(&m_mutex->cs);
 	}
 
-	bool Mutex::try_lock()
+	bool Mutex::tryLock()
 	{
 		return TryEnterCriticalSection(&m_mutex->cs);
 	}

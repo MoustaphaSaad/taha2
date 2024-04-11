@@ -33,7 +33,7 @@ namespace core
 				m_lockable.unlock();
 		}
 
-		bool is_locked() const { return m_locked; }
+		bool isLocked() const { return m_locked; }
 	};
 
 	template<typename T>
@@ -46,7 +46,7 @@ namespace core
 	template<typename T>
 	inline Lock<T> tryLockGuard(T& lockable)
 	{
-		if (lockable.try_lock())
+		if (lockable.tryLock())
 			return Lock{lockable, true};
 		return Lock<T>{lockable, false};
 	}

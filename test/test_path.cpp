@@ -15,3 +15,14 @@ TEST_CASE("core::Path::tmpDir")
 
 	log.info("temp path: {}"_sv, tmp);
 }
+
+TEST_CASE("core::Path::join")
+{
+	core::Mallocator allocator;
+
+	SUBCASE("no separator at end of dir join")
+	{
+		auto res = core::Path::join(&allocator, "C:/ABC"_sv, "def.txt"_sv);
+		REQUIRE(res == "C:/ABC/def.txt"_sv);
+	}
+}

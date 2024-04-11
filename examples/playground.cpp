@@ -1,203 +1,50 @@
-#include <core/FastLeak.h>
+#include <core/Mallocator.h>
 #include <core/Log.h>
-#include <core/Thread.h>
-#include <core/Chan.h>
+#include <core/SHA1.h>
+#include <core/Path.h>
+#include <core/MemoryStream.h>
+#include <core/IPCMutex.h>
+#include <core/Lock.h>
 
-void evenIntegerProducer(core::Shared<core::Chan<int>> out, core::Log *log)
+inline core::Result<core::String> uniquePathForFile(core::StringView view, core::Allocator* allocator)
 {
-	for (int i = 2; i <= 100; i += 2)
-	{
-		log->debug("sending {}"_sv, i);
-		out->send(&i);
-		log->debug("sent {}"_sv, i);
-	}
-	out->close();
+	auto hash = core::SHA1::hash(view);
+	auto tmpResult = core::Path::tmpDir(allocator);
+	if (tmpResult.isError()) return tmpResult.releaseError();
+
+	core::MemoryStream stream{allocator};
+	core::strf(&stream, "budget_byte_"_sv);
+	for (auto b: hash.asBytes())
+		core::strf(&stream, "{:02x}"_sv, b);
+
+	return core::Path::join(allocator, tmpResult.releaseValue(), stream.releaseString());
 }
 
-void oddIntegerProducer(core::Shared<core::Chan<int>> out, core::Log *log)
+int main(int argc, char** argv)
 {
-	for (int i = 1; i <= 100; i += 2)
-	{
-		log->debug("sending {}"_sv, i);
-		out->send(&i);
-		log->debug("sent {}"_sv, i);
-	}
-	out->close();
-}
+	if (argc < 2)
+		return EXIT_FAILURE;
+	auto filename = core::StringView{argv[1]};
 
-void slowEvenIntegerProducer(core::Shared<core::Chan<int>> out, core::Log *log)
-{
-	for (int i = 2; i <= 100; i += 2)
+	core::Mallocator allocator{};
+	core::Log log{&allocator};
+	auto uniquePathResult = uniquePathForFile(filename, &allocator);
+	if (uniquePathResult.isError())
 	{
-		out->send(&i);
-		std::this_thread::sleep_for(std::chrono::milliseconds{15});
+		log.critical("{}"_sv, uniquePathResult.releaseError());
+		return EXIT_FAILURE;
 	}
-	out->close();
-}
+	auto uniquePath = uniquePathResult.releaseValue();
+	log.info("file: {}, uniquePath: {}"_sv, filename, uniquePath);
 
-namespace two_producers
-{
-	void
-	consumerDefault(core::Shared<core::Chan<int>> evenNumbers, core::Shared<core::Chan<int>> oddNumbers, core::Log *log,
-					core::Allocator *allocator)
+	core::IPCMutex mutex{uniquePath, &allocator};
+	auto lock = core::tryLockGuard(mutex);
+	if (!lock.isLocked())
 	{
-		while (evenNumbers->isClosed() == false || oddNumbers->isClosed() == false)
-		{
-			core::Select
-			{
-			core::ReadCase{allocator, *evenNumbers} = [&](int num)
-			{
-				log->info("even consumer: {}"_sv, num);
-			},
-			core::DefaultCase{allocator} = [&]
-			{
-				log->info("default"_sv);
-			},
-			core::ReadCase{allocator, *oddNumbers} = [&](int num)
-			{
-				log->info("odd consumer: {}"_sv, num);
-			},
-			};
-		}
+		log.info("another instance already running"_sv);
+		return EXIT_FAILURE;
 	}
 
-	void consumer(core::Shared<core::Chan<int>> evenNumbers, core::Shared<core::Chan<int>> oddNumbers, core::Log *log,
-				  core::Allocator *allocator)
-	{
-		while (evenNumbers->isClosed() == false || oddNumbers->isClosed() == false)
-		{
-			core::Select
-			{
-			core::ReadCase{allocator, *evenNumbers} = [&](int num)
-			{
-				log->info("even consumer: {}"_sv, num);
-			},
-			core::ReadCase{allocator, *oddNumbers} = [&](int num)
-			{
-				log->info("odd consumer: {}"_sv, num);
-			},
-			};
-		}
-	}
-
-	void test()
-	{
-		core::FastLeak allocator{};
-		core::Log log{&allocator};
-
-		auto evenNumbers = core::Chan<int>::create(0, &allocator);
-		core::Thread evenNumberProducerThread{&allocator, [evenNumbers, &log]{ evenIntegerProducer(evenNumbers, &log); }};
-
-		auto oddNumbers = core::Chan<int>::create(0, &allocator);
-		core::Thread oddNumberProducerThread{&allocator, [oddNumbers, &log]{ oddIntegerProducer(oddNumbers, &log); }};
-
-		core::Thread consumerThread{&allocator, core::Func<void()>{&allocator, [evenNumbers, oddNumbers, &log, &allocator]{ consumer(evenNumbers, oddNumbers, &log, &allocator); }}};
-
-		oddNumberProducerThread.join();
-		evenNumberProducerThread.join();
-		consumerThread.join();
-		log.info("two producers: success"_sv);
-	}
-}
-
-namespace timeout
-{
-	void signalTimeout(core::Shared<core::Chan<bool>> out)
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds{100});
-		bool v = true;
-		out->send(&v);
-		out->close();
-	}
-
-	void consumer(core::Shared<core::Chan<int>> numbers, core::Shared<core::Chan<bool>> stop, core::Log* log, core::Allocator* allocator)
-	{
-		core::Select
-		{
-		core::ReadCase{allocator, *numbers} = [&](int num)
-		{
-			log->info("number: {}"_sv, num);
-		},
-		core::ReadCase{allocator, *stop} = [&](bool stop)
-		{
-			log->debug("stop"_sv);
-		},
-		};
-	}
-
-	void test()
-	{
-		core::FastLeak allocator{};
-		core::Log log{&allocator};
-
-		auto evenNumbers = core::Chan<int>::create(0, &allocator);
-		core::Thread evenNumberProducerThread{&allocator, [evenNumbers, &log]{ slowEvenIntegerProducer(evenNumbers, &log); }};
-
-		auto stop = core::Chan<bool>::create(0, &allocator);
-		core::Thread stopThread{&allocator, [stop, &log]{ signalTimeout(stop); }};
-
-		core::Thread consumerThread{&allocator, core::Func<void()>{&allocator, [evenNumbers, stop, &log, &allocator]{ consumer(evenNumbers, stop, &log, &allocator); }}};
-
-		consumerThread.join();
-		stopThread.detach();
-		evenNumberProducerThread.detach();
-		log.info("timeout: success"_sv);
-	}
-}
-
-namespace load_balancer
-{
-	void consumer(core::Shared<core::Chan<int>> numbers, core::Log* log, core::Allocator* allocator)
-	{
-		for (auto num: *numbers)
-		{
-			std::this_thread::sleep_for(std::chrono::milliseconds{100});
-			log->info("number: {}"_sv, num);
-		}
-	}
-
-	void balanceLoad(core::Shared<core::Chan<int>> tasks, core::Shared<core::Chan<int>> worker1, core::Shared<core::Chan<int>> worker2, core::Allocator* allocator)
-	{
-		for (auto task: *tasks)
-		{
-			core::Select
-			{
-			core::WriteCase{allocator, *worker1, task} = []{},
-			core::WriteCase{allocator, *worker2, task} = []{},
-			};
-		}
-		worker1->close();
-		worker2->close();
-	}
-
-	void test()
-	{
-		core::FastLeak allocator{};
-		core::Log log{&allocator};
-
-		auto evenNumbers = core::Chan<int>::create(0, &allocator);
-		core::Thread evenNumberProducerThread{&allocator, [evenNumbers, &log]{ evenIntegerProducer(evenNumbers, &log); }};
-
-		auto worker1Chan = core::Chan<int>::create(0, &allocator);
-		core::Thread worker1{&allocator, [worker1Chan, &log, &allocator]{ consumer(worker1Chan, &log, &allocator); }};
-
-		auto worker2Chan = core::Chan<int>::create(0, &allocator);
-		core::Thread worker2{&allocator, [worker2Chan, &log, &allocator]{ consumer(worker2Chan, &log, &allocator); }};
-
-		core::Thread loadBalancer{&allocator, core::Func<void()>{&allocator, [evenNumbers, worker1Chan, worker2Chan, &allocator]{ balanceLoad(evenNumbers, worker1Chan, worker2Chan, &allocator); }}};
-
-		evenNumberProducerThread.join();
-		loadBalancer.join();
-		worker1.join();
-		worker2.join();
-		log.info("load balancer: success"_sv);
-	}
-}
-
-int main()
-{
-	two_producers::test();
-	timeout::test();
-	load_balancer::test();
+	// open an exclusive file
 	return EXIT_SUCCESS;
 }

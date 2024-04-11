@@ -52,7 +52,7 @@ namespace core
 		bool tryPop(NotificationQueueEntry& func)
 		{
 			auto lock = tryLockGuard(m_mutex);
-			if (lock.is_locked() == false || m_queue.count() == 0)
+			if (lock.isLocked() == false || m_queue.count() == 0)
 				return false;
 			func = std::move(m_queue.front());
 			m_queue.pop_front();
@@ -62,7 +62,7 @@ namespace core
 		bool tryPush(Func<void()>&& func, const Weak<ExecutionQueue>& execQueue)
 		{
 			auto lock = tryLockGuard(m_mutex);
-			if (lock.is_locked() == false)
+			if (lock.isLocked() == false)
 				return false;
 			m_queue.push_back(NotificationQueueEntry{.func = std::move(func), .executionQueue = execQueue});
 			m_condition.notify_one();

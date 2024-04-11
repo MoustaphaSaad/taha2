@@ -31,7 +31,7 @@ namespace core
 		coreAssert(res == 0);
 	}
 
-	bool Mutex::try_lock()
+	bool Mutex::tryLock()
 	{
 		auto res = pthread_mutex_trylock(&m_mutex->handle);
 		return res == 0;

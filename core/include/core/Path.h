@@ -15,6 +15,8 @@ namespace core
 		template<typename ... TArgs>
 		static void join(String& result, StringView first, TArgs&& ... args)
 		{
+			if (!(result.endsWith("/"_sv) && result.endsWith("\\"_sv)))
+				result.push(Rune{'/'});
 			result.push(first);
 			join(result, std::forward<TArgs>(args)...);
 		}
@@ -29,7 +31,7 @@ namespace core
 		{
 			String result{allocator};
 			join(result, std::forward<TArgs>(args)...);
-			return result;
+			return clean(result, allocator);
 		}
 
 		static String clean(StringView path, Allocator* allocator)
