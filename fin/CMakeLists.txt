@@ -3,9 +3,11 @@ add_library(fin)
 target_sources(fin PRIVATE
 	include/fin/Server.h
 	src/fin/Server.cpp
+	include/fin/Ledger.h
+	src/fin/Ledger.cpp
 )
 
-target_link_libraries(fin PUBLIC core)
+target_link_libraries(fin PUBLIC core sqlite3)
 
 # generate exports header file
 include(GenerateExportHeader)
