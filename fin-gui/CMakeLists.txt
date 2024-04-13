@@ -11,12 +11,13 @@ qt_standard_project_setup(REQUIRES 6.7)
 qt_add_executable(fin-gui
 	src/fin-gui/main.cpp
 )
-
 qt_add_qml_module(fin-gui
 	URI "Fin.GUI"
 	VERSION 1.0
 	QML_FILES
 		Main.qml
+	RESOURCES
+	    gear.svg
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

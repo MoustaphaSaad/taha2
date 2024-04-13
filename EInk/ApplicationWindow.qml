@@ -1,6 +1,6 @@
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls as Q
 
-ApplicationWindow {
-    color: "#b1b1af"
+Q.ApplicationWindow {
+    color: Style.theme.backgroundColor
 }
