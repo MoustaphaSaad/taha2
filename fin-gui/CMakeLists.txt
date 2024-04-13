@@ -31,7 +31,9 @@ set_target_properties(fin-gui PROPERTIES
 )
 
 target_link_libraries(fin-gui PRIVATE
-	Qt6::Quick)
+	Qt6::Quick
+	EInk
+	EInkplugin)
 
 include(GNUInstallDirs)
 install(TARGETS fin-gui
