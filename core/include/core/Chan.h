@@ -177,8 +177,11 @@ namespace core
 			while (selects.count() > 0)
 			{
 				auto it = selects.begin();
-				if (it[offsetIndex].key->signalReady(it[offsetIndex].value) == false)
+				auto index = offsetIndex % selects.count();
+				if (it[index].key->signalReady(it[index].value) == false)
 					selects.remove(it[offsetIndex].key);
+				else
+					break;
 			}
 		}
 
@@ -335,7 +338,6 @@ namespace core
 				{
 					signalSelectAndRemove(m_readSelects);
 				}
-				internalInsertWriteSelectCond(cond, index);
 				return ChanErr::Ok;
 			}
 			else
@@ -365,7 +367,6 @@ namespace core
 					signalSelectAndRemove(m_readSelects);
 				}
 				m_writeCond.wait(m_mutex);
-				internalInsertWriteSelectCond(cond, index);
 				return ChanErr::Ok;
 			}
 		}
@@ -397,7 +398,6 @@ namespace core
 				{
 					signalSelectAndRemove(m_writeSelects);
 				}
-				internalInsertReadSelectCond(cond, index);
 				return res;
 			}
 			else
@@ -428,7 +428,6 @@ namespace core
 				{
 					signalSelectAndRemove(m_writeSelects);
 				}
-				internalInsertReadSelectCond(cond, index);
 				return res;
 			}
 		}
@@ -630,8 +629,8 @@ namespace core
 	class SelectCaseDesc
 	{
 		void* m_case = nullptr;
-		ChanErr (*m_eval)(void* ptr, SelectCond* cond, size_t index) = nullptr;
-		ChanErr (*m_eval2)(void* ptr) = nullptr;
+		ChanErr (*m_tryEval)(void* ptr, SelectCond* cond, size_t index) = nullptr;
+		ChanErr (*m_eval)(void* ptr) = nullptr;
 		void (*m_removeSelectCond)(void* ptr, SelectCond* cond) = nullptr;
 		bool m_isDefault = false;
 	public:
@@ -639,7 +638,7 @@ namespace core
 		SelectCaseDesc(ReadCase<T, dir>& c)
 			: m_case(&c)
 		{
-			m_eval = +[](void* ptr, SelectCond* cond, size_t index) {
+			m_tryEval = +[](void* ptr, SelectCond* cond, size_t index) {
 				auto c = (ReadCase<T, dir>*)ptr;
 				c->m_res = c->m_chan->internalTryRecv(cond, index);
 				if (c->m_res.isError())
@@ -655,7 +654,7 @@ namespace core
 				return ChanErr::Empty;
 			};
 
-			m_eval2 = +[](void* ptr) {
+			m_eval = +[](void* ptr) {
 				auto c = (ReadCase<T, dir>*)ptr;
 				c->m_res = c->m_chan->recv();
 				if (c->m_res.isError())
@@ -681,7 +680,7 @@ namespace core
 		SelectCaseDesc(WriteCase<T, dir>& c)
 			: m_case(&c)
 		{
-			m_eval = +[](void* ptr, SelectCond* cond, size_t index) {
+			m_tryEval = +[](void* ptr, SelectCond* cond, size_t index) {
 				auto c = (WriteCase<T, dir>*)ptr;
 				auto err = c->m_chan->internalTrySend(c->m_value, cond, index);
 				if (err == ChanErr::Ok)
@@ -689,7 +688,7 @@ namespace core
 				return err;
 			};
 
-			m_eval2 = +[](void* ptr) {
+			m_eval = +[](void* ptr) {
 				auto c = (WriteCase<T, dir>*)ptr;
 				auto err = c->m_chan->send(c->m_value);
 				if (err == ChanErr::Ok)
@@ -707,13 +706,13 @@ namespace core
 			: m_case(&c),
 			  m_isDefault(true)
 		{
-			m_eval = +[](void* ptr, SelectCond*, size_t) {
+			m_tryEval = +[](void* ptr, SelectCond*, size_t) {
 				auto c = (DefaultCase*)ptr;
 				c->m_callback();
 				return ChanErr::Ok;
 			};
 
-			m_eval2 = +[](void* ptr) {
+			m_eval = +[](void* ptr) {
 				auto c = (DefaultCase*)ptr;
 				c->m_callback();
 				return ChanErr::Ok;
@@ -723,13 +722,13 @@ namespace core
 		}
 
 		bool isDefault() const { return m_isDefault; }
-		ChanErr eval(SelectCond* cond, size_t index)
+		ChanErr tryEval(SelectCond* cond, size_t index)
 		{
-			return m_eval(m_case, cond, index);
+			return m_tryEval(m_case, cond, index);
 		}
-		ChanErr eval2()
+		ChanErr eval()
 		{
-			return m_eval2(m_case);
+			return m_eval(m_case);
 		}
 		void removeCond(SelectCond* cond)
 		{
@@ -769,7 +768,7 @@ namespace core
 				for (size_t i = 0; i < descsCount; ++i)
 				{
 					auto index = (i + offsetIndex) % descsCount;
-					auto err = descs[index].eval(&cond, index);
+					auto err = descs[index].tryEval(&cond, index);
 					if (err == ChanErr::Ok)
 					{
 						cond.close();
@@ -798,7 +797,7 @@ namespace core
 					}
 					else
 					{
-						auto err = descs[event.index].eval2();
+						auto err = descs[event.index].eval();
 						if (err == ChanErr::Ok)
 						{
 							for (size_t i = 0; i < descsCount; ++i)
@@ -823,11 +822,11 @@ namespace core
 					auto index = (i + offsetIndex) % descsCount;
 					if (index == defaultIndex)
 						continue;
-					auto err = descs[index].eval(nullptr, 0);
+					auto err = descs[index].tryEval(nullptr, 0);
 					if (err == ChanErr::Ok)
 						return;
 				}
-				descs[defaultIndex].eval(nullptr, 0);
+				descs[defaultIndex].eval();
 				return;
 			}
 		}

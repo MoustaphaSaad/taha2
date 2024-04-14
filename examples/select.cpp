@@ -25,12 +25,12 @@ void oddIntegerProducer(core::Shared<core::Chan<int>> out, core::Log *log)
 	out->close();
 }
 
-void slowEvenIntegerProducer(core::Shared<core::Chan<int>> out, core::Log *log)
+void slowEvenIntegerProducer(core::Shared<core::Chan<int>> out, core::Log *log, std::chrono::milliseconds waitTime)
 {
 	for (int i = 2; i <= 100; i += 2)
 	{
 		out->send(&i);
-		std::this_thread::sleep_for(std::chrono::milliseconds{15});
+		std::this_thread::sleep_for(waitTime);
 	}
 	out->close();
 }
@@ -100,6 +100,48 @@ namespace two_producers
 	}
 }
 
+namespace two_producers_fast_slow
+{
+	void consumer(core::Shared<core::Chan<int>> evenNumbers, core::Shared<core::Chan<int>> oddNumbers, core::Log *log,
+				  core::Allocator *allocator)
+	{
+		while (evenNumbers->isClosed() == false || oddNumbers->isClosed() == false)
+		{
+			core::Select
+			{
+				core::ReadCase{allocator, *evenNumbers} = [&](int num)
+				{
+					log->info("even consumer: {}"_sv, num);
+				},
+				core::ReadCase{allocator, *oddNumbers} = [&](int num)
+				{
+					log->info("odd consumer: {}"_sv, num);
+				},
+				};
+		}
+	}
+
+	void test()
+	{
+		core::FastLeak allocator{};
+		core::Log log{&allocator};
+
+		auto evenNumbers = core::Chan<int>::create(0, &allocator);
+		core::Thread evenNumberProducerThread{&allocator, [evenNumbers, &log]{ slowEvenIntegerProducer(evenNumbers, &log, std::chrono::milliseconds{100}); }};
+
+		auto oddNumbers = core::Chan<int>::create(0, &allocator);
+		core::Thread oddNumberProducerThread{&allocator, [oddNumbers, &log]{ oddIntegerProducer(oddNumbers, &log); }};
+
+		core::Thread consumerThread{&allocator, core::Func<void()>{&allocator, [evenNumbers, oddNumbers, &log, &allocator]{ consumer(evenNumbers, oddNumbers, &log, &allocator); }}};
+
+		oddNumberProducerThread.join();
+		evenNumberProducerThread.join();
+		consumerThread.join();
+		log.info("two producers: success"_sv);
+	}
+}
+
+
 namespace timeout
 {
 	void signalTimeout(core::Shared<core::Chan<bool>> out)
@@ -131,7 +173,7 @@ namespace timeout
 		core::Log log{&allocator};
 
 		auto evenNumbers = core::Chan<int>::create(0, &allocator);
-		core::Thread evenNumberProducerThread{&allocator, [evenNumbers, &log]{ slowEvenIntegerProducer(evenNumbers, &log); }};
+		core::Thread evenNumberProducerThread{&allocator, [evenNumbers, &log]{ slowEvenIntegerProducer(evenNumbers, &log, std::chrono::milliseconds{15}); }};
 
 		auto stop = core::Chan<bool>::create(0, &allocator);
 		core::Thread stopThread{&allocator, [stop, &log]{ signalTimeout(stop); }};
@@ -197,6 +239,7 @@ namespace load_balancer
 int main()
 {
 	two_producers::test();
+	two_producers_fast_slow::test();
 	timeout::test();
 	load_balancer::test();
 	return EXIT_SUCCESS;
