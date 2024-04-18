@@ -152,14 +152,34 @@ namespace core
 			m_values_count = other.m_values_count;
 			m_values_capacity = m_values_count;
 
-			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slots_count, alignof(HashSlot));
-			m_allocator->commit(m_slots, sizeof(HashSlot) * m_slots_count);
-			::memcpy(m_slots, other.m_slots, sizeof(HashSlot) * m_slots_count);
-
 			m_values = (T*)m_allocator->alloc(sizeof(T) * m_values_count, alignof(T));
 			m_allocator->commit(m_values, sizeof(T) * m_values_count);
 			for (size_t i = 0; i < m_values_count; ++i)
 				::new (m_values + i) T(other.m_values[i]);
+
+			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slots_count, alignof(HashSlot));
+			m_allocator->commit(m_slots, sizeof(HashSlot) * m_slots_count);
+			for (size_t i = 0; i < m_values_count; ++i)
+			{
+				auto res = findSlotForInsert(m_slots, m_slots_count, m_values, m_values[i]);
+				auto& slot = m_slots[res.index];
+				auto flags = slot.flags();
+				switch (flags)
+				{
+				case HASH_FLAGS::HASH_EMPTY:
+				{
+					slot.setFlags(HASH_FLAGS::HASH_USED);
+					slot.setValueIndex(i);
+					slot.setValueHash(res.hash);
+					break;
+				}
+				case HASH_FLAGS::HASH_USED:
+				case HASH_FLAGS::HASH_DELETED:
+				default:
+					coreUnreachable();
+					break;
+				}
+			}
 		}
 
 		void moveFrom(Set&& other)
@@ -187,13 +207,10 @@ namespace core
 		}
 
 		Search_Result
-		findSlotForInsert(const HashSlot* _slots, size_t _slots_count, const T* _values, const T& key, size_t* external_hash)
+		findSlotForInsert(const HashSlot* _slots, size_t _slots_count, const T* _values, const T& key)
 		{
 			Search_Result res{};
-			if (external_hash)
-				res.hash = *external_hash;
-			else
-				res.hash = THash{}(key);
+			res.hash = THash{}(key, size_t(_slots));
 
 			auto cap = _slots_count;
 			if (cap == 0) return res;
@@ -272,7 +289,7 @@ namespace core
 		Search_Result findSlotForLookup(const T& key) const
 		{
 			Search_Result res{};
-			res.hash = THash{}(key);
+			res.hash = THash{}(key, size_t(m_slots));
 
 			auto cap = m_slots_count;
 			if (cap == 0) return res;
@@ -337,16 +354,25 @@ namespace core
 			// do a rehash
 			if (m_values_count != 0)
 			{
-				for (size_t i = 0; i < m_slots_count; ++i)
+				for (size_t i = 0; i < m_values_count; ++i)
 				{
-					const auto& slot = m_slots[i];
+					auto res = findSlotForInsert(new_slots, new_count, m_values, m_values[i]);
+					auto& slot = new_slots[res.index];
 					auto flags = slot.flags();
-					if (flags == HASH_USED)
+					switch (flags)
 					{
-						auto index = slot.valueIndex();
-						auto hash = slot.valueHash();
-						auto res = findSlotForInsert(new_slots, new_count, m_values, m_values[index], &hash);
-						new_slots[res.index] = slot;
+					case HASH_FLAGS::HASH_EMPTY:
+					{
+						slot.setFlags(HASH_FLAGS::HASH_USED);
+						slot.setValueIndex(i);
+						slot.setValueHash(res.hash);
+						break;
+					}
+					case HASH_FLAGS::HASH_USED:
+					case HASH_FLAGS::HASH_DELETED:
+					default:
+						coreUnreachable();
+						break;
 					}
 				}
 			}
@@ -459,7 +485,7 @@ namespace core
 		{
 			maintainSpaceComplexity();
 
-			auto res = findSlotForInsert(m_slots, m_slots_count, m_values, key, nullptr);
+			auto res = findSlotForInsert(m_slots, m_slots_count, m_values, key);
 
 			auto& slot = m_slots[res.index];
 			auto flags = slot.flags();
@@ -672,14 +698,34 @@ namespace core
 			m_values_count = other.m_values_count;
 			m_values_capacity = m_values_count;
 
-			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slots_count, alignof(HashSlot));
-			m_allocator->commit(m_slots, sizeof(HashSlot) * m_slots_count);
-			::memcpy(m_slots, other.m_slots, sizeof(HashSlot) * m_slots_count);
-
 			m_values = (KeyValue<const TKey, TValue>*)m_allocator->alloc(sizeof(KeyValue<const TKey, TValue>) * m_values_count, alignof(KeyValue<const TKey, TValue>));
 			m_allocator->commit(m_values, sizeof(TValue) * m_values_count);
 			for (size_t i = 0; i < m_values_count; ++i)
 				::new (m_values + i) KeyValue<const TKey, TValue>(other.m_values[i]);
+
+			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slots_count, alignof(HashSlot));
+			m_allocator->commit(m_slots, sizeof(HashSlot) * m_slots_count);
+			for (size_t i = 0; i < m_values_count; ++i)
+			{
+				auto res = findSlotForInsert(m_slots, m_slots_count, m_values, m_values[i].key);
+				auto& slot = m_slots[res.index];
+				auto flags = slot.flags();
+				switch (flags)
+				{
+				case HASH_FLAGS::HASH_EMPTY:
+				{
+					slot.setFlags(HASH_FLAGS::HASH_USED);
+					slot.setValueIndex(i);
+					slot.setValueHash(res.hash);
+					break;
+				}
+				case HASH_FLAGS::HASH_USED:
+				case HASH_FLAGS::HASH_DELETED:
+				default:
+					coreUnreachable();
+					break;
+				}
+			}
 		}
 
 		void moveFrom(Map&& other)
@@ -707,13 +753,10 @@ namespace core
 		}
 
 		Search_Result
-		findSlotForInsert(const HashSlot* _slots, size_t _slots_count, const KeyValue<const TKey, TValue>* _values, const TKey& key, size_t* external_hash)
+		findSlotForInsert(const HashSlot* _slots, size_t _slots_count, const KeyValue<const TKey, TValue>* _values, const TKey& key)
 		{
 			Search_Result res{};
-			if (external_hash)
-				res.hash = *external_hash;
-			else
-				res.hash = THash{}(key);
+			res.hash = THash{}(key, size_t(_slots));
 
 			auto cap = _slots_count;
 			if (cap == 0) return res;
@@ -792,7 +835,7 @@ namespace core
 		Search_Result findSlotForLookup(const TKey& key) const
 		{
 			Search_Result res{};
-			res.hash = THash{}(key);
+			res.hash = THash{}(key, size_t(m_slots));
 
 			auto cap = m_slots_count;
 			if (cap == 0) return res;
@@ -857,16 +900,25 @@ namespace core
 			// do a rehash
 			if (m_values_count != 0)
 			{
-				for (size_t i = 0; i < m_slots_count; ++i)
+				for (size_t i = 0; i < m_values_count; ++i)
 				{
-					const auto& slot = m_slots[i];
+					auto res = findSlotForInsert(new_slots, new_count, m_values, m_values[i].key);
+					auto& slot = new_slots[res.index];
 					auto flags = slot.flags();
-					if (flags == HASH_USED)
+					switch (flags)
 					{
-						auto index = slot.valueIndex();
-						auto hash = slot.valueHash();
-						auto res = findSlotForInsert(new_slots, new_count, m_values, m_values[index].key, &hash);
-						new_slots[res.index] = slot;
+					case HASH_FLAGS::HASH_EMPTY:
+					{
+						slot.setFlags(HASH_FLAGS::HASH_USED);
+						slot.setValueIndex(i);
+						slot.setValueHash(res.hash);
+						break;
+					}
+					case HASH_FLAGS::HASH_USED:
+					case HASH_FLAGS::HASH_DELETED:
+					default:
+						coreUnreachable();
+						break;
 					}
 				}
 			}
@@ -979,7 +1031,7 @@ namespace core
 		{
 			maintainSpaceComplexity();
 
-			auto res = findSlotForInsert(m_slots, m_slots_count, m_values, key, nullptr);
+			auto res = findSlotForInsert(m_slots, m_slots_count, m_values, key);
 
 			auto& slot = m_slots[res.index];
 			auto flags = slot.flags();

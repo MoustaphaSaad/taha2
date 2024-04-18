@@ -223,9 +223,9 @@ namespace core
 	template<typename T>
 	struct Hash<Shared<T>>
 	{
-		inline size_t operator()(const Shared<T>& value) const
+		inline size_t operator()(const Shared<T>& value, size_t seed) const
 		{
-			return Hash<T*>{}(value.get());
+			return Hash<T*>{}(value.get(), seed);
 		}
 	};
 
@@ -471,9 +471,9 @@ namespace core
 	template<typename T>
 	struct Hash<Weak<T>>
 	{
-		inline size_t operator()(const Weak<T>& value) const
+		inline size_t operator()(const Weak<T>& value, size_t seed) const
 		{
-			return Hash<void*>{}(value.control);
+			return Hash<void*>{}(value.m_ptr, seed);
 		}
 	};
 
