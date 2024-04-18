@@ -66,7 +66,7 @@ CPMDeclarePackage(tracy
 
 set(TAHA2_CPPTRACE_USE_WINAPI_UNWIND OFF)
 if (MINGW OR WIN32)
-	set(TAHA2_CPPTRACE_USE_WINAPI_UNWIND ON)
+  set(TAHA2_CPPTRACE_USE_WINAPI_UNWIND ON)
 endif ()
 
 CPMDeclarePackage(cpptrace-lib
