@@ -64,12 +64,19 @@ CPMDeclarePackage(tracy
     "TRACY_ON_DEMAND ${TRACY_ENABLE}"
 )
 
+set(TAHA2_CPPTRACE_USE_WINAPI_UNWIND OFF)
+if (MINGW OR WIN32)
+	set(TAHA2_CPPTRACE_USE_WINAPI_UNWIND ON)
+endif ()
+
 CPMDeclarePackage(cpptrace-lib
   NAME cpptrace-lib
   GIT_TAG v0.5.0
   GIT_REPOSITORY git@github.com:jeremy-rifkin/cpptrace.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "CPPTRACE_UNWIND_WITH_WINAPI ${TAHA2_CPPTRACE_USE_WINAPI_UNWIND}"
 )
 
 CPMDeclarePackage(date
