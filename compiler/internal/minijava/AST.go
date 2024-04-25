@@ -22,8 +22,7 @@ type SimpleClassDecl struct {
 	Methods   []MethodDecl
 }
 
-func (_ SimpleClassDecl) dummyClassDecl() {
-}
+func (*SimpleClassDecl) dummyClassDecl() {}
 
 type ExtendsClassDecl struct {
 	Name              Identifier
@@ -32,8 +31,7 @@ type ExtendsClassDecl struct {
 	Methods           []MethodDecl
 }
 
-func (_ ExtendsClassDecl) dummyClassDecl() {
-}
+func (*ExtendsClassDecl) dummyClassDecl() {}
 
 type VarDecl struct {
 	Type Type
@@ -62,27 +60,23 @@ type Type interface {
 type IntArray struct {
 }
 
-func (_ IntArray) dummyType() {
-}
+func (*IntArray) dummyType() {}
 
 type BooleanType struct {
 }
 
-func (_ BooleanType) dummyType() {
-}
+func (*BooleanType) dummyType() {}
 
 type IntegerType struct {
 }
 
-func (_ IntegerType) dummyType() {
-}
+func (*IntegerType) dummyType() {}
 
 type IndentifierType struct {
 	Name Identifier
 }
 
-func (_ IndentifierType) dummyType() {
-}
+func (*IndentifierType) dummyType() {}
 
 // Abstract Statement
 type Stmt interface {
@@ -93,8 +87,7 @@ type BlockStmt struct {
 	Statements []Stmt
 }
 
-func (_ BlockStmt) dummyStmt() {
-}
+func (*BlockStmt) dummyStmt() {}
 
 type IfStmt struct {
 	Condition   Expr
@@ -102,31 +95,27 @@ type IfStmt struct {
 	FalseBranch Stmt
 }
 
-func (_ IfStmt) dummyStmt() {
-}
+func (*IfStmt) dummyStmt() {}
 
 type WhileStmt struct {
 	Condition Expr
 	Body      Stmt
 }
 
-func (_ WhileStmt) dummyStmt() {
-}
+func (*WhileStmt) dummyStmt() {}
 
 type PrintStmt struct {
 	Value Expr
 }
 
-func (_ PrintStmt) dummyStmt() {
-}
+func (*PrintStmt) dummyStmt() {}
 
 type AssignStmt struct {
 	VariableName Identifier
 	Value        Expr
 }
 
-func (_ AssignStmt) dummyStmt() {
-}
+func (*AssignStmt) dummyStmt() {}
 
 type ArrayAssignStmt struct {
 	ArrayName Identifier
@@ -134,8 +123,7 @@ type ArrayAssignStmt struct {
 	Value     Expr
 }
 
-func (_ ArrayAssignStmt) dummyStmt() {
-}
+func (*ArrayAssignStmt) dummyStmt() {}
 
 // Abstract Expr
 type Expr interface {
@@ -147,55 +135,48 @@ type AndExpr struct {
 	Operand2 Expr
 }
 
-func (_ AndExpr) dummyExpr() {
-}
+func (*AndExpr) dummyExpr() {}
 
 type LessThanExpr struct {
 	Operand1 Expr
 	Operand2 Expr
 }
 
-func (_ LessThanExpr) dummyExpr() {
-}
+func (*LessThanExpr) dummyExpr() {}
 
 type PlusExpr struct {
 	Operand1 Expr
 	Operand2 Expr
 }
 
-func (_ PlusExpr) dummyExpr() {
-}
+func (*PlusExpr) dummyExpr() {}
 
 type MinusExpr struct {
 	Operand1 Expr
 	Operand2 Expr
 }
 
-func (_ MinusExpr) dummyExpr() {
-}
+func (*MinusExpr) dummyExpr() {}
 
 type TimesExpr struct {
 	Operand1 Expr
 	Operand2 Expr
 }
 
-func (_ TimesExpr) dummyExpr() {
-}
+func (*TimesExpr) dummyExpr() {}
 
 type ArrayLookupExpr struct {
 	Name  Expr
 	Index Expr
 }
 
-func (_ ArrayLookupExpr) dummyExpr() {
-}
+func (*ArrayLookupExpr) dummyExpr() {}
 
 type ArrayLengthExpr struct {
 	Name Expr
 }
 
-func (_ ArrayLengthExpr) dummyExpr() {
-}
+func (*ArrayLengthExpr) dummyExpr() {}
 
 type CallExpr struct {
 	Base      Expr
@@ -203,61 +184,52 @@ type CallExpr struct {
 	Arguments []Expr
 }
 
-func (_ CallExpr) dummyExpr() {
-}
+func (*CallExpr) dummyExpr() {}
 
 type IntegerLiteralExpr struct {
 	Value int
 }
 
-func (_ IntegerLiteralExpr) dummyExpr() {
-}
+func (*IntegerLiteralExpr) dummyExpr() {}
 
 type TrueExpr struct {
 }
 
-func (_ TrueExpr) dummyExpr() {
-}
+func (*TrueExpr) dummyExpr() {}
 
 type FalseExpr struct {
 }
 
-func (_ FalseExpr) dummyExpr() {
-}
+func (*FalseExpr) dummyExpr() {}
 
 type IdentifierExpr struct {
 	Name Token
 }
 
-func (_ IdentifierExpr) dummyExpr() {
-}
+func (*IdentifierExpr) dummyExpr() {}
 
 type ThisExpr struct {
 }
 
-func (_ ThisExpr) dummyExpr() {
-}
+func (*ThisExpr) dummyExpr() {}
 
 type NewArrayExpr struct {
 	Length Expr
 }
 
-func (_ NewArrayExpr) dummyExpr() {
-}
+func (*NewArrayExpr) dummyExpr() {}
 
 type NewObjectExpr struct {
 	Name Identifier
 }
 
-func (_ NewObjectExpr) dummyExpr() {
-}
+func (*NewObjectExpr) dummyExpr() {}
 
 type NotExpr struct {
 	Value Expr
 }
 
-func (_ NotExpr) dummyExpr() {
-}
+func (*NotExpr) dummyExpr() {}
 
 type Identifier struct {
 	Name Token
