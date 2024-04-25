@@ -190,12 +190,15 @@ namespace core
 			if (isBuffered())
 			{
 				auto lockMutex = lockGuard(m_mutex);
-				while (m_buffer.count() == m_bufferSize)
+				while (m_buffer.count() >= m_bufferSize && m_closed.load() == false)
 				{
 					m_writeWaiting.fetch_add(1);
 					m_writeCond.wait(m_mutex);
 					m_writeWaiting.fetch_sub(1);
 				}
+
+				if (m_closed.load())
+					return ChanErr::Closed;
 
 				coreAssert(m_buffer.count() < m_bufferSize);
 				if constexpr (std::is_move_constructible_v<T>)
@@ -569,7 +572,6 @@ namespace core
 		friend class SelectCaseDesc;
 		Allocator* m_allocator = nullptr;
 		Chan<T, dir>* m_chan = nullptr;
-		Result<T, ChanErr> m_res = Result<T, ChanErr>::createEmpty();
 		Func<void(T&&)> m_callback;
 	public:
 		ReadCase(Allocator* allocator, Chan<T, dir>& chan)
@@ -640,15 +642,15 @@ namespace core
 		{
 			m_tryEval = +[](void* ptr, SelectCond* cond, size_t index) {
 				auto c = (ReadCase<T, dir>*)ptr;
-				c->m_res = c->m_chan->internalTryRecv(cond, index);
-				if (c->m_res.isError())
+				auto res = c->m_chan->internalTryRecv(cond, index);
+				if (res.isError())
 				{
-					if (c->m_res.error() == ChanErr::Closed)
-						return c->m_res.releaseError();
+					if (res.error() == ChanErr::Closed)
+						return res.releaseError();
 				}
-				else if (c->m_res.isValue())
+				else if (res.isValue())
 				{
-					c->m_callback(c->m_res.releaseValue());
+					c->m_callback(res.releaseValue());
 					return ChanErr::Ok;
 				}
 				return ChanErr::Empty;
@@ -656,15 +658,15 @@ namespace core
 
 			m_eval = +[](void* ptr) {
 				auto c = (ReadCase<T, dir>*)ptr;
-				c->m_res = c->m_chan->recv();
-				if (c->m_res.isError())
+				auto res = c->m_chan->recv();
+				if (res.isError())
 				{
-					if (c->m_res.error() == ChanErr::Closed)
-						return c->m_res.releaseError();
+					if (res.error() == ChanErr::Closed)
+						return res.releaseError();
 				}
-				else if (c->m_res.isValue())
+				else if (res.isValue())
 				{
-					c->m_callback(c->m_res.releaseValue());
+					c->m_callback(res.releaseValue());
 					return ChanErr::Ok;
 				}
 				return ChanErr::Empty;
