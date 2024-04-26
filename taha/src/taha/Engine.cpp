@@ -1,7 +1,7 @@
 #include "taha/Engine.h"
 
 #if TAHA_OS_WINDOWS
-#include "taha/DX11Renderer.h"
+#include "taha/dx11/DX11Renderer.h"
 #endif
 
 namespace taha
@@ -17,8 +17,8 @@ namespace taha
 		return Engine{rendererResult.releaseValue()};
 	}
 
-	Frame Engine::createFrame()
+	core::Unique<Frame> Engine::createFrameForWindow(taha::NativeWindowDesc desc)
 	{
-		return Frame{};
+		return m_renderer->createFrameForWindow(desc);
 	}
 }

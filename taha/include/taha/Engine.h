@@ -3,6 +3,7 @@
 #include "taha/Exports.h"
 #include "taha/Frame.h"
 #include "taha/Renderer.h"
+#include "taha/NativeWindowDesc.h"
 
 #include <core/Result.h>
 #include <core/Unique.h>
@@ -20,6 +21,6 @@ namespace taha
 	public:
 		TAHA_EXPORT static core::Result<Engine> create(core::Allocator* allocator);
 
-		Frame createFrame();
+		TAHA_EXPORT core::Unique<Frame> createFrameForWindow(NativeWindowDesc desc);
 	};
 }
