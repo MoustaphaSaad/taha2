@@ -1,35 +1,34 @@
 #pragma once
 
 #include "taha/Frame.h"
+#include "taha/dx11/DXPtr.h"
 
-class IDXGISwapChain;
-class ID3D11Texture2D;
-class ID3D11RenderTargetView;
-class ID3D11DepthStencilView;
+struct IDXGISwapChain;
+struct ID3D11Texture2D;
+struct ID3D11RenderTargetView;
+struct ID3D11DepthStencilView;
 
 namespace taha
 {
 	class DX11Frame: public Frame
 	{
-		IDXGISwapChain* m_swapchain = nullptr;
-		ID3D11Texture2D* m_colorTexture = nullptr;
-		ID3D11Texture2D* m_depthTexture = nullptr;
-		ID3D11RenderTargetView* m_renderTargetView = nullptr;
-		ID3D11DepthStencilView* m_depthStencilView = nullptr;
+		DXPtr<IDXGISwapChain> m_swapchain;
+		DXPtr<ID3D11Texture2D> m_colorTexture;
+		DXPtr<ID3D11Texture2D> m_depthTexture;
+		DXPtr<ID3D11RenderTargetView> m_renderTargetView;
+		DXPtr<ID3D11DepthStencilView> m_depthStencilView;
 	public:
 		DX11Frame(
-			IDXGISwapChain* swapchain,
-			ID3D11Texture2D* colorTexture,
-			ID3D11Texture2D* depthTexture,
-			ID3D11RenderTargetView* renderTargetView,
-			ID3D11DepthStencilView* depthStencilView)
-			: m_swapchain(swapchain),
-			  m_colorTexture(colorTexture),
-			  m_depthTexture(depthTexture),
-			  m_renderTargetView(renderTargetView),
-			  m_depthStencilView(depthStencilView)
+			DXPtr<IDXGISwapChain> swapchain,
+			DXPtr<ID3D11Texture2D> colorTexture,
+			DXPtr<ID3D11Texture2D> depthTexture,
+			DXPtr<ID3D11RenderTargetView> renderTargetView,
+			DXPtr<ID3D11DepthStencilView> depthStencilView)
+			: m_swapchain(std::move(swapchain)),
+			  m_colorTexture(std::move(colorTexture)),
+			  m_depthTexture(std::move(depthTexture)),
+			  m_renderTargetView(std::move(renderTargetView)),
+			  m_depthStencilView(std::move(depthStencilView))
 		{}
-
-		~DX11Frame() override;
 	};
 }

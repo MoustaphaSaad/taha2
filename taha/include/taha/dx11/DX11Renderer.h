@@ -2,14 +2,16 @@
 
 #include "taha/Exports.h"
 #include "taha/Renderer.h"
+#include "taha/dx11/DXPtr.h"
 
 #include <core/Result.h>
 #include <core/Unique.h>
 
-class IDXGIFactory1;
-class IDXGIAdapter1;
-class ID3D11Device;
-class ID3D11DeviceContext;
+struct IDXGIFactory1;
+struct IDXGIAdapter1;
+struct ID3D11Device;
+struct ID3D11DeviceContext;
+
 namespace taha
 {
 	class DX11Renderer: public Renderer
@@ -18,17 +20,17 @@ namespace taha
 		friend inline core::Unique<T> core::unique_from(core::Allocator* allocator, TArgs&&... args);
 
 		core::Allocator* m_allocator = nullptr;
-		IDXGIFactory1* m_factory = nullptr;
-		IDXGIAdapter1* m_adapter = nullptr;
-		ID3D11Device* m_device = nullptr;
-		ID3D11DeviceContext* m_deviceContext = nullptr;
+		DXPtr<IDXGIFactory1> m_factory;
+		DXPtr<IDXGIAdapter1> m_adapter;
+		DXPtr<ID3D11Device> m_device;
+		DXPtr<ID3D11DeviceContext> m_deviceContext;
 
-		DX11Renderer(IDXGIFactory1* factory, IDXGIAdapter1* adapter, ID3D11Device* device, ID3D11DeviceContext* deviceContext, core::Allocator* allocator)
+		DX11Renderer(DXPtr<IDXGIFactory1> factory, DXPtr<IDXGIAdapter1> adapter, DXPtr<ID3D11Device> device, DXPtr<ID3D11DeviceContext> deviceContext, core::Allocator* allocator)
 			: m_allocator(allocator),
-			  m_factory(factory),
-			  m_adapter(adapter),
-			  m_device(device),
-			  m_deviceContext(deviceContext)
+			  m_factory(std::move(factory)),
+			  m_adapter(std::move(adapter)),
+			  m_device(std::move(device)),
+			  m_deviceContext(std::move(deviceContext))
 		{}
 
 	public:

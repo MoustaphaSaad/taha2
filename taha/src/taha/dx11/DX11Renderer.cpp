@@ -1,5 +1,6 @@
 #include "taha/dx11/DX11Renderer.h"
 #include "taha/dx11/DX11Frame.h"
+#include "taha/dx11/DXPtr.h"
 
 #include <core/Array.h>
 
@@ -14,29 +15,28 @@ namespace taha
 {
 	core::Result<core::Unique<DX11Renderer>> DX11Renderer::create(core::Allocator *allocator)
 	{
-		IDXGIFactory1* factory = nullptr;
-		auto res = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&factory);
+		DXPtr<IDXGIFactory1> factory;
+		auto res = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)factory.getPtrAddress());
 		if (FAILED(res))
 			return core::errf(allocator, "CreateDXGIFactory1 failed, ErrorCode({})"_sv, res);
 
-		IDXGIAdapter1* selectedAdapter1 = nullptr;
+		DXPtr<IDXGIAdapter1> selectedAdapter1;
 		DXGI_ADAPTER_DESC1 selectedAdapterDesc1{};
-		IDXGIAdapter1* adapter1 = nullptr;
-		for (UINT i = 0; factory->EnumAdapters1(i, &adapter1) != DXGI_ERROR_NOT_FOUND; ++i)
+		DXPtr<IDXGIAdapter1> adapter1;
+		for (UINT i = 0; factory->EnumAdapters1(i, adapter1.getPtrAddress()) != DXGI_ERROR_NOT_FOUND; ++i)
 		{
 			DXGI_ADAPTER_DESC1 adapterDesc1{};
 			adapter1->GetDesc1(&adapterDesc1);
 
 			if (adapterDesc1.DedicatedVideoMemory > selectedAdapterDesc1.DedicatedVideoMemory)
 			{
-				if (selectedAdapter1) selectedAdapter1->Release();
-				selectedAdapter1 = adapter1;
+				selectedAdapter1 = std::move(adapter1);
 				selectedAdapterDesc1 = adapterDesc1;
 			}
 		}
 
-		ID3D11Device* device = nullptr;
-		ID3D11DeviceContext* context = nullptr;
+		DXPtr<ID3D11Device> device;
+		DXPtr<ID3D11DeviceContext> context;
 		D3D_FEATURE_LEVEL features[] {
 			D3D_FEATURE_LEVEL_11_1,
 			D3D_FEATURE_LEVEL_11_0,
@@ -47,21 +47,21 @@ namespace taha
 			flags = D3D11_CREATE_DEVICE_DEBUG;
 
 		res = D3D11CreateDevice(
-			selectedAdapter1,
+			selectedAdapter1.get(),
 			D3D_DRIVER_TYPE_UNKNOWN,
 			nullptr,
 			flags,
 			features,
 			sizeof(features) / sizeof(*features),
 			D3D11_SDK_VERSION,
-			&device,
+			device.getPtrAddress(),
 			nullptr,
-			&context
+			context.getPtrAddress()
 		);
 		if (FAILED(res))
 			return core::errf(allocator, "D3D11CreateDevice failed, ErrorCode({})"_sv, res);
 
-		return core::unique_from<DX11Renderer>(allocator, factory, selectedAdapter1, device, context, allocator);
+		return core::unique_from<DX11Renderer>(allocator, std::move(factory), std::move(selectedAdapter1), std::move(device), std::move(context), allocator);
 	}
 
 	core::Unique<Frame> DX11Renderer::createFrameForWindow(NativeWindowDesc desc)
@@ -81,8 +81,8 @@ namespace taha
 
 		if (desc.enableVSync)
 		{
-			IDXGIOutput* output = nullptr;
-			auto res = m_adapter->EnumOutputs(0, &output);
+			DXPtr<IDXGIOutput> output;
+			auto res = m_adapter->EnumOutputs(0, output.getPtrAddress());
 			if (FAILED(res))
 				return nullptr;
 
@@ -97,7 +97,6 @@ namespace taha
 			res = output->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &modesCount, modes.begin());
 			if (FAILED(res))
 				return nullptr;
-			output->Release();
 
 			for (const auto& mode: modes)
 			{
@@ -111,22 +110,22 @@ namespace taha
 			swapchainDesc.BufferDesc.RefreshRate.Denominator = 1;
 		}
 
-		IDXGISwapChain* swapchain = nullptr;
-		auto res = m_factory->CreateSwapChain(m_device, &swapchainDesc, &swapchain);
+		DXPtr<IDXGISwapChain> swapchain;
+		auto res = m_factory->CreateSwapChain(m_device.get(), &swapchainDesc, swapchain.getPtrAddress());
 		if (FAILED(res))
 			return nullptr;
 
-		ID3D11Texture2D* colorTexture = nullptr;
-		res = swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&colorTexture);
+		DXPtr<ID3D11Texture2D> colorTexture;
+		res = swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)colorTexture.getPtrAddress());
 		if (FAILED(res))
 			return nullptr;
 
-		ID3D11RenderTargetView* renderTargetView = nullptr;
-		res = m_device->CreateRenderTargetView(colorTexture, nullptr, &renderTargetView);
+		DXPtr<ID3D11RenderTargetView> renderTargetView;
+		res = m_device->CreateRenderTargetView(colorTexture.get(), nullptr, renderTargetView.getPtrAddress());
 		if (FAILED(res))
 			return nullptr;
 
-		ID3D11Texture2D* depthTexture = nullptr;
+		DXPtr<ID3D11Texture2D> depthTexture;
 		D3D11_TEXTURE2D_DESC depthDesc{};
 		depthDesc.Width = swapchainDesc.BufferDesc.Width;
 		depthDesc.Height = swapchainDesc.BufferDesc.Height;
@@ -136,18 +135,18 @@ namespace taha
 		depthDesc.SampleDesc.Count = 1;
 		depthDesc.Usage = D3D11_USAGE_DEFAULT;
 		depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-		res = m_device->CreateTexture2D(&depthDesc, nullptr, &depthTexture);
+		res = m_device->CreateTexture2D(&depthDesc, nullptr, depthTexture.getPtrAddress());
 		if (FAILED(res))
 			return nullptr;
 
-		ID3D11DepthStencilView* depthStencilView = nullptr;
+		DXPtr<ID3D11DepthStencilView> depthStencilView;
 		D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
 		depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 		depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-		res = m_device->CreateDepthStencilView(depthTexture, &depthStencilViewDesc, &depthStencilView);
+		res = m_device->CreateDepthStencilView(depthTexture.get(), &depthStencilViewDesc, depthStencilView.getPtrAddress());
 		if (FAILED(res))
 			return nullptr;
 
-		return core::unique_from<DX11Frame>(m_allocator, swapchain, colorTexture, depthTexture, renderTargetView, depthStencilView);
+		return core::unique_from<DX11Frame>(m_allocator, std::move(swapchain), std::move(colorTexture), std::move(depthTexture), std::move(renderTargetView), std::move(depthStencilView));
 	}
 }

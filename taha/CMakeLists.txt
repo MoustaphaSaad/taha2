@@ -12,6 +12,7 @@ target_sources(taha PRIVATE
 if (WIN32)
 	target_sources(taha
 		PRIVATE
+			include/taha/dx11/DXPtr.h
 			include/taha/dx11/DX11Renderer.h
 			src/taha/dx11/DX11Renderer.cpp
 			include/taha/dx11/DX11Frame.h
