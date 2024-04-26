@@ -109,8 +109,7 @@ namespace core
 	};
 
 	template<typename T, typename... TArgs>
-	inline Unique<T>
-	unique_from(Allocator* allocator, TArgs&&... args)
+	inline Unique<T> unique_from(Allocator* allocator, TArgs&&... args)
 	{
 		auto ptr = (T*)allocator->alloc(sizeof(T), alignof(T));
 		allocator->commit(ptr, sizeof(T));

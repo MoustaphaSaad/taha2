@@ -152,6 +152,9 @@ target_compile_definitions(core
 		$<$<CXX_COMPILER_ID:AppleClang>:TAHA_COMPILER_CLANG=1>
 		$<$<CXX_COMPILER_ID:GNU>:TAHA_COMPILER_GNU=1>
 		$<$<CXX_COMPILER_ID:MSVC>:TAHA_COMPILER_MSVC=1>
+		$<$<PLATFORM_ID:Windows>:TAHA_OS_WINDOWS=1>
+		$<$<PLATFORM_ID:Linux>:TAHA_OS_LINUX=1>
+		$<$<PLATFORM_ID:Darwin>:TAHA_OS_DARWIN=1>
 )
 
 target_compile_features(core PUBLIC cxx_std_20)

@@ -5,7 +5,18 @@ target_sources(taha PRIVATE
 	src/taha/Engine.cpp
 	include/taha/Frame.h
 	src/taha/Frame.cpp
+	include/taha/Renderer.h
 )
+
+if (WIN32)
+	target_sources(taha
+		PRIVATE
+			include/taha/DX11Renderer.h
+			src/taha/DX11Renderer.cpp
+	)
+	target_compile_definitions(taha PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+	target_link_libraries(taha PRIVATE d3d11 dxgi d3dcompiler dxguid)
+endif ()
 
 target_link_libraries(taha PUBLIC core)
 

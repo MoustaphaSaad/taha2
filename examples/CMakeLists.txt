@@ -25,3 +25,7 @@ target_link_libraries(select core)
 CPMGetPackage(glfw)
 add_executable(window window.cpp)
 target_link_libraries(window core glfw)
+
+CPMGetPackage(glfw)
+add_executable(clear-window clear-window.cpp)
+target_link_libraries(clear-window taha glfw)
