@@ -7,6 +7,9 @@ target_sources(taha PRIVATE
 	src/taha/Frame.cpp
 	include/taha/Renderer.h
 	include/taha/NativeWindowDesc.h
+	include/taha/Encoder.h
+	src/taha/Encoder.cpp
+	include/taha/Command.h
 )
 
 if (WIN32)
