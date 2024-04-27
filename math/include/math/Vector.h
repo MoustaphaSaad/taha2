@@ -13,7 +13,7 @@ namespace math
 	template<typename T, size_t N, typename VectorSpace>
 	struct Vector
 	{
-		T elements[N];
+		T elements[N] = {};
 
 		T& operator[](size_t index)
 		{

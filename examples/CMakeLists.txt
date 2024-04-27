@@ -1,5 +1,5 @@
 add_executable(playground playground.cpp)
-target_link_libraries(playground core)
+target_link_libraries(playground core math)
 
 add_executable(thread-per-client-echo-server thread-per-client-echo-server.cpp)
 target_link_libraries(thread-per-client-echo-server core)

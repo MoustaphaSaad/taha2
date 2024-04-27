@@ -7,7 +7,7 @@ namespace math
 	template<typename T, size_t N, typename SrcSpace, typename DstSpace>
 	struct Matrix
 	{
-		Vector<T, N, SrcSpace> elements[N];
+		Vector<T, N, SrcSpace> elements[N] = {};
 
 		Matrix()
 		{
