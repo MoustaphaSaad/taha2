@@ -7,31 +7,31 @@
 
 namespace math
 {
-	template<typename T>
+	template<typename T, typename V, typename W>
 	struct Mat4
 	{
-		Vec4<T> columns[4] = {
-			Vec4<T>{T(1), T(0), T(0), T(0)},
-			Vec4<T>{T(0), T(1), T(0), T(0)},
-			Vec4<T>{T(0), T(0), T(1), T(0)},
-			Vec4<T>{T(0), T(0), T(0), T(1)}
+		Vec4<T, W> columns[4] = {
+			Vec4<T, W>{T(1), T(0), T(0), T(0)},
+			Vec4<T, W>{T(0), T(1), T(0), T(0)},
+			Vec4<T, W>{T(0), T(0), T(1), T(0)},
+			Vec4<T, W>{T(0), T(0), T(0), T(1)}
 		};
 
-		constexpr TAHA_FORCE_INLINE Vec4<T>& TAHA_XCALL operator[](size_t index)
+		constexpr Vec4<T, W>& TAHA_XCALL operator[](size_t index)
 		{
 			coreAssert(index < 4);
 			return columns[index];
 		}
 
-		constexpr TAHA_FORCE_INLINE const Vec4<T>& TAHA_XCALL operator[](size_t index) const
+		constexpr const Vec4<T, W>& TAHA_XCALL operator[](size_t index) const
 		{
 			coreAssert(index < 4);
 			return columns[index];
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec4<T> TAHA_XCALL operator*(Vec4<T> other) const
+		constexpr Vec4<T, W> TAHA_XCALL operator*(Vec4<T, V> other) const
 		{
-			Vec4<T> res;
+			Vec4<T, W> res;
 			res += columns[0] * other.elements[0];
 			res += columns[1] * other.elements[1];
 			res += columns[2] * other.elements[2];
@@ -40,5 +40,6 @@ namespace math
 		}
 	};
 
-	using float4x4 = Mat4<float>;
+	template<typename V = UnknownSpace, typename W = UnknownSpace>
+	using float4x4 = Mat4<float, V, W>;
 }

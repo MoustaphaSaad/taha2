@@ -9,15 +9,15 @@ namespace math
 	template<typename T, size_t N>
 	struct VecStorage
 	{
-		T elements[N];
+		T elements[N] = {};
 
-		constexpr TAHA_FORCE_INLINE T& operator[](size_t index)
+		constexpr T& operator[](size_t index)
 		{
 			coreAssert(index < N);
 			return elements[index];
 		}
 
-		constexpr TAHA_FORCE_INLINE const T& operator[](size_t index) const
+		constexpr const T& operator[](size_t index) const
 		{
 			coreAssert(index < N);
 			return elements[index];
@@ -36,13 +36,23 @@ namespace math
 			T elements[2];
 		};
 
-		constexpr TAHA_FORCE_INLINE T& operator[](size_t index)
+		constexpr VecStorage()
+		{
+			for (auto& element: elements)
+				element = T(0);
+		}
+
+		constexpr VecStorage(T x, T y)
+			: elements{x, y}
+		{}
+
+		constexpr T& operator[](size_t index)
 		{
 			coreAssert(index < 2);
 			return elements[index];
 		}
 
-		constexpr TAHA_FORCE_INLINE const T& operator[](size_t index) const
+		constexpr const T& operator[](size_t index) const
 		{
 			coreAssert(index < 2);
 			return elements[index];
@@ -61,13 +71,23 @@ namespace math
 			T elements[3];
 		};
 
-		constexpr TAHA_FORCE_INLINE T& operator[](size_t index)
+		constexpr VecStorage()
+		{
+			for (auto& element: elements)
+				element = T(0);
+		}
+
+		constexpr VecStorage(T x, T y, T z)
+			: elements{x, y, z}
+		{}
+
+		constexpr T& operator[](size_t index)
 		{
 			coreAssert(index < 3);
 			return elements[index];
 		}
 
-		constexpr TAHA_FORCE_INLINE const T& operator[](size_t index) const
+		constexpr const T& operator[](size_t index) const
 		{
 			coreAssert(index < 3);
 			return elements[index];
@@ -86,59 +106,73 @@ namespace math
 			T elements[4];
 		};
 
-		constexpr TAHA_FORCE_INLINE T& operator[](size_t index)
+		constexpr VecStorage()
+		{
+			for (auto& element: elements)
+				element = T(0);
+		}
+
+		constexpr VecStorage(T x, T y, T z, T w)
+			: elements{x, y, z, w}
+		{}
+
+		constexpr T& operator[](size_t index)
 		{
 			coreAssert(index < 4);
 			return elements[index];
 		}
 
-		constexpr TAHA_FORCE_INLINE const T& operator[](size_t index) const
+		constexpr const T& operator[](size_t index) const
 		{
 			coreAssert(index < 4);
 			return elements[index];
 		}
 	};
 
-	template<typename T>
+	struct UnknownSpace{};
+	struct ModelSpace{};
+	struct WorldSpace{};
+	struct Viewspace{};
+
+	template<typename T, typename V>
 	struct Vec2
 	{
+		using VectorSpace = V;
 		using Storage = VecStorage<T, 2>;
-		Storage elements = {};
+		Storage elements;
 
 		Vec2() = default;
-		TAHA_FORCE_INLINE Vec2(Storage e)
+		constexpr Vec2(Storage e)
 			: elements(e)
 		{}
-		Vec2(T x, T y)
+		constexpr Vec2(T x, T y)
+			: elements{x, y}
+		{}
+
+		constexpr Vec2 TAHA_XCALL operator+(Vec2 other) const
 		{
-			elements.x = x;
-			elements.y = y;
+			return Vec2{
+				elements[0] + other.elements[0],
+				elements[1] + other.elements[1]
+			};
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec2 TAHA_XCALL operator+(Vec2<T> other) const
-		{
-			Storage res;
-			res[0] = elements[0] + other.elements[0];
-			res[1] = elements[1] + other.elements[1];
-			return res;
-		}
-
-		constexpr TAHA_FORCE_INLINE Vec2& TAHA_XCALL operator+=(Vec2 other)
+		constexpr Vec2& TAHA_XCALL operator+=(Vec2 other)
 		{
 			elements[0] += other.elements[0];
 			elements[1] += other.elements[1];
 			return *this;
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec2 TAHA_XCALL operator*(T other) const
+		constexpr Vec2 TAHA_XCALL operator*(T other) const
 		{
-			Storage res;
-			res[0] = elements[0] * other;
-			res[1] = elements[1] * other;
-			return res;
+			return Vec2{
+				elements[0] * other,
+				elements[1] * other
+			};
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec2& TAHA_XCALL operator*=(T other)
+		constexpr Vec2& TAHA_XCALL operator*=(T other)
 		{
 			elements[0] *= other;
 			elements[1] *= other;
@@ -146,33 +180,31 @@ namespace math
 		}
 	};
 
-	template<typename T>
+	template<typename T, typename V>
 	struct Vec3
 	{
+		using VectorSpace = V;
 		using Storage = VecStorage<T, 3>;
-		Storage elements = {};
+		Storage elements;
 
 		Vec3() = default;
-		TAHA_FORCE_INLINE Vec3(Storage e)
+		constexpr Vec3(Storage e)
 			: elements(e)
 		{}
-		Vec3(T x, T y, T z)
+		constexpr Vec3(T x, T y, T z)
+			: elements{x, y, z}
+		{}
+
+		constexpr Vec3 TAHA_XCALL operator+(Vec3 other) const
 		{
-			elements.x = x;
-			elements.y = y;
-			elements.z = z;
+			return Vec3{
+				elements[0] + other.elements[0],
+				elements[1] + other.elements[1],
+				elements[2] + other.elements[2]
+			};
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec3 TAHA_XCALL operator+(Vec3 other) const
-		{
-			Storage res;
-			res[0] = elements[0] + other.elements[0];
-			res[1] = elements[1] + other.elements[1];
-			res[2] = elements[2] + other.elements[2];
-			return res;
-		}
-
-		constexpr TAHA_FORCE_INLINE Vec3& TAHA_XCALL operator+=(Vec3 other)
+		constexpr Vec3& TAHA_XCALL operator+=(Vec3 other)
 		{
 			elements[0] += other.elements[0];
 			elements[1] += other.elements[1];
@@ -180,16 +212,16 @@ namespace math
 			return *this;
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec3 TAHA_XCALL operator*(T other) const
+		constexpr Vec3 TAHA_XCALL operator*(T other) const
 		{
-			Storage res;
-			res[0] = elements[0] * other;
-			res[1] = elements[1] * other;
-			res[2] = elements[2] * other;
-			return res;
+			return Vec3{
+				elements[0] * other,
+				elements[1] * other,
+				elements[2] * other
+			};
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec3& TAHA_XCALL operator*=(T other)
+		constexpr Vec3& TAHA_XCALL operator*=(T other)
 		{
 			elements[0] *= other;
 			elements[1] *= other;
@@ -198,39 +230,44 @@ namespace math
 		}
 	};
 
-	template<typename T>
+	template<typename T, typename V>
 	struct Vec4
 	{
+		using VectorSpace = V;
 		using Storage = VecStorage<T, 4>;
-		Storage elements = {};
+		Storage elements;
 
 		Vec4() = default;
-		TAHA_FORCE_INLINE Vec4(Storage e)
+		constexpr Vec4(Storage e)
 			: elements(e)
 		{}
-		TAHA_FORCE_INLINE Vec4(T x, T y, T z, T w)
-		{
-			elements.x = x;
-			elements.y = y;
-			elements.z = z;
-			elements.w = w;
-		}
-		Vec4(const Vec4&) = default;
-		Vec4(Vec4&&) = default;
-		Vec4& operator=(const Vec4&) = default;
-		Vec4& operator=(Vec4&&) = default;
+		constexpr Vec4(T x, T y, T z, T w)
+			: elements{x, y, z, w}
+		{}
 
-		constexpr TAHA_FORCE_INLINE Vec4 TAHA_XCALL operator+(Vec4 other) const
+		constexpr T& operator[](size_t index)
 		{
-			Storage res;
-			res[0] = elements[0] + other.elements[0];
-			res[1] = elements[1] + other.elements[1];
-			res[2] = elements[2] + other.elements[2];
-			res[3] = elements[3] + other.elements[3];
-			return res;
+			coreAssert(index < 4);
+			return elements[index];
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec4& TAHA_XCALL operator+=(Vec4 other)
+		constexpr const T& operator[](size_t index) const
+		{
+			coreAssert(index < 4);
+			return elements[index];
+		}
+
+		constexpr Vec4 TAHA_XCALL operator+(Vec4 other) const
+		{
+			return Vec4{
+				elements[0] + other.elements[0],
+				elements[1] + other.elements[1],
+				elements[2] + other.elements[2],
+				elements[3] + other.elements[3]
+			};
+		}
+
+		constexpr Vec4& TAHA_XCALL operator+=(Vec4 other)
 		{
 			elements[0] += other.elements[0];
 			elements[1] += other.elements[1];
@@ -239,17 +276,17 @@ namespace math
 			return *this;
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec4 TAHA_XCALL operator*(T other) const
+		constexpr Vec4 TAHA_XCALL operator*(T other) const
 		{
-			Storage res;
-			res[0] = elements[0] * other;
-			res[1] = elements[1] * other;
-			res[2] = elements[2] * other;
-			res[3] = elements[3] * other;
-			return Vec4{res};
+			return Vec4{
+				elements[0] * other,
+				elements[1] * other,
+				elements[2] * other,
+				elements[3] * other
+			};
 		}
 
-		constexpr TAHA_FORCE_INLINE Vec4& TAHA_XCALL operator*=(T other)
+		constexpr Vec4& TAHA_XCALL operator*=(T other)
 		{
 			elements[0] *= other;
 			elements[1] *= other;
@@ -259,7 +296,12 @@ namespace math
 		}
 	};
 
-	using float2 = Vec2<float>;
-	using float3 = Vec3<float>;
-	using float4 = Vec4<float>;
+	template<typename V = UnknownSpace>
+	using float2 = Vec2<float, V>;
+
+	template<typename V = UnknownSpace>
+	using float3 = Vec3<float, V>;
+
+	template<typename V = UnknownSpace>
+	using float4 = Vec4<float, V>;
 }

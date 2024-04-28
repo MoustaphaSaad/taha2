@@ -20,7 +20,7 @@ add_executable(unittests
 	test_threadpool.cpp
 	test_log.cpp
 	test_url.cpp
-	test_vector.cpp
+	test_vec.cpp
 	test_sha1.cpp
 	test_stacktrace.cpp
 	test_os.cpp

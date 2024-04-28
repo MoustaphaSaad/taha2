@@ -99,3 +99,11 @@ CPMDeclarePackage(glfw
     "GLFW_BUILD_DOCS OFF"
     "GLFW_INSTALL OFF"
 )
+
+CPMDeclarePackage(nanobench
+  NAME nanobench
+  GIT_TAG v4.3.11
+  GIT_REPOSITORY git@github.com:martinus/nanobench.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+)
