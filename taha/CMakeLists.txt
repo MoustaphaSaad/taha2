@@ -25,7 +25,7 @@ if (WIN32)
 	target_link_libraries(taha PRIVATE d3d11 dxgi d3dcompiler dxguid)
 endif ()
 
-target_link_libraries(taha PUBLIC core)
+target_link_libraries(taha PUBLIC core math)
 
 # generate exports header file
 include(GenerateExportHeader)

@@ -36,6 +36,10 @@ namespace math
 			{
 				T x, y;
 			};
+			struct
+			{
+				T r, g;
+			};
 			T elements[2];
 		};
 
@@ -71,6 +75,10 @@ namespace math
 			{
 				T x, y, z;
 			};
+			struct
+			{
+				T r, g, b;
+			};
 			T elements[3];
 		};
 
@@ -105,6 +113,10 @@ namespace math
 			struct
 			{
 				T x, y, z, w;
+			};
+			struct
+			{
+				T r, g, b, a;
 			};
 			T elements[4];
 		};
@@ -1587,4 +1599,7 @@ namespace math
 
 	template<typename V = UnknownSpace>
 	using float4 = Vec4<float, V>;
+
+	using rgb = Vec3<float, UnknownSpace>;
+	using rgba = Vec4<float, UnknownSpace>;
 }

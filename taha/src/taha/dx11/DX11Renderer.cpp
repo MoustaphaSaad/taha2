@@ -147,6 +147,39 @@ namespace taha
 		if (FAILED(res))
 			return nullptr;
 
-		return core::unique_from<DX11Frame>(m_allocator, std::move(swapchain), std::move(colorTexture), std::move(depthTexture), std::move(renderTargetView), std::move(depthStencilView));
+		return core::unique_from<DX11Frame>(m_allocator, this, std::move(swapchain), std::move(colorTexture), std::move(depthTexture), std::move(renderTargetView), std::move(depthStencilView));
+	}
+
+	void DX11Renderer::submitCommandsAndExecute(Frame *frame, const core::Array<core::Unique<Command>> &commands)
+	{
+		// write rendering algorithm here
+		// for now we get the clear command at the beginning and clear the frame
+		coreAssert(commands.count() > 0);
+		coreAssert(commands[0]->kind() == Command::KIND_CLEAR);
+		auto clear = dynamic_cast<ClearCommand*>(commands[0].get());
+
+		auto dx11Frame = dynamic_cast<DX11Frame*>(frame);
+		m_deviceContext->OMSetRenderTargets(1, dx11Frame->m_renderTargetView.getPtrAddress(), dx11Frame->m_depthStencilView.get());
+
+		D3D11_VIEWPORT viewport{};
+		viewport.Width = 640;
+		viewport.Height = 480;
+		viewport.MinDepth = 0.0f;
+		viewport.MaxDepth = 1.0f;
+		viewport.TopLeftX = 0.0f;
+		viewport.TopLeftY = 0.0f;
+		m_deviceContext->RSSetViewports(1, &viewport);
+
+		D3D11_RECT scissor{};
+		scissor.left = 0;
+		scissor.right = viewport.Width;
+		scissor.top = 0;
+		scissor.bottom = viewport.Height;
+		m_deviceContext->RSSetScissorRects(1, &scissor);
+
+		m_deviceContext->ClearRenderTargetView(dx11Frame->m_renderTargetView.get(), &clear->color.elements.r);
+		m_deviceContext->ClearDepthStencilView(dx11Frame->m_depthStencilView.get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clear->depth, clear->stencil);
+
+		dx11Frame->m_swapchain->Present(0, 0);
 	}
 }

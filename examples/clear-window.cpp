@@ -1,13 +1,16 @@
 #include <core/FastLeak.h>
 #include <core/Log.h>
 
+#include <taha/Engine.h>
+
 #include <GLFW/glfw3.h>
 #if TAHA_OS_WINDOWS
 #define GLFW_EXPOSE_NATIVE_WIN32 1
+#define NOMINMAX 1
+#define WIN32_LEAN_AND_MEAN 1
+#define _CRT_SECURE_NO_WARNINGS 1
 #endif
 #include <GLFW/glfw3native.h>
-
-#include <taha/Engine.h>
 
 taha::NativeWindowDesc getNativeWindowDesc(GLFWwindow* window)
 {
@@ -57,7 +60,9 @@ int main()
 	glfwMakeContextCurrent(window);
 	while (glfwWindowShouldClose(window) == false)
 	{
-		glfwSwapBuffers(window);
+		auto encoder = frame->createEncoderAndRecord({1, 0, 0, 1}, &allocator);
+		encoder.endEncodingAndSubmit();
+
 		glfwPollEvents();
 	}
 

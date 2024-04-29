@@ -37,5 +37,6 @@ namespace taha
 		TAHA_EXPORT static core::Result<core::Unique<DX11Renderer>> create(core::Allocator* allocator);
 
 		TAHA_EXPORT core::Unique<Frame> createFrameForWindow(NativeWindowDesc desc) override;
+		TAHA_EXPORT void submitCommandsAndExecute(Frame* frame, const core::Array<core::Unique<Command>>& commands) override;
 	};
 }

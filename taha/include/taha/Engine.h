@@ -22,5 +22,6 @@ namespace taha
 		TAHA_EXPORT static core::Result<Engine> create(core::Allocator* allocator);
 
 		TAHA_EXPORT core::Unique<Frame> createFrameForWindow(NativeWindowDesc desc);
+
 	};
 }
