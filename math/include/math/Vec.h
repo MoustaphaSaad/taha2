@@ -135,7 +135,7 @@ namespace math
 	struct UnknownSpace{};
 	struct ModelSpace{};
 	struct WorldSpace{};
-	struct Viewspace{};
+	struct ViewSpace{};
 
 	template<typename T, typename V>
 	struct Vec2
@@ -148,19 +148,20 @@ namespace math
 		constexpr Vec2(Storage e)
 			: elements(e)
 		{}
+		constexpr Vec2(T x)
+			: elements{x, x}
+		{}
 		constexpr Vec2(T x, T y)
 			: elements{x, y}
 		{}
 
 		constexpr T& operator[](size_t index)
 		{
-			coreAssert(index < 2);
 			return elements[index];
 		}
 
 		constexpr const T& operator[](size_t index) const
 		{
-			coreAssert(index < 2);
 			return elements[index];
 		}
 	};
@@ -588,19 +589,20 @@ namespace math
 		constexpr Vec3(Storage e)
 			: elements(e)
 		{}
+		constexpr Vec3(T x)
+			: elements{x, x, x}
+		{}
 		constexpr Vec3(T x, T y, T z)
 			: elements{x, y, z}
 		{}
 
 		constexpr T& operator[](size_t index)
 		{
-			coreAssert(index < 3);
 			return elements[index];
 		}
 
 		constexpr const T& operator[](size_t index) const
 		{
-			coreAssert(index < 3);
 			return elements[index];
 		}
 	};
@@ -1075,19 +1077,20 @@ namespace math
 		constexpr Vec4(Storage e)
 			: elements(e)
 		{}
+		constexpr Vec4(T x)
+			: elements{x, x, x, x}
+		{}
 		constexpr Vec4(T x, T y, T z, T w)
 			: elements{x, y, z, w}
 		{}
 
 		constexpr T& operator[](size_t index)
 		{
-			coreAssert(index < 4);
 			return elements[index];
 		}
 
 		constexpr const T& operator[](size_t index) const
 		{
-			coreAssert(index < 4);
 			return elements[index];
 		}
 	};
