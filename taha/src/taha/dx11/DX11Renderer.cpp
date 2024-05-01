@@ -177,8 +177,8 @@ namespace taha
 		scissor.bottom = viewport.Height;
 		m_deviceContext->RSSetScissorRects(1, &scissor);
 
-		m_deviceContext->ClearRenderTargetView(dx11Frame->m_renderTargetView.get(), &clear->color.elements.r);
-		m_deviceContext->ClearDepthStencilView(dx11Frame->m_depthStencilView.get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clear->depth, clear->stencil);
+		m_deviceContext->ClearRenderTargetView(dx11Frame->m_renderTargetView.get(), &clear->action.color[0].value.elements.r);
+		m_deviceContext->ClearDepthStencilView(dx11Frame->m_depthStencilView.get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clear->action.depth.value, clear->action.stencil.value);
 
 		dx11Frame->m_swapchain->Present(0, 0);
 	}

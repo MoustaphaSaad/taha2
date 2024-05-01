@@ -44,9 +44,9 @@ namespace taha
 			  m_depthStencilView(std::move(depthStencilView))
 		{}
 
-		Encoder createEncoderAndRecord(math::rgba clearColor, core::Allocator* allocator) override
+		Encoder createEncoderAndRecord(const FrameAction& action, core::Allocator* allocator) override
 		{
-			return Encoder{this, clearColor, allocator};
+			return Encoder{this, action, allocator};
 		}
 	};
 }

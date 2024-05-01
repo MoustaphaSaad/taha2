@@ -11,6 +11,6 @@ namespace taha
 		virtual void endEncodingAndSubmit(const core::Array<core::Unique<Command>>& commands) = 0;
 	public:
 		virtual ~Frame() = default;
-		virtual Encoder createEncoderAndRecord(math::rgba clearColor, core::Allocator* allocator) = 0;
+		virtual Encoder createEncoderAndRecord(const FrameAction& action, core::Allocator* allocator) = 0;
 	};
 }

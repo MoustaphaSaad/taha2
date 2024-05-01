@@ -4,6 +4,41 @@
 
 namespace taha
 {
+	constexpr size_t CONSTANT_MAX_COLOR_ATTACHMENT_SIZE = 4;
+
+	enum class Action
+	{
+		Clear,
+		Load,
+		DontCare,
+	};
+
+	struct FrameColorAction
+	{
+		Action action = Action::Clear;
+		math::rgba value = {0, 0, 0, 1};
+	};
+
+	struct FrameDepthAction
+	{
+		Action action = Action::Clear;
+		float value = 1.0f;
+	};
+
+	struct FrameStencilAction
+	{
+		Action action = Action::Clear;
+		uint8_t value = 0;
+	};
+
+	struct FrameAction
+	{
+		bool independentClearColor = false;
+		FrameColorAction color[CONSTANT_MAX_COLOR_ATTACHMENT_SIZE];
+		FrameDepthAction depth;
+		FrameStencilAction stencil;
+	};
+
 	class Command
 	{
 	public:
@@ -26,9 +61,7 @@ namespace taha
 	class ClearCommand: public Command
 	{
 	public:
-		math::rgba color = {0, 0, 0, 1};
-		float depth = 1.0f;
-		uint8_t stencil = 0;
+		FrameAction action;
 
 		ClearCommand()
 			: Command(Command::KIND_CLEAR)

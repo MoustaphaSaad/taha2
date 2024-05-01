@@ -16,7 +16,7 @@ namespace taha
 		core::Array<core::Unique<Command>> m_commands;
 		Frame* m_frame = nullptr;
 	public:
-		TAHA_EXPORT Encoder(Frame* frame, math::rgba clearColor, core::Allocator* allocator);
+		TAHA_EXPORT Encoder(Frame* frame, const FrameAction& action, core::Allocator* allocator);
 		Encoder(const Encoder&) = delete;
 		Encoder& operator=(const Encoder&) = delete;
 
