@@ -19,7 +19,13 @@ namespace taha
 		{}
 
 	public:
-		TAHA_EXPORT static core::Result<Engine> create(core::Allocator* allocator);
+		enum API
+		{
+			API_DX11,
+			API_VULKAN,
+		};
+
+		TAHA_EXPORT static core::Result<Engine> create(API api, core::Allocator* allocator);
 
 		TAHA_EXPORT core::Unique<Frame> createFrameForWindow(NativeWindowDesc desc);
 

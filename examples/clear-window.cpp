@@ -33,7 +33,7 @@ int main()
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
 
-	auto engineResult = taha::Engine::create(&allocator);
+	auto engineResult = taha::Engine::create(taha::Engine::API_VULKAN, &allocator);
 	if (engineResult.isError())
 	{
 		log.critical("taha::Engine::create failed, {}"_sv, engineResult.error());

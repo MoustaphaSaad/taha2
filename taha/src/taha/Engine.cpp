@@ -2,19 +2,37 @@
 
 #if TAHA_OS_WINDOWS
 #include "taha/dx11/DX11Renderer.h"
+#include "taha/vk/VkRenderer.h"
 #endif
 
 namespace taha
 {
-	core::Result<Engine> Engine::create(core::Allocator* allocator)
+	core::Result<Engine> Engine::create(API api, core::Allocator* allocator)
 	{
+		core::Unique<Renderer> renderer{};
 		#if TAHA_OS_WINDOWS
-			auto rendererResult = DX11Renderer::create(allocator);
+			switch (api)
+			{
+			case API_DX11:
+			{
+				auto rendererResult = DX11Renderer::create(allocator);
+				if (rendererResult.isError())
+					return rendererResult.releaseError();
+				renderer = rendererResult.releaseValue();
+				break;
+			}
+			case API_VULKAN:
+			{
+				auto rendererResult = VkRenderer::create(allocator);
+				if (rendererResult.isError())
+					return rendererResult.releaseError();
+				renderer = rendererResult.releaseValue();
+				break;
+			}
+			}
 		#endif
 
-		if (rendererResult.isError())
-			return rendererResult.releaseError();
-		return Engine{rendererResult.releaseValue()};
+		return Engine{std::move(renderer)};
 	}
 
 	core::Unique<Frame> Engine::createFrameForWindow(taha::NativeWindowDesc desc)

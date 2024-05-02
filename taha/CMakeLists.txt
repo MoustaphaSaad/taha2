@@ -25,6 +25,16 @@ if (WIN32)
 	target_link_libraries(taha PRIVATE d3d11 dxgi d3dcompiler dxguid)
 endif ()
 
+if (WIN32 OR (UNIX AND NOT APPLE))
+	target_sources(taha
+		PRIVATE
+			include/taha/vk/VkRenderer.h
+			src/taha/vk/VkRenderer.cpp
+	)
+	find_package(Vulkan REQUIRED)
+	target_link_libraries(taha PRIVATE Vulkan::Vulkan)
+endif ()
+
 target_link_libraries(taha PUBLIC core math)
 
 # generate exports header file
