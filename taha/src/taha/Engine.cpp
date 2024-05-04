@@ -7,7 +7,7 @@
 
 namespace taha
 {
-	core::Result<Engine> Engine::create(API api, core::Allocator* allocator)
+	core::Result<Engine> Engine::create(API api, core::Log* log, core::Allocator* allocator)
 	{
 		core::Unique<Renderer> renderer{};
 		#if TAHA_OS_WINDOWS
@@ -23,7 +23,7 @@ namespace taha
 			}
 			case API_VULKAN:
 			{
-				auto rendererResult = VkRenderer::create(allocator);
+				auto rendererResult = VkRenderer::create(log, allocator);
 				if (rendererResult.isError())
 					return rendererResult.releaseError();
 				renderer = rendererResult.releaseValue();

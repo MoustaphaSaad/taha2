@@ -33,7 +33,7 @@ int main()
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
 
-	auto engineResult = taha::Engine::create(taha::Engine::API_VULKAN, &allocator);
+	auto engineResult = taha::Engine::create(taha::Engine::API_VULKAN, &log, &allocator);
 	if (engineResult.isError())
 	{
 		log.critical("taha::Engine::create failed, {}"_sv, engineResult.error());
@@ -62,12 +62,12 @@ int main()
 	glfwMakeContextCurrent(window);
 	while (glfwWindowShouldClose(window) == false)
 	{
-		auto encoder = frame->createEncoderAndRecord({
-			.color = {
-				taha::FrameColorAction{.value = {1, 1, 0, 1}}
-			},
-		}, &allocator);
-		encoder.endEncodingAndSubmit();
+//		auto encoder = frame->createEncoderAndRecord({
+//			.color = {
+//				taha::FrameColorAction{.value = {1, 1, 0, 1}}
+//			},
+//		}, &allocator);
+//		encoder.endEncodingAndSubmit();
 
 		glfwPollEvents();
 	}

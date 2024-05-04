@@ -7,6 +7,7 @@
 
 #include <core/Result.h>
 #include <core/Unique.h>
+#include <core/Log.h>
 
 namespace taha
 {
@@ -25,7 +26,7 @@ namespace taha
 			API_VULKAN,
 		};
 
-		TAHA_EXPORT static core::Result<Engine> create(API api, core::Allocator* allocator);
+		TAHA_EXPORT static core::Result<Engine> create(API api, core::Log* log, core::Allocator* allocator);
 
 		TAHA_EXPORT core::Unique<Frame> createFrameForWindow(NativeWindowDesc desc);
 
