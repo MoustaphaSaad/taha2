@@ -209,6 +209,7 @@ namespace taha
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateInstance failed, ErrorCode({})"_sv, result);
 
+		// create debug messenger
 		auto createDebugUtilsMessengerEXTFn = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(renderer->m_instance, "vkCreateDebugUtilsMessengerEXT");
 		if (createDebugUtilsMessengerEXTFn == nullptr)
 			return core::errf(allocator, "vkGetInstanceProcAddr failed, failed to find 'vkCreateDebugUtilsMessengerEXT'"_sv);
@@ -219,19 +220,48 @@ namespace taha
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateDebugUtilsMessengerEXT failed, ErrorCode({})"_sv, result);
 
+		// choose physical device
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, nullptr);
 		if (deviceCount == 0)
 			return core::errf(allocator, "Failed to find GPUs with Vulkan support"_sv);
-		core::Array<VkPhysicalDevice> devices{allocator};
-		devices.resize_fill(deviceCount, {});
-		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, devices.begin());
+		core::Array<VkPhysicalDevice> physicalDevices{allocator};
+		physicalDevices.resize_fill(deviceCount, {});
+		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, physicalDevices.begin());
 
-		// TODO: check all devices and choose the best one
-		VkPhysicalDevice physicalDevice = devices[0];
+		for (auto device: physicalDevices)
+		{
+			uint32_t queueFamilyCount = 0;
+			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+			core::Array<VkQueueFamilyProperties> queueFamilies{allocator};
+			queueFamilies.resize_fill(queueFamilyCount, VkQueueFamilyProperties{});
+			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.begin());
+
+			for (auto family: queueFamilies)
+			{
+				if (family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				{
+					renderer->m_physicalDevice = device;
+					break;
+				}
+			}
+			if (renderer->m_physicalDevice != VK_NULL_HANDLE)
+				break;
+		}
+
+		if (renderer->m_physicalDevice == VK_NULL_HANDLE)
+			return core::errf(allocator, "cannot find suitable physical device"_sv);
+
 		VkPhysicalDeviceProperties deviceProperties;
-		vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+		vkGetPhysicalDeviceProperties(renderer->m_physicalDevice, &deviceProperties);
+		log->info("name: {}, driver version: {}.{}.{}"_sv, deviceProperties.deviceName,
+			VK_VERSION_MAJOR(deviceProperties.driverVersion),
+			VK_VERSION_MINOR(deviceProperties.driverVersion),
+			VK_VERSION_PATCH(deviceProperties.driverVersion)
+		);
 
+		// create device
 		float queuePriority = 1.0f;
 		VkDeviceQueueCreateInfo queueCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -246,7 +276,7 @@ namespace taha
 			.pQueueCreateInfos = &queueCreateInfo,
 		};
 
-		result = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &renderer->m_device);
+		result = vkCreateDevice(renderer->m_physicalDevice, &deviceCreateInfo, nullptr, &renderer->m_device);
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
 
