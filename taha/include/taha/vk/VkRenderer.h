@@ -26,6 +26,7 @@ namespace taha
 		PFN_vkDestroyDebugUtilsMessengerEXT m_destroyDebugMessengerFn = nullptr;
 		VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 		VkDevice m_device = VK_NULL_HANDLE;
+		VkQueue m_graphicsQueue = VK_NULL_HANDLE;
 
 		VkRenderer(core::Log* log, core::Allocator* allocator)
 			: m_allocator(allocator),

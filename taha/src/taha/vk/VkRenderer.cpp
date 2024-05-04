@@ -229,6 +229,7 @@ namespace taha
 		physicalDevices.resize_fill(deviceCount, {});
 		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, physicalDevices.begin());
 
+		int graphicsFamilyIndex = 0;
 		for (auto device: physicalDevices)
 		{
 			uint32_t queueFamilyCount = 0;
@@ -238,14 +239,16 @@ namespace taha
 			queueFamilies.resize_fill(queueFamilyCount, VkQueueFamilyProperties{});
 			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.begin());
 
-			for (auto family: queueFamilies)
+			for (size_t i = 0; i < queueFamilies.count(); ++i)
 			{
-				if (family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 				{
 					renderer->m_physicalDevice = device;
+					graphicsFamilyIndex = i;
 					break;
 				}
 			}
+
 			if (renderer->m_physicalDevice != VK_NULL_HANDLE)
 				break;
 		}
@@ -279,6 +282,8 @@ namespace taha
 		result = vkCreateDevice(renderer->m_physicalDevice, &deviceCreateInfo, nullptr, &renderer->m_device);
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
+
+		vkGetDeviceQueue(renderer->m_device, graphicsFamilyIndex, 0, &renderer->m_graphicsQueue);
 
 		return renderer;
 	}
