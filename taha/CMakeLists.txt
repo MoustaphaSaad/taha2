@@ -30,6 +30,8 @@ if (WIN32 OR (UNIX AND NOT APPLE))
 		PRIVATE
 			include/taha/vk/VkRenderer.h
 			src/taha/vk/VkRenderer.cpp
+			include/taha/vk/VkFrame.h
+			src/taha/vk/VkFrame.cpp
 	)
 	find_package(Vulkan REQUIRED)
 	target_link_libraries(taha PRIVATE Vulkan::Vulkan)

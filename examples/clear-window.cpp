@@ -62,12 +62,12 @@ int main()
 	glfwMakeContextCurrent(window);
 	while (glfwWindowShouldClose(window) == false)
 	{
-//		auto encoder = frame->createEncoderAndRecord({
-//			.color = {
-//				taha::FrameColorAction{.value = {1, 1, 0, 1}}
-//			},
-//		}, &allocator);
-//		encoder.endEncodingAndSubmit();
+		auto encoder = frame->createEncoderAndRecord({
+			.color = {
+				taha::FrameColorAction{.value = {1, 1, 0, 1}}
+			},
+		}, &allocator);
+		encoder.endEncodingAndSubmit();
 
 		glfwPollEvents();
 	}

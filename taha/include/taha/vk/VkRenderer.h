@@ -14,8 +14,12 @@
 
 namespace taha
 {
+	class VkFrame;
+
 	class VkRenderer: public Renderer
 	{
+		friend class VkFrame;
+
 		template<typename T, typename... TArgs>
 		friend inline core::Unique<T> core::unique_from(core::Allocator* allocator, TArgs&&... args);
 

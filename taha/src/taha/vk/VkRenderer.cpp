@@ -1,4 +1,5 @@
 #include "taha/vk/VkRenderer.h"
+#include "taha/vk/VkFrame.h"
 
 #include <core/Array.h>
 
@@ -244,7 +245,7 @@ namespace taha
 				if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 				{
 					renderer->m_physicalDevice = device;
-					graphicsFamilyIndex = i;
+					graphicsFamilyIndex = int(i);
 					break;
 				}
 			}
@@ -302,6 +303,21 @@ namespace taha
 
 	core::Unique<Frame> VkRenderer::createFrameForWindow(NativeWindowDesc desc)
 	{
+		#if TAHA_OS_WINDOWS
+		VkWin32SurfaceCreateInfoKHR createInfo {
+			.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+			.hinstance = GetModuleHandle(nullptr),
+			.hwnd = desc.windowHandle,
+		};
+
+		VkSurfaceKHR surface;
+		auto result = vkCreateWin32SurfaceKHR(m_instance, &createInfo, nullptr, &surface);
+		if (result != VK_SUCCESS)
+			return nullptr;
+
+		return core::unique_from<VkFrame>(m_allocator, this, surface);
+		#endif
+
 		return nullptr;
 	}
 
