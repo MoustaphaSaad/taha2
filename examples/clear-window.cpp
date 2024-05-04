@@ -47,6 +47,8 @@ int main()
 		return EXIT_FAILURE;
 	}
 
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
 	auto window = glfwCreateWindow(640, 480, "Clear Window", nullptr, nullptr);
 	if (window == nullptr)
 	{

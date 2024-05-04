@@ -2,6 +2,9 @@
 
 #include <core/Array.h>
 
+#if TAHA_OS_WINDOWS
+#define VK_USE_PLATFORM_WIN32_KHR 1
+#endif
 #include <vulkan/vulkan.h>
 
 namespace fmt
@@ -77,20 +80,78 @@ namespace taha
 			.apiVersion = VK_API_VERSION_1_0,
 		};
 
-		// TODO: check for available validation layers and extensions
+		// layers
 		const char* validationLayers[] = { "VK_LAYER_KHRONOS_validation" };
-		const char* extensions[] = {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_SURFACE_EXTENSION_NAME};
+
+		uint32_t availableLayersCount = 0;
+		auto result = vkEnumerateInstanceLayerProperties(&availableLayersCount, nullptr);
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkEnumerateInstanceLayerProperties failed, ErrorCode({})"_sv, result);
+
+		core::Array<VkLayerProperties> availableLayers{allocator};
+		availableLayers.resize_fill(availableLayersCount, VkLayerProperties{});
+		result = vkEnumerateInstanceLayerProperties(&availableLayersCount, availableLayers.begin());
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkEnumerateInstanceLayerProperties failed, ErrorCode({})"_sv, result);
+
+		for (auto requiredLayer: validationLayers)
+		{
+			bool found = false;
+			for (auto availableLayer: availableLayers)
+			{
+				if (core::StringView{availableLayer.layerName} == core::StringView{requiredLayer})
+				{
+					found = true;
+					break;
+				}
+			}
+			if (found == false)
+				return core::errf(allocator, "failed to find layer '{}'"_sv, requiredLayer);
+		}
+
+		// extensions
+		#if TAHA_OS_WINDOWS
+		const char* extensions[] = {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME};
+		#endif
+
+		uint32_t availableExtensionsCount = 0;
+		result = vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, nullptr);
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkEnumerateInstanceExtensionProperties failed, ErrorCode({})"_sv, result);
+
+		core::Array<VkExtensionProperties> availableExtensions{allocator};
+		availableExtensions.resize_fill(availableExtensionsCount, VkExtensionProperties{});
+		result = vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, availableExtensions.begin());
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkEnumerateInstanceExtensionProperties failed, ErrorCode({})"_sv, result);
+
+		for (auto requiredExtension: extensions)
+		{
+			bool found = false;
+			for (auto availableExtension: availableExtensions)
+			{
+				if (core::StringView{availableExtension.extensionName} == core::StringView{requiredExtension})
+				{
+					found = true;
+					break;
+				}
+			}
+			if (found == false)
+				return core::errf(allocator, "failed to find extension '{}'"_sv, requiredExtension);
+		}
+
+		// create instance
 		VkInstanceCreateInfo createInfo{
 			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 			.pApplicationInfo = &appInfo,
-			.enabledLayerCount = 1,
+			.enabledLayerCount = sizeof(validationLayers) / sizeof(*validationLayers),
 			.ppEnabledLayerNames = validationLayers,
-			.enabledExtensionCount = 2,
+			.enabledExtensionCount = sizeof(extensions) / sizeof(*extensions),
 			.ppEnabledExtensionNames = extensions,
 		};
 
 		VkInstance instance{};
-		auto result = vkCreateInstance(&createInfo, nullptr, &instance);
+		result = vkCreateInstance(&createInfo, nullptr, &instance);
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateInstance failed, ErrorCode({})"_sv, result);
 
