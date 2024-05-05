@@ -117,6 +117,8 @@ namespace taha
 		return VK_FALSE;
 	}
 
+	constexpr const char* REQUIRED_DEVICE_EXTENSIONS[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
 	static bool checkPhysicalDeviceExtensions(VkPhysicalDevice device, core::Allocator* allocator)
 	{
 		uint32_t extensionCount = 0;
@@ -130,11 +132,17 @@ namespace taha
 		if (res != VK_SUCCESS)
 			return false;
 
-		int requiredExtensionsCount = 1;
+		int requiredExtensionsCount = sizeof(REQUIRED_DEVICE_EXTENSIONS) / sizeof(*REQUIRED_DEVICE_EXTENSIONS);
 		for (auto extension: availableExtensions)
 		{
-			if (core::StringView{extension.extensionName} == core::StringView{VK_KHR_SWAPCHAIN_EXTENSION_NAME})
-				--requiredExtensionsCount;
+			for (auto requiredExtension: REQUIRED_DEVICE_EXTENSIONS)
+			{
+				if (core::StringView{extension.extensionName} == core::StringView{requiredExtension})
+				{
+					--requiredExtensionsCount;
+					break;
+				}
+			}
 		}
 
 		return requiredExtensionsCount == 0;
@@ -397,6 +405,8 @@ namespace taha
 			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 			.queueCreateInfoCount = uint32_t(queueCreateInfos.count()),
 			.pQueueCreateInfos = queueCreateInfos.begin(),
+			.enabledExtensionCount = sizeof(REQUIRED_DEVICE_EXTENSIONS) / sizeof(*REQUIRED_DEVICE_EXTENSIONS),
+			.ppEnabledExtensionNames = REQUIRED_DEVICE_EXTENSIONS,
 		};
 
 		result = vkCreateDevice(renderer->m_physicalDevice, &deviceCreateInfo, nullptr, &renderer->m_device);

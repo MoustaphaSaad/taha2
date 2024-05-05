@@ -1,16 +1,16 @@
 #pragma once
 
+#include "core/Array.h"
+#include "core/Assert.h"
 #include "core/Exports.h"
 #include "core/Rune.h"
-#include "core/Array.h"
 #include "core/Span.h"
-#include "core/Assert.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
 
-#include <cstring>
 #include <cstdint>
+#include <cstring>
 
 namespace core
 {
@@ -20,11 +20,9 @@ namespace core
 	{
 		const char* m_ptr = nullptr;
 		Rune m_rune;
+
 	public:
-		RuneIterator(const char* ptr, Rune rune)
-			: m_ptr(ptr)
-			, m_rune(rune)
-		{}
+		RuneIterator(const char* ptr, Rune rune): m_ptr(ptr), m_rune(rune) {}
 
 		RuneIterator& operator++()
 		{
@@ -50,15 +48,21 @@ namespace core
 	{
 		const char* m_begin = nullptr;
 		const char* m_end = nullptr;
+
 	public:
-		StringRunes(const char* begin, const char* end)
-			: m_begin(begin)
-			, m_end(end)
-		{}
+		StringRunes(const char* begin, const char* end): m_begin(begin), m_end(end) {}
 
 		RuneIterator begin() const { return RuneIterator(m_begin, Rune::decode(m_begin)); }
 		RuneIterator end() const { return RuneIterator(m_end, Rune{}); }
 	};
+
+	constexpr inline size_t strlen(const char* start)
+	{
+		auto end = start;
+		while (*end != '\0')
+			++end;
+		return end - start;
+	}
 
 	class StringView
 	{
@@ -78,46 +82,30 @@ namespace core
 		static RabinKarpState hashRabinKarpReverse(StringView v);
 		static RabinKarpState hashRabinKarpIgnoreCase(StringView v);
 		CORE_EXPORT static int cmp(StringView a, StringView b);
+
 	public:
 		StringView() = default;
 
-		explicit StringView(const char* ptr)
+		explicit constexpr StringView(const char* ptr)
 		{
 			m_begin = ptr;
-			m_count = ::strlen(ptr);
+			m_count = strlen(ptr);
 		}
 
-		StringView(const char* begin, size_t count)
-			: m_begin(begin)
-			, m_count(count)
-		{}
+		StringView(const char* begin, size_t count): m_begin(begin), m_count(count) {}
 
-		StringView(const char* begin, const char* end)
-			: m_begin(begin)
-			, m_count(end - begin)
+		StringView(const char* begin, const char* end): m_begin(begin), m_count(end - begin)
 		{
 			coreAssert(begin <= end);
 		}
 
-		StringView(const Span<const std::byte>& span)
-			: m_begin((const char*)span.data())
-			, m_count(span.count())
-		{}
+		StringView(const Span<const std::byte>& span): m_begin((const char*)span.data()), m_count(span.count()) {}
 
-		StringView(const Span<std::byte>& span)
-			: m_begin((const char*)span.data())
-			, m_count(span.count())
-		{}
+		StringView(const Span<std::byte>& span): m_begin((const char*)span.data()), m_count(span.count()) {}
 
-		operator Span<std::byte>() const
-		{
-			return Span<std::byte>{(std::byte*)m_begin, m_count};
-		}
+		operator Span<std::byte>() const { return Span<std::byte>{(std::byte*)m_begin, m_count}; }
 
-		operator Span<const std::byte>() const
-		{
-			return Span<const std::byte>{(std::byte*)m_begin, m_count};
-		}
+		operator Span<const std::byte>() const { return Span<const std::byte>{(std::byte*)m_begin, m_count}; }
 
 		const char& operator[](size_t i) const
 		{
@@ -159,15 +147,9 @@ namespace core
 			return StringView{m_begin + start, end - start};
 		}
 
-		StringView sliceRight(size_t start) const
-		{
-			return slice(start, m_count);
-		}
+		StringView sliceRight(size_t start) const { return slice(start, m_count); }
 
-		StringView sliceLeft(size_t start) const
-		{
-			return slice(0, start);
-		}
+		StringView sliceLeft(size_t start) const { return slice(0, start); }
 
 		CORE_EXPORT Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const;
 
@@ -205,8 +187,7 @@ namespace core
 			return sliceRight(m_count - other.m_count).equalsIgnoreCase(other);
 		}
 
-		template<typename TFunc>
-		StringView trimLeftPredicate(TFunc&& predicate) const
+		template <typename TFunc> StringView trimLeftPredicate(TFunc&& predicate) const
 		{
 			auto self = *this;
 
@@ -234,8 +215,7 @@ namespace core
 
 		StringView trimLeft() const;
 
-		template<typename TFunc>
-		StringView trimRightPredicate(TFunc&& predicate) const
+		template <typename TFunc> StringView trimRightPredicate(TFunc&& predicate) const
 		{
 			auto self = *this;
 
@@ -277,8 +257,7 @@ namespace core
 
 		StringView trimRight() const;
 
-		template<typename TFunc>
-		StringView trimPredicate(TFunc&& predicate) const
+		template <typename TFunc> StringView trimPredicate(TFunc&& predicate) const
 		{
 			return trimLeftPredicate(predicate).trimRightPredicate(predicate);
 		}
@@ -294,24 +273,15 @@ namespace core
 	};
 }
 
-inline static core::StringView operator "" _sv(const char* ptr, size_t len)
-{
-	return core::StringView(ptr, len);
-}
+inline static core::StringView operator"" _sv(const char* ptr, size_t len) { return core::StringView(ptr, len); }
 
 namespace fmt
 {
-	template<>
-	struct formatter<core::StringView>
+	template <> struct formatter<core::StringView>
 	{
-		template<typename ParseContext>
-		constexpr auto parse(ParseContext& ctx)
-		{
-			return ctx.begin();
-		}
+		template <typename ParseContext> constexpr auto parse(ParseContext& ctx) { return ctx.begin(); }
 
-		template<typename FormatContext>
-		auto format(const core::StringView& str, FormatContext& ctx)
+		template <typename FormatContext> auto format(const core::StringView& str, FormatContext& ctx)
 		{
 			return format_to(ctx.out(), fmt::runtime("{}"), fmt::string_view{str.data(), str.count()});
 		}
