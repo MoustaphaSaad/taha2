@@ -118,6 +118,47 @@ namespace taha
 		return VK_FALSE;
 	}
 
+	struct SwapchainSupport
+	{
+		VkSurfaceCapabilitiesKHR capabilities = {};
+		core::Array<VkSurfaceFormatKHR> formats;
+		core::Array<VkPresentModeKHR> presentModes;
+
+		SwapchainSupport(core::Allocator* allocator): formats(allocator), presentModes(allocator) {}
+	};
+
+	static core::Result<SwapchainSupport>
+	querySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR dummySurface, core::Allocator* allocator)
+	{
+		SwapchainSupport support{allocator};
+		auto result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, dummySurface, &support.capabilities);
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed, ErrorCode({})"_sv, result);
+
+		uint32_t formatCount{};
+		result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, dummySurface, &formatCount, nullptr);
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkGetPhysicalDeviceSurfaceFormatsKHR failed, ErrorCode({})"_sv, result);
+
+		support.formats.resize_fill(formatCount, VkSurfaceFormatKHR{});
+		result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, dummySurface, &formatCount, support.formats.data());
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkGetPhysicalDeviceSurfaceFormatsKHR failed, ErrorCode({})"_sv, result);
+
+		uint32_t presentModeCount{};
+		result = vkGetPhysicalDeviceSurfacePresentModesKHR(device, dummySurface, &presentModeCount, nullptr);
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkGetPhysicalDeviceSurfacePresentModesKHR failed, ErrorCode({})"_sv, result);
+
+		support.presentModes.resize_fill(presentModeCount, VkPresentModeKHR{});
+		result = vkGetPhysicalDeviceSurfacePresentModesKHR(
+			device, dummySurface, &presentModeCount, support.presentModes.data());
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkGetPhysicalDeviceSurfacePresentModesKHR failed, ErrorCode({})"_sv, result);
+
+		return support;
+	}
+
 	constexpr const char* REQUIRED_DEVICE_EXTENSIONS[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
 	static bool checkPhysicalDeviceExtensions(VkPhysicalDevice device, core::Allocator* allocator)
@@ -129,7 +170,7 @@ namespace taha
 
 		core::Array<VkExtensionProperties> availableExtensions{allocator};
 		availableExtensions.resize_fill(extensionCount, VkExtensionProperties{});
-		res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.begin());
+		res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 		if (res != VK_SUCCESS)
 			return false;
 
@@ -154,25 +195,34 @@ namespace taha
 		int graphicsFamilyIndex = -1;
 		int presentationFamilyIndex = -1;
 		bool requiredExtensionsSupported = false;
+		bool swapchainSupported = false;
 
 		bool suitable() const
 		{
-			return graphicsFamilyIndex != -1 && presentationFamilyIndex != -1 && requiredExtensionsSupported;
+			return (
+				graphicsFamilyIndex != -1 && presentationFamilyIndex != -1 && requiredExtensionsSupported &&
+				swapchainSupported);
 		}
 	};
 
 	static PhysicalDeviceCheckResult
 	checkPhysicalDevice(VkPhysicalDevice device, VkSurfaceKHR dummySurface, core::Allocator* allocator)
 	{
+		auto swapchainSupportResult = querySwapchainSupport(device, dummySurface, allocator);
+		if (swapchainSupportResult.isError())
+			return PhysicalDeviceCheckResult{};
+		auto swapchainSupport = swapchainSupportResult.releaseValue();
+
 		PhysicalDeviceCheckResult res{};
 		res.requiredExtensionsSupported = checkPhysicalDeviceExtensions(device, allocator);
+		res.swapchainSupported = swapchainSupport.formats.count() > 0 && swapchainSupport.presentModes.count() > 0;
 
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
 		core::Array<VkQueueFamilyProperties> queueFamilies{allocator};
 		queueFamilies.resize_fill(queueFamilyCount, VkQueueFamilyProperties{});
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.begin());
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
 		for (uint32_t i = 0; i < queueFamilyCount; ++i)
 		{
@@ -217,7 +267,7 @@ namespace taha
 
 		core::Array<VkLayerProperties> availableLayers{allocator};
 		availableLayers.resize_fill(availableLayersCount, VkLayerProperties{});
-		result = vkEnumerateInstanceLayerProperties(&availableLayersCount, availableLayers.begin());
+		result = vkEnumerateInstanceLayerProperties(&availableLayersCount, availableLayers.data());
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkEnumerateInstanceLayerProperties failed, ErrorCode({})"_sv, result);
 
@@ -249,8 +299,7 @@ namespace taha
 
 		core::Array<VkExtensionProperties> availableExtensions{allocator};
 		availableExtensions.resize_fill(availableExtensionsCount, VkExtensionProperties{});
-		result =
-			vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, availableExtensions.begin());
+		result = vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, availableExtensions.data());
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkEnumerateInstanceExtensionProperties failed, ErrorCode({})"_sv, result);
 
@@ -358,7 +407,7 @@ namespace taha
 			return core::errf(allocator, "Failed to find GPUs with Vulkan support"_sv);
 		core::Array<VkPhysicalDevice> physicalDevices{allocator};
 		physicalDevices.resize_fill(deviceCount, {});
-		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, physicalDevices.begin());
+		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, physicalDevices.data());
 
 		PhysicalDeviceCheckResult physicalDeviceCheckResult{};
 		for (auto device: physicalDevices)
@@ -408,7 +457,7 @@ namespace taha
 		VkDeviceCreateInfo deviceCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 			.queueCreateInfoCount = uint32_t(queueCreateInfos.count()),
-			.pQueueCreateInfos = queueCreateInfos.begin(),
+			.pQueueCreateInfos = queueCreateInfos.data(),
 			.enabledExtensionCount = sizeof(REQUIRED_DEVICE_EXTENSIONS) / sizeof(*REQUIRED_DEVICE_EXTENSIONS),
 			.ppEnabledExtensionNames = REQUIRED_DEVICE_EXTENSIONS,
 		};

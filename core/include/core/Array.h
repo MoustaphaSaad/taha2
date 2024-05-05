@@ -3,14 +3,13 @@
 #include "core/Allocator.h"
 #include "core/Assert.h"
 
-#include <type_traits>
 #include <new>
+#include <type_traits>
 #include <utility>
 
 namespace core
 {
-	template<typename T>
-	class Array
+	template <typename T> class Array
 	{
 		Allocator* m_allocator = nullptr;
 		T* m_ptr = nullptr;
@@ -88,19 +87,11 @@ namespace core
 		}
 
 	public:
-		explicit Array(Allocator* a)
-			: m_allocator(a)
-		{}
+		explicit Array(Allocator* a): m_allocator(a) {}
 
-		Array(const Array& other)
-		{
-			copyFrom(other);
-		}
+		Array(const Array& other) { copyFrom(other); }
 
-		Array(Array&& other)
-		{
-			moveFrom(std::move(other));
-		}
+		Array(Array&& other) { moveFrom(std::move(other)); }
 
 		Array& operator=(const Array& other)
 		{
@@ -116,10 +107,7 @@ namespace core
 			return *this;
 		}
 
-		~Array()
-		{
-			destroy();
-		}
+		~Array() { destroy(); }
 
 		T& operator[](size_t i)
 		{
@@ -153,8 +141,7 @@ namespace core
 			++m_count;
 		}
 
-		template<typename ... TArgs>
-		void emplace(TArgs&& ... args)
+		template <typename... TArgs> void emplace(TArgs&&... args)
 		{
 			ensureSpaceExists();
 			m_allocator->commit(m_ptr + m_count, sizeof(T));
@@ -178,10 +165,7 @@ namespace core
 			m_count = 0;
 		}
 
-		void reserve(size_t added_count)
-		{
-			ensureSpaceExists(added_count);
-		}
+		void reserve(size_t added_count) { ensureSpaceExists(added_count); }
 
 		void resize(size_t new_count)
 		{
@@ -189,7 +173,7 @@ namespace core
 			{
 				ensureSpaceExists(new_count - m_count);
 				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizeof(T));
-				for (;m_count < new_count; ++m_count)
+				for (; m_count < new_count; ++m_count)
 					::new (m_ptr + m_count) T();
 			}
 			else if (new_count < m_count)
@@ -207,7 +191,7 @@ namespace core
 			{
 				ensureSpaceExists(new_count - m_count);
 				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizeof(T));
-				for (;m_count < new_count; ++m_count)
+				for (; m_count < new_count; ++m_count)
 					::new (m_ptr + m_count) T(value);
 			}
 			else
@@ -242,24 +226,15 @@ namespace core
 			m_ptr = new_ptr;
 		}
 
-		T* begin()
-		{
-			return m_ptr;
-		}
+		T* data() { return m_ptr; }
+		const T* data() const { return m_ptr; }
 
-		const T* begin() const
-		{
-			return m_ptr;
-		}
+		T* begin() { return m_ptr; }
 
-		T* end()
-		{
-			return m_ptr + m_count;
-		}
+		const T* begin() const { return m_ptr; }
 
-		const T* end() const
-		{
-			return m_ptr + m_count;
-		}
+		T* end() { return m_ptr + m_count; }
+
+		const T* end() const { return m_ptr + m_count; }
 	};
 }
