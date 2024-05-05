@@ -1,4 +1,5 @@
 BasedOnStyle: LLVM
+AccessModifierOffset: -4
 AlignAfterOpenBracket: AlwaysBreak
 BinPackArguments: false
 BinPackParameters: false

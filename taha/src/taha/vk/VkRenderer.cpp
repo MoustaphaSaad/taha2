@@ -5,17 +5,11 @@
 
 namespace fmt
 {
-	template<>
-	struct formatter<VkResult>
+	template <> struct formatter<VkResult>
 	{
-		template<typename ParseContext>
-		constexpr auto parse(ParseContext& ctx)
-		{
-			return ctx.begin();
-		}
+		template <typename ParseContext> constexpr auto parse(ParseContext& ctx) { return ctx.begin(); }
 
-		template<typename FormatContext>
-		auto format(VkResult r, FormatContext& ctx)
+		template <typename FormatContext> auto format(VkResult r, FormatContext& ctx)
 		{
 			switch (r)
 			{
@@ -65,6 +59,21 @@ namespace fmt
 
 namespace taha
 {
+#if TAHA_OS_WINDOWS
+	LRESULT CALLBACK dummyWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+	{
+		switch (uMsg)
+		{
+		case WM_CLOSE:
+			PostQuitMessage(0);
+			break;
+		default:
+			return DefWindowProc(hwnd, uMsg, wParam, lParam);
+		}
+		return 0;
+	}
+#endif
+
 	VkBool32 VKAPI_CALL VkRenderer::debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,
@@ -108,7 +117,46 @@ namespace taha
 		return VK_FALSE;
 	}
 
-	core::Result<core::Unique<VkRenderer>> VkRenderer::create(core::Log* log, core::Allocator *allocator)
+	struct PhysicalDeviceCheckResult
+	{
+		int graphicsFamilyIndex = -1;
+		int presentationFamilyIndex = -1;
+
+		bool suitable() const { return graphicsFamilyIndex != -1 && presentationFamilyIndex != -1; }
+	};
+
+	static PhysicalDeviceCheckResult
+	checkPhysicalDevice(VkPhysicalDevice device, VkSurfaceKHR dummySurface, core::Allocator* allocator)
+	{
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		core::Array<VkQueueFamilyProperties> queueFamilies{allocator};
+		queueFamilies.resize_fill(queueFamilyCount, VkQueueFamilyProperties{});
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.begin());
+
+		PhysicalDeviceCheckResult res{};
+		for (uint32_t i = 0; i < queueFamilyCount; ++i)
+		{
+			if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				res.graphicsFamilyIndex = int(i);
+
+			VkBool32 presentationSupported = false;
+			auto result = vkGetPhysicalDeviceSurfaceSupportKHR(device, i, dummySurface, &presentationSupported);
+			if (result != VK_SUCCESS)
+				continue;
+
+			if (presentationSupported)
+				res.presentationFamilyIndex = int(i);
+
+			if (res.suitable())
+				break;
+		}
+
+		return res;
+	}
+
+	core::Result<core::Unique<VkRenderer>> VkRenderer::create(core::Log* log, core::Allocator* allocator)
 	{
 		auto renderer = unique_from<VkRenderer>(allocator, log, allocator);
 
@@ -122,7 +170,7 @@ namespace taha
 		};
 
 		// layers
-		const char* validationLayers[] = { "VK_LAYER_KHRONOS_validation" };
+		const char* validationLayers[] = {"VK_LAYER_KHRONOS_validation"};
 
 		uint32_t availableLayersCount = 0;
 		auto result = vkEnumerateInstanceLayerProperties(&availableLayersCount, nullptr);
@@ -150,14 +198,11 @@ namespace taha
 				return core::errf(allocator, "failed to find layer '{}'"_sv, requiredLayer);
 		}
 
-		// extensions
-		#if TAHA_OS_WINDOWS
+// extensions
+#if TAHA_OS_WINDOWS
 		const char* extensions[] = {
-			VK_KHR_SURFACE_EXTENSION_NAME,
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-		};
-		#endif
+			VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
+#endif
 
 		uint32_t availableExtensionsCount = 0;
 		result = vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, nullptr);
@@ -166,7 +211,8 @@ namespace taha
 
 		core::Array<VkExtensionProperties> availableExtensions{allocator};
 		availableExtensions.resize_fill(availableExtensionsCount, VkExtensionProperties{});
-		result = vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, availableExtensions.begin());
+		result =
+			vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, availableExtensions.begin());
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkEnumerateInstanceExtensionProperties failed, ErrorCode({})"_sv, result);
 
@@ -188,12 +234,13 @@ namespace taha
 		// debug messenger
 		VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-			.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-				VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+			.messageSeverity =
+				VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+			.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+						   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+						   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 			.pfnUserCallback = VkRenderer::debugCallback,
-			.pUserData = renderer.get()
-		};
+			.pUserData = renderer.get()};
 
 		// create instance
 		VkInstanceCreateInfo createInfo{
@@ -211,15 +258,57 @@ namespace taha
 			return core::errf(allocator, "vkCreateInstance failed, ErrorCode({})"_sv, result);
 
 		// create debug messenger
-		auto createDebugUtilsMessengerEXTFn = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(renderer->m_instance, "vkCreateDebugUtilsMessengerEXT");
+		auto createDebugUtilsMessengerEXTFn = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+			renderer->m_instance, "vkCreateDebugUtilsMessengerEXT");
 		if (createDebugUtilsMessengerEXTFn == nullptr)
-			return core::errf(allocator, "vkGetInstanceProcAddr failed, failed to find 'vkCreateDebugUtilsMessengerEXT'"_sv);
-		renderer->m_destroyDebugMessengerFn = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(renderer->m_instance, "vkDestroyDebugUtilsMessengerEXT");
+			return core::errf(
+				allocator, "vkGetInstanceProcAddr failed, failed to find 'vkCreateDebugUtilsMessengerEXT'"_sv);
+		renderer->m_destroyDebugMessengerFn = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+			renderer->m_instance, "vkDestroyDebugUtilsMessengerEXT");
 		if (renderer->m_destroyDebugMessengerFn == nullptr)
-			return core::errf(allocator, "vkGetInstanceProcAddr failed, failed to find 'vkDestroyDebugUtilsMessengerEXT'"_sv);
-		result = createDebugUtilsMessengerEXTFn(renderer->m_instance, &debugMessengerCreateInfo, nullptr, &renderer->m_debugMessenger);
+			return core::errf(
+				allocator, "vkGetInstanceProcAddr failed, failed to find 'vkDestroyDebugUtilsMessengerEXT'"_sv);
+		result = createDebugUtilsMessengerEXTFn(
+			renderer->m_instance, &debugMessengerCreateInfo, nullptr, &renderer->m_debugMessenger);
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateDebugUtilsMessengerEXT failed, ErrorCode({})"_sv, result);
+
+#if TAHA_OS_WINDOWS
+		constexpr TCHAR CLASS_NAME[] = L"DummyWindowClass";
+		WNDCLASSEX windowClass{};
+		windowClass.cbSize = sizeof(windowClass);
+		windowClass.lpfnWndProc = dummyWindowProc;
+		windowClass.hInstance = GetModuleHandle(nullptr);
+		windowClass.lpszClassName = CLASS_NAME;
+		RegisterClassEx(&windowClass);
+
+		auto dummyHwnd = CreateWindowEx(
+			0,
+			CLASS_NAME,
+			L"Dummy Window",
+			WS_OVERLAPPEDWINDOW,
+			CW_USEDEFAULT,
+			CW_USEDEFAULT,
+			CW_USEDEFAULT,
+			CW_USEDEFAULT,
+			nullptr,
+			nullptr,
+			GetModuleHandle(nullptr),
+			nullptr);
+		if (dummyHwnd == nullptr)
+			return core::errf(allocator, "CreateWindowEx failed, ErrorCode({})"_sv, GetLastError());
+
+		VkWin32SurfaceCreateInfoKHR dummySurfaceCreateInfo{
+			.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+			.hinstance = GetModuleHandle(nullptr),
+			.hwnd = dummyHwnd,
+		};
+
+		VkSurfaceKHR dummySurface;
+		result = vkCreateWin32SurfaceKHR(renderer->m_instance, &dummySurfaceCreateInfo, nullptr, &dummySurface);
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkCreateWin32SurfaceKHR failed, ErrorCode({})"_sv, result);
+#endif
 
 		// choose physical device
 		uint32_t deviceCount = 0;
@@ -230,28 +319,15 @@ namespace taha
 		physicalDevices.resize_fill(deviceCount, {});
 		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, physicalDevices.begin());
 
-		int graphicsFamilyIndex = 0;
+		PhysicalDeviceCheckResult physicalDeviceCheckResult{};
 		for (auto device: physicalDevices)
 		{
-			uint32_t queueFamilyCount = 0;
-			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-
-			core::Array<VkQueueFamilyProperties> queueFamilies{allocator};
-			queueFamilies.resize_fill(queueFamilyCount, VkQueueFamilyProperties{});
-			vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.begin());
-
-			for (size_t i = 0; i < queueFamilies.count(); ++i)
+			physicalDeviceCheckResult = checkPhysicalDevice(device, dummySurface, allocator);
+			if (physicalDeviceCheckResult.suitable())
 			{
-				if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-				{
-					renderer->m_physicalDevice = device;
-					graphicsFamilyIndex = int(i);
-					break;
-				}
-			}
-
-			if (renderer->m_physicalDevice != VK_NULL_HANDLE)
+				renderer->m_physicalDevice = device;
 				break;
+			}
 		}
 
 		if (renderer->m_physicalDevice == VK_NULL_HANDLE)
@@ -259,32 +335,50 @@ namespace taha
 
 		VkPhysicalDeviceProperties deviceProperties;
 		vkGetPhysicalDeviceProperties(renderer->m_physicalDevice, &deviceProperties);
-		log->info("name: {}, driver version: {}.{}.{}"_sv, deviceProperties.deviceName,
+		log->info(
+			"name: {}, driver version: {}.{}.{}"_sv,
+			deviceProperties.deviceName,
 			VK_VERSION_MAJOR(deviceProperties.driverVersion),
 			VK_VERSION_MINOR(deviceProperties.driverVersion),
-			VK_VERSION_PATCH(deviceProperties.driverVersion)
-		);
+			VK_VERSION_PATCH(deviceProperties.driverVersion));
 
 		// create device
+		int uniqueQueues[2] = {physicalDeviceCheckResult.graphicsFamilyIndex, -1};
+		size_t uniqueQueuesCount = 1;
+		if (physicalDeviceCheckResult.presentationFamilyIndex != physicalDeviceCheckResult.graphicsFamilyIndex)
+		{
+			uniqueQueues[1] = physicalDeviceCheckResult.presentationFamilyIndex;
+			++uniqueQueuesCount;
+		}
+
 		float queuePriority = 1.0f;
-		VkDeviceQueueCreateInfo queueCreateInfo{
-			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-			.queueFamilyIndex = 0,
-			.queueCount = 1,
-			.pQueuePriorities = &queuePriority,
-		};
+		core::Array<VkDeviceQueueCreateInfo> queueCreateInfos{allocator};
+		for (size_t i = 0; i < uniqueQueuesCount; ++i)
+		{
+			VkDeviceQueueCreateInfo queueCreateInfo{
+				.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+				.queueFamilyIndex = uint32_t(uniqueQueues[i]),
+				.queueCount = 1,
+				.pQueuePriorities = &queuePriority,
+			};
+			queueCreateInfos.push(queueCreateInfo);
+		}
 
 		VkDeviceCreateInfo deviceCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			.queueCreateInfoCount = 1,
-			.pQueueCreateInfos = &queueCreateInfo,
+			.queueCreateInfoCount = uint32_t(queueCreateInfos.count()),
+			.pQueueCreateInfos = queueCreateInfos.begin(),
 		};
 
 		result = vkCreateDevice(renderer->m_physicalDevice, &deviceCreateInfo, nullptr, &renderer->m_device);
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
 
-		vkGetDeviceQueue(renderer->m_device, graphicsFamilyIndex, 0, &renderer->m_graphicsQueue);
+		vkGetDeviceQueue(
+			renderer->m_device, physicalDeviceCheckResult.graphicsFamilyIndex, 0, &renderer->m_graphicsQueue);
+
+		vkGetDeviceQueue(
+			renderer->m_device, physicalDeviceCheckResult.presentationFamilyIndex, 0, &renderer->m_presentQueue);
 
 		return renderer;
 	}
@@ -303,8 +397,8 @@ namespace taha
 
 	core::Unique<Frame> VkRenderer::createFrameForWindow(NativeWindowDesc desc)
 	{
-		#if TAHA_OS_WINDOWS
-		VkWin32SurfaceCreateInfoKHR createInfo {
+#if TAHA_OS_WINDOWS
+		VkWin32SurfaceCreateInfoKHR createInfo{
 			.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
 			.hinstance = GetModuleHandle(nullptr),
 			.hwnd = desc.windowHandle,
@@ -316,12 +410,12 @@ namespace taha
 			return nullptr;
 
 		return core::unique_from<VkFrame>(m_allocator, this, surface);
-		#endif
+#endif
 
 		return nullptr;
 	}
 
-	void VkRenderer::submitCommandsAndExecute(Frame *frame, const core::Array<core::Unique<Command>> &commands)
+	void VkRenderer::submitCommandsAndExecute(Frame* frame, const core::Array<core::Unique<Command>>& commands)
 	{
 		// do nothing
 	}
