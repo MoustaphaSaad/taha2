@@ -117,17 +117,47 @@ namespace taha
 		return VK_FALSE;
 	}
 
+	static bool checkPhysicalDeviceExtensions(VkPhysicalDevice device, core::Allocator* allocator)
+	{
+		uint32_t extensionCount = 0;
+		auto res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+		if (res != VK_SUCCESS)
+			return false;
+
+		core::Array<VkExtensionProperties> availableExtensions{allocator};
+		availableExtensions.resize_fill(extensionCount, VkExtensionProperties{});
+		res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.begin());
+		if (res != VK_SUCCESS)
+			return false;
+
+		int requiredExtensionsCount = 1;
+		for (auto extension: availableExtensions)
+		{
+			if (core::StringView{extension.extensionName} == core::StringView{VK_KHR_SWAPCHAIN_EXTENSION_NAME})
+				--requiredExtensionsCount;
+		}
+
+		return requiredExtensionsCount == 0;
+	}
+
 	struct PhysicalDeviceCheckResult
 	{
 		int graphicsFamilyIndex = -1;
 		int presentationFamilyIndex = -1;
+		bool requiredExtensionsSupported = false;
 
-		bool suitable() const { return graphicsFamilyIndex != -1 && presentationFamilyIndex != -1; }
+		bool suitable() const
+		{
+			return graphicsFamilyIndex != -1 && presentationFamilyIndex != -1 && requiredExtensionsSupported;
+		}
 	};
 
 	static PhysicalDeviceCheckResult
 	checkPhysicalDevice(VkPhysicalDevice device, VkSurfaceKHR dummySurface, core::Allocator* allocator)
 	{
+		PhysicalDeviceCheckResult res{};
+		res.requiredExtensionsSupported = checkPhysicalDeviceExtensions(device, allocator);
+
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
@@ -135,7 +165,6 @@ namespace taha
 		queueFamilies.resize_fill(queueFamilyCount, VkQueueFamilyProperties{});
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.begin());
 
-		PhysicalDeviceCheckResult res{};
 		for (uint32_t i = 0; i < queueFamilyCount; ++i)
 		{
 			if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
