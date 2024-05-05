@@ -2,6 +2,7 @@
 #include "taha/vk/VkFrame.h"
 
 #include <core/Array.h>
+#include <core/CUtils.h>
 
 namespace fmt
 {
@@ -334,6 +335,7 @@ namespace taha
 			nullptr);
 		if (dummyHwnd == nullptr)
 			return core::errf(allocator, "CreateWindowEx failed, ErrorCode({})"_sv, GetLastError());
+		coreDefer { CloseWindow(dummyHwnd); };
 
 		VkWin32SurfaceCreateInfoKHR dummySurfaceCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
@@ -345,6 +347,8 @@ namespace taha
 		result = vkCreateWin32SurfaceKHR(renderer->m_instance, &dummySurfaceCreateInfo, nullptr, &dummySurface);
 		if (result != VK_SUCCESS)
 			return core::errf(allocator, "vkCreateWin32SurfaceKHR failed, ErrorCode({})"_sv, result);
+		auto instance = renderer->m_instance;
+		coreDefer { vkDestroySurfaceKHR(instance, dummySurface, nullptr); };
 #endif
 
 		// choose physical device

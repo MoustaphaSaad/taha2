@@ -2,6 +2,7 @@
 
 #include "core/Array.h"
 #include "core/Assert.h"
+#include "core/CUtils.h"
 #include "core/Exports.h"
 #include "core/Rune.h"
 #include "core/Span.h"
@@ -55,14 +56,6 @@ namespace core
 		RuneIterator begin() const { return RuneIterator(m_begin, Rune::decode(m_begin)); }
 		RuneIterator end() const { return RuneIterator(m_end, Rune{}); }
 	};
-
-	constexpr inline size_t strlen(const char* start)
-	{
-		auto end = start;
-		while (*end != '\0')
-			++end;
-		return end - start;
-	}
 
 	class StringView
 	{
