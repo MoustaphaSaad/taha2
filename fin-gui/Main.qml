@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Effects
-import EInk
+import QtQuick.Layouts
 
 ApplicationWindow {
     width: 640
@@ -9,10 +8,25 @@ ApplicationWindow {
     visible: true
     title: qsTr("Hello World")
 
-    DefaultButton {
-        anchors.centerIn: parent
-        text: "Click Me!"
-        icon.source: "qrc:/qt/qml/Fin/GUI/gear.svg"
-        onClicked: console.log("Click!")
+    ColumnLayout {
+        anchors {
+            fill: parent
+            margins: 8
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            height: 100
+            color: "blue"
+        }
+        TransactionsTable {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            height: 50
+            color: "green"
+        }
     }
 }

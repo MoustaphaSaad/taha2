@@ -16,6 +16,7 @@ qt_add_qml_module(fin-gui
 	VERSION 1.0
 	QML_FILES
 		Main.qml
+		TransactionsTable.qml
 	RESOURCES
 	    gear.svg
 )
