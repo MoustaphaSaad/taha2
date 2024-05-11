@@ -3,6 +3,8 @@
 #if TAHA_OS_WINDOWS
 #include "taha/dx11/DX11Renderer.h"
 #include "taha/vk/VkRenderer.h"
+#elif TAHA_OS_LINUX
+#include "taha/vk/VkRenderer.h"
 #endif
 
 namespace taha
@@ -29,6 +31,27 @@ namespace taha
 				renderer = rendererResult.releaseValue();
 				break;
 			}
+			default:
+				coreUnreachable();
+				break;
+			}
+		#elif TAHA_OS_LINUX
+			switch (api)
+			{
+			case API_DX11:
+				coreUnreachableMsg("DirectX11 is not supported on linux platform");
+				break;
+			case API_VULKAN:
+			{
+				auto rendererResult = VkRenderer::create(log, allocator);
+				if (rendererResult.isError())
+					return rendererResult.releaseError();
+				renderer = rendererResult.releaseValue();
+				break;
+			}
+			default:
+				coreUnreachable();
+				break;
 			}
 		#endif
 

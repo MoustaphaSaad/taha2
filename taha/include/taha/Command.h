@@ -2,6 +2,8 @@
 
 #include <math/Vec.h>
 
+#include <cstdint>
+
 namespace taha
 {
 	constexpr size_t CONSTANT_MAX_COLOR_ATTACHMENT_SIZE = 4;

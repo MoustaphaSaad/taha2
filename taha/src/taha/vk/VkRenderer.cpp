@@ -4,6 +4,10 @@
 #include <core/Array.h>
 #include <core/CUtils.h>
 
+#if TAHA_OS_LINUX
+#include <vulkan/vulkan_wayland.h>
+#endif
+
 namespace fmt
 {
 	template <> struct formatter<VkResult>
@@ -276,6 +280,7 @@ namespace taha
 			bool found = false;
 			for (auto availableLayer: availableLayers)
 			{
+				log->trace("available layer: {}"_sv, availableLayer.layerName);
 				if (core::StringView{availableLayer.layerName} == core::StringView{requiredLayer})
 				{
 					found = true;
@@ -290,6 +295,9 @@ namespace taha
 #if TAHA_OS_WINDOWS
 		const char* extensions[] = {
 			VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
+#elif TAHA_OS_LINUX
+		const char* extensions[] = {
+			VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
 #endif
 
 		uint32_t availableExtensionsCount = 0;
@@ -308,6 +316,7 @@ namespace taha
 			bool found = false;
 			for (auto availableExtension: availableExtensions)
 			{
+				log->trace("extension: {}"_sv, availableExtension.extensionName);
 				if (core::StringView{availableExtension.extensionName} == core::StringView{requiredExtension})
 				{
 					found = true;
@@ -398,6 +407,9 @@ namespace taha
 			return core::errf(allocator, "vkCreateWin32SurfaceKHR failed, ErrorCode({})"_sv, result);
 		auto instance = renderer->m_instance;
 		coreDefer { vkDestroySurfaceKHR(instance, dummySurface, nullptr); };
+#elif TAHA_OS_LINUX
+		// TODO: handle this later
+		VkSurfaceKHR dummySurface = VK_NULL_HANDLE;
 #endif
 
 		// choose physical device
