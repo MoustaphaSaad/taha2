@@ -19,6 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        preset: [ci-test-math-debug, ci-test-math-release]
 
     steps:
     - uses: actions/checkout@v3
@@ -31,16 +32,9 @@ jobs:
 
     - uses: seanmiddleditch/gha-setup-ninja@master
 
-    - name: configure debug
-      run: cmake . --preset=ci-test-math-debug
-    - name: build debug
-      run: cmake --build build -j
-    - name: unittests debug
-      run: ./build/ci-test-math-debug/bin/test-math
-
-    - name: configure release
-      run: cmake . --preset=ci-test-math-release
-    - name: build release
-      run: cmake --build build -j
-    - name: unittests release
-      run: ./build/ci-test-math-release/bin/test-math
+    - name: Configure Tests
+      run: cmake . --preset=${{matrix.preset}}
+    - name: Build Tests
+      run: cmake --build build/${{matrix.preset}} -j
+    - name: Run Tests
+      run: ./build/${{matrix.preset}}/bin/test-math
