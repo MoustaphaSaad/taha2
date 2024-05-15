@@ -33,6 +33,7 @@ jobs:
         ssh-private-key: ${{secrets.SSH_PRIVATE_KEY}}
 
     - uses: seanmiddleditch/gha-setup-ninja@master
+    - uses: humbletim/install-vulkan-sdk@v1.1.1
 
     - name: Configure Tests
       run: cmake . --preset=${{matrix.preset}}
