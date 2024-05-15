@@ -170,16 +170,11 @@
 		{
 			"name": "emscripten-base",
 			"hidden": true,
-			"generator": "Unix Makefiles",
+			"generator": "Ninja Multi-Config",
 			"cacheVariables": {
 				"TRACY_ENABLE": "OFF",
 				"BUILD_SHARED_LIBS": "OFF",
-				"ENABLE_ASM": "OFF",
-				"CMAKE_C_FLAGS": "-D __linux__"
-			},
-			"environment": {
-				"CC": "emcc",
-				"CXX": "em++"
+				"CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
 			}
 		},
 		{

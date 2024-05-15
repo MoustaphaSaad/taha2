@@ -156,6 +156,7 @@ target_compile_definitions(core
         $<$<PLATFORM_ID:Windows>:TAHA_OS_WINDOWS=1>
         $<$<PLATFORM_ID:Linux>:TAHA_OS_LINUX=1>
         $<$<PLATFORM_ID:Darwin>:TAHA_OS_DARWIN=1>
+        $<$<PLATFORM_ID:Emscripten>:TAHA_OS_EMSCRIPTEN=1>
 )
 
 target_compile_features(core PUBLIC cxx_std_20)
