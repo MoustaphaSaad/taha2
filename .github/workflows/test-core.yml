@@ -6,11 +6,13 @@ on:
     paths:
       - 'infrastructure/core/**'
       - 'infrastructure/test-core/**'
+      - '.github/workflows/test-core.yml'
   pull_request:
     branches: [ master ]
     paths:
       - 'infrastructure/core/**'
       - 'infrastructure/test-core/**'
+      - '.github/workflows/test-core.yml'
 
 jobs:
   build:

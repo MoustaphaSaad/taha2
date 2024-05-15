@@ -6,11 +6,13 @@ on:
     paths:
       - 'renderer/math/**'
       - 'renderer/test-math/**'
+      - '.github/workflows/test-math.yml'
   pull_request:
     branches: [ master ]
     paths:
       - 'renderer/math/**'
       - 'renderer/test-math/**'
+      - '.github/workflows/test-math.yml'
 
 jobs:
   build:
