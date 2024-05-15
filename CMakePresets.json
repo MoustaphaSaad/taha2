@@ -168,6 +168,50 @@
 			}
 		},
 		{
+			"name": "ci-test-core-debug",
+			"inherits": "ninja-debug",
+			"displayName": "CI Test Core Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"DISABLE_BUDGET_APP": "ON",
+				"DISABLE_RENDERER": "ON",
+				"DISABLE_COMPILER_CONSTRUCTION": "ON"
+			}
+		},
+		{
+			"name": "ci-test-core-release",
+			"inherits": "ninja-release",
+			"displayName": "CI Test Core Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"DISABLE_BUDGET_APP": "ON",
+				"DISABLE_RENDERER": "ON",
+				"DISABLE_COMPILER_CONSTRUCTION": "ON"
+			}
+		},
+		{
+			"name": "ci-test-math-debug",
+			"inherits": "ninja-debug",
+			"displayName": "CI Test Math Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"DISABLE_BUDGET_APP": "ON",
+				"DISABLE_RENDERER": "OFF",
+				"DISABLE_COMPILER_CONSTRUCTION": "ON"
+			}
+		},
+		{
+			"name": "ci-test-math-release",
+			"inherits": "ninja-release",
+			"displayName": "CI Test Math Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"DISABLE_BUDGET_APP": "ON",
+				"DISABLE_RENDERER": "OFF",
+				"DISABLE_COMPILER_CONSTRUCTION": "ON"
+			}
+		},
+		{
 			"name": "emscripten-base",
 			"hidden": true,
 			"generator": "Unix Makefiles",

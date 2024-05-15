@@ -1,0 +1,5 @@
+add_subdirectory(math)
+add_subdirectory(test-math)
+add_subdirectory(sabre)
+add_subdirectory(taha)
+add_subdirectory(examples)

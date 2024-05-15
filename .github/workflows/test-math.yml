@@ -1,0 +1,46 @@
+name: test core
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'renderer/math/**'
+      - 'renderer/test-math/**'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'renderer/math/**'
+      - 'renderer/test-math/**'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{secrets.SSH_PRIVATE_KEY}}
+
+    - uses: seanmiddleditch/gha-setup-ninja@master
+
+    - name: configure debug
+      run: cmake . --preset=ci-test-math-debug
+    - name: build debug
+      run: cmake --build build -j
+    - name: unittests debug
+      run: ./build/ci-test-math-debug/bin/test-math
+
+    - name: configure release
+      run: cmake . --preset=ci-test-math-release
+    - name: build release
+      run: cmake --build build -j
+    - name: unittests release
+      run: ./build/ci-test-math-release/bin/test-math
