@@ -34,6 +34,11 @@ jobs:
 
     - uses: seanmiddleditch/gha-setup-ninja@master
     - uses: humbletim/install-vulkan-sdk@v1.1.1
+    - name: Set up X11 on Ubuntu
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libx11-dev libwayland-dev wayland-protocols libxkbcommon-dev xorg-dev libglu1-mesa-dev
 
     - name: Configure Tests
       run: cmake . --preset=${{matrix.preset}}
