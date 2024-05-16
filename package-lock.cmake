@@ -71,8 +71,8 @@ endif ()
 
 CPMDeclarePackage(cpptrace-lib
   NAME cpptrace-lib
-  GIT_TAG v0.5.0
-  GIT_REPOSITORY git@github.com:jeremy-rifkin/cpptrace.git
+  GIT_TAG v0.5.4-mostafa
+  GIT_REPOSITORY git@github.com:MoustaphaSaad/cpptrace.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
   OPTIONS
