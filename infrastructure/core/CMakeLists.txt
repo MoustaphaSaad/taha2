@@ -44,6 +44,7 @@ target_sources(core PRIVATE
   include/core/Lock.h
   include/core/Path.h
   include/core/CUtils.h
+  include/core/BufferedReader.h
   include/core/websocket/Handshake.h
   include/core/websocket/MessageParser.h
   include/core/websocket/Message.h
