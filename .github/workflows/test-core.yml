@@ -43,7 +43,7 @@ jobs:
       run: ./build/${{matrix.preset}}/bin/test-core
     - name: Run Client autobahn-testsuite
       run: >
-        docker run -it --rm
+        docker run --rm
         -v "${pwd}/infrastructure/test-core/autobahn-testsuite/config:/config"
         -v "${pwd}/infrastructure/test-core/autobahn-testsuite/reports:/reports"
         -p 9011:9011
