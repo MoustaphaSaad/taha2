@@ -24,8 +24,8 @@ namespace core
 				auto requiredSize = size - availableSize;
 				auto offset = m_buffer.count();
 				m_buffer.resize(m_buffer.count() + requiredSize);
-
-				m_source->read(m_buffer.data() + offset, requiredSize);
+				auto readSize = m_source->read(m_buffer.data() + offset, requiredSize);
+				m_buffer.resize(offset + readSize);
 			}
 
 			availableSize = m_buffer.count() - m_readCursor;

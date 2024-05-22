@@ -54,7 +54,7 @@ namespace core::ws
 			KIND_PONG,
 		};
 
-		KIND kind;
+		KIND kind = KIND_NONE;
 		Buffer payload;
 
 		explicit Message(Allocator* allocator)

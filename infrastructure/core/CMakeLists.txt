@@ -51,6 +51,8 @@ target_sources(core PRIVATE
   include/core/websocket/Server.h
   include/core/websocket/Client.h
   include/core/ws/Message.h
+  include/core/ws/Client.h
+  include/core/ws/Handshake.h
   src/core/StringView.cpp
   src/core/Mallocator.cpp
   src/core/FastLeak.cpp
@@ -71,6 +73,8 @@ target_sources(core PRIVATE
   src/core/websocket/Server.cpp
   src/core/websocket/Client.cpp
   src/core/ws/Message.cpp
+  src/core/ws/Client.cpp
+  src/core/ws/Handshake.cpp
 )
 
 if (WIN32)

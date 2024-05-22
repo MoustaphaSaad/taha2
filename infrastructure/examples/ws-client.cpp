@@ -6,16 +6,11 @@
 
 #include <core/FastLeak.h>
 #include <core/Log.h>
-#include <core/EventLoop.h>
-#include <core/websocket/Client.h>
-#include <core/Unique.h>
+#include <core/ws/Client.h>
 
 #include <tracy/Tracy.hpp>
 
 #include <signal.h>
-#include "core/websocket/Server.h"
-
-core::ThreadedEventLoop* EVENT_LOOP = nullptr;
 
 static const char* TESTS[] = {
 	"1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.1.5", "1.1.6", "1.1.7", "1.1.8",
@@ -63,208 +58,87 @@ static const char* TESTS[] = {
 	"10.1.1"
 };
 
+bool RUNNING = true;
+
 void signalHandler(int signal)
 {
 	if (signal == SIGINT)
-		EVENT_LOOP->stop();
+		RUNNING = false;
 }
 
-class TestFinishedEvent: public core::Event
-{};
-
-class ClientHandler: public core::EventThread
+core::HumanError updateReport(core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
 {
-	core::Allocator* m_allocator = nullptr;
-	core::Shared<core::EventThread> m_testDriver;
-public:
-	ClientHandler(core::EventLoop* loop, core::Shared<core::EventThread> testDriver, core::Allocator* allocator)
-		: core::EventThread(loop),
-		  m_allocator(allocator),
-		  m_testDriver(std::move(testDriver))
-	{}
+	auto url = core::strf(allocator, "{}/updateReports?agent=taha2"_sv, baseUrl);
+	auto clientResult = core::ws::Client::connect(url, 4069ULL, 64ULL * 1024ULL * 1024ULL, log, allocator);
+	if (clientResult.isError())
+		return clientResult.releaseError();
+	auto client = clientResult.releaseValue();
 
-	core::HumanError handle(core::Event* event) override
+	while (RUNNING)
 	{
-		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
+		auto messageResult = client.readMessage();
+		if (messageResult.isError())
+			return messageResult.releaseError();
+		auto message = messageResult.releaseValue();
+
+		if (message.kind == core::ws::Message::KIND_CLOSE)
 		{
-			ZoneScopedN("NewConnection");
-			return newConn->client()->startReadingMessages(sharedFromThis());
+			return client.handleMessage(message);
 		}
-		else if (auto messageEvent = dynamic_cast<core::websocket::MessageEvent*>(event))
+		else
 		{
-			ZoneScopedN("MessageEvent");
-			if (messageEvent->message().type == core::websocket::Message::TYPE_TEXT)
-			{
-				return messageEvent->client()->writeText(core::StringView{messageEvent->message().payload});
-			}
-			else if (messageEvent->message().type == core::websocket::Message::TYPE_BINARY)
-			{
-				return messageEvent->client()->writeBinary(core::Span<const std::byte>{messageEvent->message().payload});
-			}
-			else
-			{
-				return messageEvent->handle();
-			}
+			if (auto err = client.handleMessage(message))
+				return err;
 		}
-		else if (auto errorEvent = dynamic_cast<core::websocket::ErrorEvent*>(event))
-		{
-			ZoneScopedN("ErrorEvent");
-			return errorEvent->handle();
-		}
-		else if (auto disconnected = dynamic_cast<core::websocket::DisconnectedEvent*>(event))
-		{
-			ZoneScopedN("DisconnectedEvent");
-			auto testFinished = unique_from<TestFinishedEvent>(m_allocator);
-			(void)m_testDriver->send(std::move(testFinished));
-			return stop();
-		}
-		return {};
 	}
-};
 
-class ReportUpdatedEvent: public core::Event
-{};
+	return {};
+}
 
-class UpdateReportHandler: public core::EventThread
+core::HumanError runTest(core::StringView testname, core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
 {
-	core::Allocator* m_allocator = nullptr;
-	core::Shared<core::EventThread> m_testDriver;
-public:
-	UpdateReportHandler(core::EventLoop* loop, core::Shared<core::EventThread> testDriver, core::Allocator* allocator)
-		: core::EventThread(loop),
-		  m_allocator(allocator),
-		  m_testDriver(std::move(testDriver))
-	{}
+	auto url = core::strf(allocator, "{}/runCase?casetuple={}&agent=taha2"_sv, baseUrl, testname);
+	auto clientResult = core::ws::Client::connect(url, 4069ULL, 64ULL * 1024ULL * 1024ULL, log, allocator);
+	if (clientResult.isError())
+		return clientResult.releaseError();
+	auto client = clientResult.releaseValue();
 
-	core::HumanError handle(core::Event* event) override
+	while (RUNNING)
 	{
-		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
-		{
-			ZoneScopedN("NewConnection");
-			return newConn->client()->startReadingMessages(sharedFromThis());
-		}
-		else if (auto messageEvent = dynamic_cast<core::websocket::MessageEvent*>(event))
-		{
-			ZoneScopedN("MessageEvent");
-			return messageEvent->handle();
-		}
-		else if (auto errorEvent = dynamic_cast<core::websocket::ErrorEvent*>(event))
-		{
-			ZoneScopedN("ErrorEvent");
-			return errorEvent->handle();
-		}
-		else if (auto disconnected = dynamic_cast<core::websocket::DisconnectedEvent*>(event))
-		{
-			ZoneScopedN("DisconnectedEvent");
-			auto reportUpdated = unique_from<ReportUpdatedEvent>(m_allocator);
-			(void)m_testDriver->send(std::move(reportUpdated));
-			return stop();
-		}
-		return {};
-	}
-};
+		auto messageResult = client.readMessage();
+		if (messageResult.isError())
+			return messageResult.releaseError();
+		auto message = messageResult.releaseValue();
 
-class TestDriver: public core::EventThread
+		if (message.kind == core::ws::Message::KIND_TEXT)
+		{
+			if (auto err = client.writeText(core::StringView{message.payload}); err)
+				return err;
+		}
+		else if (message.kind == core::ws::Message::KIND_BINARY)
+		{
+			if (auto err = client.writeBinary(core::Span<const std::byte>{message.payload}); err)
+				return err;
+		}
+		else if (message.kind == core::ws::Message::KIND_CLOSE)
+		{
+			return client.handleMessage(message);
+		}
+		else
+		{
+			if (auto err = client.handleMessage(message))
+				return err;
+		}
+	}
+
+	return {};
+}
+
+void runSingleTest(core::StringView testname, core::StringView url, core::Log* log, core::Allocator* allocator)
 {
-	core::Allocator* m_allocator = nullptr;
-	core::Log* m_log = nullptr;
-	size_t m_currentTest = 0;
-	size_t m_testsCount = sizeof(TESTS) / sizeof(*TESTS);
-	core::StringView m_baseUrl;
-	core::Shared<core::websocket::Client> m_client;
-
-	core::HumanError startTestClient()
-	{
-		auto testname = TESTS[m_currentTest];
-		m_log->info("starting testcase {}"_sv, testname);
-		auto urlWithPath = core::strf(m_allocator, "{}/runCase?casetuple={}&agent=taha2"_sv, m_baseUrl, testname);
-		auto loop = eventLoop()->next();
-		auto handler = loop->startThread<ClientHandler>(loop, sharedFromThis(), m_allocator);
-		auto clientResult = core::websocket::Client::connect(
-			urlWithPath,
-			2ULL * 1024ULL,
-			64ULL * 1024ULL * 1024ULL,
-			handler,
-			m_log,
-			m_allocator
-		);
-		if (clientResult.isError())
-		{
-			m_log->error("failed to connected client to '{}', {}"_sv, urlWithPath, clientResult.error());
-			(void)handler->stop();
-			return clientResult.releaseError();
-		}
-		m_client = clientResult.releaseValue();
-
-		return {};
-	}
-
-	core::HumanError startUpdateReportClient()
-	{
-		auto urlWithPath = core::strf(m_allocator, "{}/updateReports?agent=taha2"_sv, m_baseUrl);
-		auto loop = eventLoop()->next();
-		auto handler = loop->startThread<UpdateReportHandler>(loop, sharedFromThis(), m_allocator);
-		auto clientResult = core::websocket::Client::connect(
-			urlWithPath,
-			2ULL * 1024ULL,
-			64ULL * 1024ULL * 1024ULL,
-			handler,
-			m_log,
-			m_allocator
-		);
-		if (clientResult.isError())
-		{
-			m_log->error("failed to connected client to '{}', {}"_sv, urlWithPath, clientResult.error());
-			(void)handler->stop();
-			return clientResult.releaseError();
-		}
-		m_client = clientResult.releaseValue();
-
-		return {};
-	}
-
-public:
-	TestDriver(core::EventLoop* loop, core::StringView baseUrl, core::Log* log, core::Allocator* allocator)
-		: core::EventThread(loop),
-		  m_allocator(allocator),
-		  m_log(log),
-		  m_baseUrl(baseUrl)
-	{}
-
-	~TestDriver() override
-	{
-		eventLoop()->stopAllLoops();
-	}
-
-	core::HumanError handle(core::Event* event) override
-	{
-		if (auto startEvent = dynamic_cast<core::StartEvent*>(event))
-		{
-			ZoneScopedN("TestDriver::StartEvent");
-			return startTestClient();
-		}
-		else if (auto testFinished = dynamic_cast<TestFinishedEvent*>(event))
-		{
-			ZoneScopedN("TestDriver::TestFinishedEvent");
-			return startUpdateReportClient();
-		}
-		else if (auto reportUpdated = dynamic_cast<ReportUpdatedEvent*>(event))
-		{
-			ZoneScopedN("TestDriver::ReportUpdatedEvent");
-			++m_currentTest;
-			if (m_currentTest < m_testsCount)
-			{
-				return startTestClient();
-			}
-			else
-			{
-				m_client = nullptr;
-				return stop();
-			}
-		}
-		return {};
-	}
-};
+	(void)runTest(testname, url, log, allocator);
+	(void)updateReport(url, log, allocator);
+}
 
 int main(int argc, char** argv)
 {
@@ -278,23 +152,14 @@ int main(int argc, char** argv)
 	core::FastLeak allocator;
 	core::Log log{&allocator};
 
-	auto threadedEventLoopResult = core::ThreadedEventLoop::create(&log, &allocator);
-	if (threadedEventLoopResult.isError())
-	{
-		log.critical("failed to create threaded event loop, {}"_sv, threadedEventLoopResult.releaseError());
-		return EXIT_FAILURE;
-	}
-	auto threadedEventLoop = threadedEventLoopResult.releaseValue();
-	EVENT_LOOP = threadedEventLoop.get();
+//	runSingleTest("1.1.6"_sv, url, &log, &allocator);
+//	return 0;
 
-	auto loop = threadedEventLoop->next();
-	loop->startThread<TestDriver>(loop, url, &log, &allocator);
-
-	auto err = threadedEventLoop->run();
-	if (err)
+	auto testsCount = sizeof(TESTS)/sizeof(*TESTS);
+	for (size_t i = 0; i < testsCount; ++i)
 	{
-		log.critical("event loop error, {}"_sv, err);
-		return EXIT_FAILURE;
+		log.info("running test: {}"_sv, TESTS[i]);
+		runSingleTest(core::StringView{TESTS[i]}, url, &log, &allocator);
 	}
 
 	log.debug("success"_sv);

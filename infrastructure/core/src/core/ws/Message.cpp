@@ -3,11 +3,25 @@
 
 namespace core::ws
 {
-	HumanError readBytes(Stream* source, Span<std::byte> bytes, Allocator* allocator)
+	static HumanError readBytes(Stream* source, Span<std::byte> bytes, Allocator* allocator)
 	{
-		auto readSize = source->read(bytes.data(), bytes.sizeInBytes());
-		if (readSize != bytes.sizeInBytes())
-			return errf(allocator, "failed to read '{}' bytes, only read '{}' bytes"_sv, bytes.sizeInBytes(), readSize);
+		auto readBytes = bytes;
+		while (readBytes.sizeInBytes() > 0)
+		{
+			auto readSize = source->read(readBytes.data(), readBytes.sizeInBytes());
+			if (readSize == 0)
+				break;
+			readBytes = readBytes.sliceRight(readSize);
+		}
+
+		if (readBytes.sizeInBytes() > 0)
+		{
+			return errf(
+				allocator,
+				"failed to read '{}' bytes, only read '{}' bytes"_sv,
+				bytes.sizeInBytes(),
+				bytes.sizeInBytes() - readBytes.sizeInBytes());
+		}
 		return {};
 	}
 
