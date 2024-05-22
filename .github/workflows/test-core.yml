@@ -41,3 +41,14 @@ jobs:
       run: cmake --build build/${{matrix.preset}} -j
     - name: Run Tests
       run: ./build/${{matrix.preset}}/bin/test-core
+    - name: Run Client autobahn-testsuite
+      run: |
+        docker run -it --rm
+        -v "${pwd}/infrastructure/test-core/autobahn-testsuite/config:/config"
+        -v "${pwd}/infrastructure/test-core/autobahn-testsuite/reports:/reports"
+        -p 9011:9011
+        --name wstest
+        crossbario/autobahn-testsuite
+        wstest -m fuzzingserver -s /config/fuzzingserver.json
+    - name: Run Client Test Driver
+      run: ./build/${{matrix.preset}}/bin/ws-client
