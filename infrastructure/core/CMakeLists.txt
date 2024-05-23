@@ -53,6 +53,7 @@ target_sources(core PRIVATE
   include/core/ws/Message.h
   include/core/ws/Client.h
   include/core/ws/Handshake.h
+  include/core/ws/Server.h
   src/core/StringView.cpp
   src/core/Mallocator.cpp
   src/core/FastLeak.cpp
@@ -75,6 +76,7 @@ target_sources(core PRIVATE
   src/core/ws/Message.cpp
   src/core/ws/Client.cpp
   src/core/ws/Handshake.cpp
+  src/core/ws/Server.cpp
 )
 
 if (WIN32)

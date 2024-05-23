@@ -101,6 +101,36 @@ namespace core::ws
 		return {};
 	}
 
+	HumanError Client::serverHandshake()
+	{
+		auto httpRequestResult = readHTTP(m_maxHandshakeSize);
+		if (httpRequestResult.isError())
+			return httpRequestResult.releaseError();
+		auto httpRequest = httpRequestResult.releaseValue();
+
+		auto handshakeResult = Handshake::parse(httpRequest, m_allocator);
+		if (handshakeResult.isError())
+		{
+			constexpr static auto REPLY = R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)";
+			(void)write(StringView{REPLY});
+			return handshakeResult.releaseError();
+		}
+		auto handshake = handshakeResult.releaseValue();
+
+		constexpr static const char* REPLY = "HTTP/1.1 101 Switching Protocols\r\n"
+			"Upgrade: websocket\r\n"
+			"Connection: Upgrade\r\n"
+			"Sec-WebSocket-Accept: {}\r\n"
+			"\r\n";
+
+		SHA1Hasher hasher;
+		hasher.hash(handshake.key());
+		hasher.hash("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"_sv);
+		auto base64 = Base64::encode(hasher.final().asBytes(), m_allocator);
+		auto reply = strf(m_allocator, StringView{REPLY}, base64);
+		return write(StringView{reply});
+	}
+
 	HumanError Client::writeFrame(Frame::OPCODE opcode, Span<const std::byte> payload)
 	{
 		if (Frame::isControlOpcode(opcode))
@@ -113,8 +143,7 @@ namespace core::ws
 
 		std::byte rawMask[4] = {};
 		Span<std::byte> mask{rawMask, sizeof(rawMask)};
-		bool shouldMask = true;
-		if (shouldMask)
+		if (m_shouldMask)
 		{
 			auto ok = Rand::cryptoRand(mask);
 			if (ok == false)
@@ -150,7 +179,7 @@ namespace core::ws
 			buf_size += 9;
 		}
 
-		if (shouldMask)
+		if (m_shouldMask)
 		{
 			buf[1] = std::byte(uint8_t(buf[1]) | 128);
 			::memcpy(buf + buf_size, mask.data(), mask.sizeInBytes());
@@ -161,7 +190,7 @@ namespace core::ws
 		if (auto err = write(Span<const std::byte>{buf, buf_size}); err)
 			return err;
 
-		if (shouldMask)
+		if (m_shouldMask)
 		{
 			Buffer maskedPayload{m_allocator};
 			maskedPayload.push(payload);
@@ -203,6 +232,16 @@ namespace core::ws
 
 		Client client{std::move(socket), maxHandshakeSize, maxMessageSize, log, allocator};
 		if (auto err = client.handshake(parsedUrl); err)
+			return err;
+
+		client.m_shouldMask = true;
+		return client;
+	}
+
+	Result<Client> Client::acceptFromServer(Unique<Socket> socket, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator)
+	{
+		Client client{std::move(socket), maxHandshakeSize, maxMessageSize, log, allocator};
+		if (auto err = client.serverHandshake(); err)
 			return err;
 		return client;
 	}

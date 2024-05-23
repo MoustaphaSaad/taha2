@@ -8,21 +8,30 @@ namespace core
 	struct Thread::IThread
 	{
 		HANDLE handle = INVALID_HANDLE_VALUE;
+	};
+
+	struct ThreadFuncData
+	{
+		Allocator* allocator = nullptr;
 		Func<void()> func;
 	};
 
 	Thread::Thread(Allocator* allocator, Func<void()> func, size_t stackSize)
 	{
-		auto thread_start = +[](void* user_data) -> DWORD
+		auto thread_start = +[](void* userData) -> DWORD
 		{
-			auto thread = (Thread::IThread*)(user_data);
-			thread->func();
+			auto funcData = (ThreadFuncData*)userData;
+			Unique threadFuncData{funcData->allocator, funcData};
+			threadFuncData->func();
 			return 0;
 		};
 
+		auto threadFuncData = unique_from<ThreadFuncData>(allocator);
+		threadFuncData->allocator = allocator;
+		threadFuncData->func = std::move(func);
+
 		m_thread = unique_from<IThread>(allocator);
-		m_thread->func = std::move(func);
-		m_thread->handle = CreateThread(nullptr, stackSize, thread_start, m_thread.get(), 0, nullptr);
+		m_thread->handle = CreateThread(nullptr, stackSize, thread_start, threadFuncData.leak(), 0, nullptr);
 	}
 
 	Thread::Thread(Thread&& other) = default;

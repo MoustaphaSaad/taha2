@@ -1,78 +1,58 @@
+// command to run the wstest
+// docker run -it --rm
+// -v "W:\Projects\taha2\test\autobahn-testsuite\config:/config"
+// -v "W:\Projects\taha2\test\autobahn-testsuite\reports:/reports"
+// -p 9011:9011 --name wstest crossbario/autobahn-testsuite wstest -m fuzzingclient -s /config/fuzzingclient.json
+
 #include <core/FastLeak.h>
 #include <core/Log.h>
-#include <core/EventLoop.h>
-#include <core/websocket/Server.h>
-#include <core/websocket/Client.h>
+#include <core/ws/Server.h>
 #include <core/Url.h>
+#include <core/Thread.h>
 
 #include <tracy/Tracy.hpp>
 
 #include <signal.h>
 
-core::ThreadedEventLoop* EVENT_LOOP = nullptr;
+bool RUNNING = true;
+
 void signalHandler(int signal)
 {
 	if (signal == SIGINT)
-	{
-		EVENT_LOOP->stop();
-	}
+		RUNNING = false;
 }
 
-class ClientHandler: public core::EventThread
+core::HumanError handleClient(core::ws::Client client)
 {
-public:
-	ClientHandler(core::EventLoop* eventLoop)
-		: EventThread(eventLoop)
-	{}
-
-	core::HumanError handle(core::Event* event) override
+	while (RUNNING)
 	{
-		if (auto messageEvent = dynamic_cast<core::websocket::MessageEvent*>(event))
-		{
-			ZoneScopedN("MessageEvent");
-			if (messageEvent->message().type == core::websocket::Message::TYPE_TEXT)
-			{
-				return messageEvent->client()->writeText(core::StringView{messageEvent->message().payload});
-			}
-			else if (messageEvent->message().type == core::websocket::Message::TYPE_BINARY)
-			{
-				return messageEvent->client()->writeBinary(core::Span<const std::byte>{messageEvent->message().payload});
-			}
-			else
-			{
-				return messageEvent->handle();
-			}
-		}
-		else if (auto errorEvent = dynamic_cast<core::websocket::ErrorEvent*>(event))
-		{
-			ZoneScopedN("ErrorEvent");
-			return errorEvent->handle();
-		}
-		return {};
-	}
-};
+		auto messageResult = client.readMessage();
+		if (messageResult.isError())
+			return messageResult.releaseError();
+		auto message = messageResult.releaseValue();
 
-class ServerHandler: public core::EventThread
-{
-	core::Log* m_log = nullptr;
-public:
-	ServerHandler(core::EventLoop* eventLoop, core::Log* log)
-		: EventThread(eventLoop),
-		  m_log(log)
-	{}
-
-	core::HumanError handle(core::Event* event) override
-	{
-		if (auto newConn = dynamic_cast<core::websocket::NewConnection*>(event))
+		if (message.kind == core::ws::Message::KIND_TEXT)
 		{
-			ZoneScopedN("NewConnection");
-			auto loop = eventLoop()->next();
-			auto clientHandler = loop->startThread<ClientHandler>(loop);
-			return newConn->client()->startReadingMessages(clientHandler);
+			if (auto err = client.writeText(core::StringView{message.payload}))
+				return err;
 		}
-		return {};
+		else if (message.kind == core::ws::Message::KIND_BINARY)
+		{
+			if (auto err = client.writeBinary(core::Span<const std::byte>{message.payload}))
+				return err;
+		}
+		else if (message.kind == core::ws::Message::KIND_CLOSE)
+		{
+			return client.handleMessage(message);
+		}
+		else
+		{
+			if (auto err = client.handleMessage(message))
+				return err;
+		}
 	}
-};
+	return {};
+}
 
 int main(int argc, char** argv)
 {
@@ -85,46 +65,28 @@ int main(int argc, char** argv)
 	core::FastLeak allocator{};
 	core::Log log{&allocator};
 
-	auto parsedUrlResult = core::Url::parse(url, &allocator);
-	if (parsedUrlResult.isError())
+	auto serverResult = core::ws::Server::connect(url, 4096ULL, 64ULL * 1024ULL * 1024ULL, &log, &allocator);
+	if (serverResult.isError())
 	{
-		log.error("parsing url failed, {}"_sv, parsedUrlResult.error());
+		log.critical("failed to create server, {}"_sv, serverResult.releaseError());
 		return EXIT_FAILURE;
 	}
-	auto parsedUrl = parsedUrlResult.releaseValue();
+	auto server = serverResult.releaseValue();
 
-	auto threadedEventLoopResult = core::ThreadedEventLoop::create(&log, &allocator);
-	if (threadedEventLoopResult.isError())
+	while (RUNNING)
 	{
-		log.critical("failed to create threaded event loop, {}"_sv, threadedEventLoopResult.releaseError());
-		return EXIT_FAILURE;
-	}
-	auto threadedEventLoop = threadedEventLoopResult.releaseValue();
-	EVENT_LOOP = threadedEventLoop.get();
+		auto clientResult = server.accept();
+		if (clientResult.isError())
+		{
+			log.error("error in accepting a new client, {}"_sv, clientResult.releaseError());
+			break;
+		}
 
-	auto server = core::websocket::Server::create(&log, &allocator);
-
-	auto eventLoop = threadedEventLoop->next();
-	auto serverHandler = eventLoop->startThread<ServerHandler>(eventLoop, &log);
-
-	core::websocket::ServerConfig config {
-		.host = parsedUrl.host(),
-		.port = parsedUrl.port(),
-		.maxHandshakeSize = 64ULL * 1024ULL * 1024ULL,
-		.handler = serverHandler,
-	};
-	auto err = server->start(config, eventLoop->next());
-	if (err)
-	{
-		log.critical("failed to start websocket server, {}"_sv, err);
-		return EXIT_FAILURE;
-	}
-
-	err = threadedEventLoop->run();
-	if (err)
-	{
-		log.critical("event loop error, {}"_sv, err);
-		return EXIT_FAILURE;
+		core::Func<void()> func{&allocator, [client = clientResult.releaseValue()]() mutable {
+			(void)handleClient(std::move(client));
+		}};
+		core::Thread clientThread{&allocator, std::move(func)};
+		clientThread.detach();
 	}
 
 	log.debug("success"_sv);

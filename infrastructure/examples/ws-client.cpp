@@ -112,12 +112,12 @@ core::HumanError runTest(core::StringView testname, core::StringView baseUrl, co
 
 		if (message.kind == core::ws::Message::KIND_TEXT)
 		{
-			if (auto err = client.writeText(core::StringView{message.payload}); err)
+			if (auto err = client.writeText(core::StringView{message.payload}))
 				return err;
 		}
 		else if (message.kind == core::ws::Message::KIND_BINARY)
 		{
-			if (auto err = client.writeBinary(core::Span<const std::byte>{message.payload}); err)
+			if (auto err = client.writeBinary(core::Span<const std::byte>{message.payload}))
 				return err;
 		}
 		else if (message.kind == core::ws::Message::KIND_CLOSE)
@@ -163,5 +163,5 @@ int main(int argc, char** argv)
 	}
 
 	log.debug("success"_sv);
-	return 0;
+	return EXIT_SUCCESS;
 }

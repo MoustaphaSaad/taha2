@@ -9,18 +9,28 @@ namespace core
 	struct Thread::IThread
 	{
 		pthread_t handle;
-		Func<void()> func;
 		bool detached = false;
+	};
+
+	struct ThreadFuncData
+	{
+		Allocator* allocator = nullptr;
+		Func<void()> func;
 	};
 
 	Thread::Thread(Allocator* allocator, Func<void()> func, size_t stackSize)
 	{
-		auto thread_start = +[](void* user_data) -> void*
+		auto thread_start = +[](void* userData) -> void*
 		{
-			auto thread = (Thread::IThread*)(user_data);
-			thread->func();
+			auto funcData = (ThreadFuncData*)userData;
+			Unique threadFuncData{funcData->allocator, funcData};
+			threadFuncData->func();
 			return 0;
 		};
+
+		auto threadFuncData = unique_from<ThreadFuncData>(allocator);
+		threadFuncData->allocator = allocator;
+		threadFuncData->func = std::move(func);
 
 		pthread_attr_t attr{};
 		[[maybe_unused]] auto res = pthread_attr_init(&attr);
@@ -32,8 +42,7 @@ namespace core
 		}
 
 		m_thread = unique_from<IThread>(allocator);
-		m_thread->func = std::move(func);
-		res = pthread_create(&m_thread->handle, &attr, thread_start, m_thread.get());
+		res = pthread_create(&m_thread->handle, &attr, thread_start, threadFuncData.leak());
 		coreAssert(res == 0);
 	}
 
