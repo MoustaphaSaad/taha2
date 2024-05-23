@@ -44,8 +44,8 @@ jobs:
     - name: Run Client autobahn-testsuite
       run: >
         docker run --rm
-        -v "${pwd}/infrastructure/test-core/autobahn-testsuite/config:/config"
-        -v "${pwd}/infrastructure/test-core/autobahn-testsuite/reports:/reports"
+        -v "./infrastructure/test-core/autobahn-testsuite/config:/config"
+        -v "./infrastructure/test-core/autobahn-testsuite/reports:/reports"
         -p 9011:9011
         --name wstest
         crossbario/autobahn-testsuite
