@@ -52,5 +52,7 @@ namespace core::ws
 		CORE_EXPORT HumanError writePing(Span<const std::byte> payload);
 		CORE_EXPORT HumanError writePong(Span<const std::byte> payload);
 		CORE_EXPORT HumanError writeClose(uint16_t code, StringView reason);
+
+		CORE_EXPORT void close();
 	};
 }

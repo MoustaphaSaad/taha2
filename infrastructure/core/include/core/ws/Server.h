@@ -27,5 +27,6 @@ namespace core::ws
 		CORE_EXPORT static Result<Server> connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator);
 
 		CORE_EXPORT Result<Client> accept();
+		CORE_EXPORT void close();
 	};
 }

@@ -336,4 +336,10 @@ namespace core::ws
 		auto lock = lockGuard(m_writeMutex);
 		return writeCloseWithCode(code, reason);
 	}
+
+	void Client::close()
+	{
+		m_socket->shutdown(Socket::SHUTDOWN_RDWR);
+		m_socket->close();
+	}
 }

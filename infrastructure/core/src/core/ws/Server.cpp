@@ -27,7 +27,7 @@ namespace core::ws
 
 	Result<Client> Server::accept()
 	{
-		while (true)
+		while (m_socket->listen())
 		{
 			auto clientSocket = m_socket->accept();
 			if (clientSocket == nullptr)
@@ -38,5 +38,12 @@ namespace core::ws
 				continue;
 			return clientResult.releaseValue();
 		}
+		return errf(m_allocator, "failed ot listen to server socket"_sv);
+	}
+
+	void Server::close()
+	{
+		m_socket->shutdown(Socket::SHUTDOWN_RDWR);
+		m_socket->close();
 	}
 }
