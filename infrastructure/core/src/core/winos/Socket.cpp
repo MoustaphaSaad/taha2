@@ -156,7 +156,6 @@ namespace core
 			}
 
 			auto res = ::shutdown(m_handle, osHow);
-			auto lastError = WSAGetLastError();
 			return res == 0;
 		}
 
