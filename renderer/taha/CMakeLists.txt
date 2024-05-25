@@ -37,6 +37,10 @@ if (WIN32 OR (UNIX AND NOT APPLE))
 	target_link_libraries(taha PRIVATE Vulkan::Vulkan)
 endif ()
 
+if (UNIX AND NOT APPLE)
+	target_link_libraries(taha PRIVATE wayland-client)
+endif ()
+
 target_link_libraries(taha PUBLIC core math)
 
 # generate exports header file

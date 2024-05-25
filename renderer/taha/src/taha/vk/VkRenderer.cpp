@@ -6,6 +6,7 @@
 
 #if TAHA_OS_LINUX
 #include <vulkan/vulkan_wayland.h>
+#include <wayland-client.h>
 #endif
 
 namespace fmt
@@ -76,6 +77,19 @@ namespace taha
 			return DefWindowProc(hwnd, uMsg, wParam, lParam);
 		}
 		return 0;
+	}
+#elif TAHA_OS_LINUX
+	static void registryListener(void* data, wl_registry* registry, uint32_t id, const char* interface, uint32_t version)
+	{
+		if (core::StringView{interface} == core::StringView{wl_compositor_interface.name})
+		{
+			*((wl_compositor**)data) = (wl_compositor*)wl_registry_bind(registry, id, &wl_compositor_interface, 1);
+		}
+	}
+
+	static void registryRemover(void* data, wl_registry* registry, uint32_t id)
+	{
+		// do nothing
 	}
 #endif
 
@@ -408,8 +422,34 @@ namespace taha
 		auto instance = renderer->m_instance;
 		coreDefer { vkDestroySurfaceKHR(instance, dummySurface, nullptr); };
 #elif TAHA_OS_LINUX
+		auto display = wl_display_connect(nullptr);
+		coreDefer{wl_display_disconnect(display);};
+
+		auto registry = wl_display_get_registry(display);
+		wl_compositor* compositor = nullptr;
+		wl_registry_listener listener{
+			.global = registryListener,
+			.global_remove = registryRemover,
+		};
+		wl_registry_add_listener(registry, &listener, &compositor);
+		coreDefer {wl_compositor_destroy(compositor);};
+		wl_display_roundtrip(display);
+
+		auto surface = wl_compositor_create_surface(compositor);
+		coreDefer {wl_surface_destroy(surface);};
+
 		// TODO: handle this later
+		VkWaylandSurfaceCreateInfoKHR dummySurfaceCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+			.display = display,
+			.surface = surface,
+		};
 		VkSurfaceKHR dummySurface = VK_NULL_HANDLE;
+		result = vkCreateWaylandSurfaceKHR(renderer->m_instance, &dummySurfaceCreateInfo, nullptr, &dummySurface);
+		if (result != VK_SUCCESS)
+			return core::errf(allocator, "vkCreateWaylandSurfaceKHR failed, ErrorCode({})"_sv, result);
+		auto instance = renderer->m_instance;
+		coreDefer {vkDestroySurfaceKHR(instance, dummySurface, nullptr);};
 #endif
 
 		// choose physical device
