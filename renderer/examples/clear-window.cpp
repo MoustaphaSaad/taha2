@@ -9,6 +9,8 @@
 #define NOMINMAX 1
 #define WIN32_LEAN_AND_MEAN 1
 #define _CRT_SECURE_NO_WARNINGS 1
+#elif TAHA_OS_LINUX
+#define GLFW_EXPOSE_NATIVE_WAYLAND 1
 #endif
 #include <GLFW/glfw3native.h>
 
@@ -21,6 +23,9 @@ taha::NativeWindowDesc getNativeWindowDesc(GLFWwindow* window)
 	taha::NativeWindowDesc nativeWindowDesc{};
 	#if TAHA_OS_WINDOWS
 	nativeWindowDesc.windowHandle = glfwGetWin32Window(window);
+	#elif TAHA_OS_LINUX
+	nativeWindowDesc.display = glfwGetWaylandDisplay();
+	nativeWindowDesc.surface = glfwGetWaylandWindow(window);
 	#endif
 	nativeWindowDesc.width = windowWidth;
 	nativeWindowDesc.height = windowHeight;

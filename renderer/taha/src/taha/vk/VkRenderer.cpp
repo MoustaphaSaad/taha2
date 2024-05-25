@@ -554,6 +554,19 @@ namespace taha
 			return nullptr;
 
 		return core::unique_from<VkFrame>(m_allocator, this, surface);
+#elif TAHA_OS_LINUX
+		VkWaylandSurfaceCreateInfoKHR createInfo{
+			.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+			.display = desc.display,
+			.surface = desc.surface,
+		};
+
+		VkSurfaceKHR surface;
+		auto result = vkCreateWaylandSurfaceKHR(m_instance, &createInfo, nullptr, &surface);
+		if (result != VK_SUCCESS)
+			return nullptr;
+
+		return core::unique_from<VkFrame>(m_allocator, this, surface);
 #endif
 
 		return nullptr;
