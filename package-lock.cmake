@@ -64,19 +64,48 @@ CPMDeclarePackage(tracy
     "TRACY_ON_DEMAND ${TRACY_ENABLE}"
 )
 
-set(TAHA2_CPPTRACE_USE_WINAPI_UNWIND OFF)
-if (MINGW OR WIN32)
-  set(TAHA2_CPPTRACE_USE_WINAPI_UNWIND ON)
-endif ()
+#CPMDeclarePackage(zlib
+#  NAME zlib
+#  GIT_TAG v1.3.1
+#  GIT_REPOSITORY git@github.com:madler/zlib.git
+#  GIT_SHALLOW TRUE
+#  EXCLUDE_FROM_ALL TRUE
+#)
+#
+#CPMDeclarePackage(zstd
+#  NAME zstd
+#  GIT_TAG v1.5.1
+#  GIT_REPOSITORY git@github.com:facebook/zstd.git
+#  GIT_SHALLOW TRUE
+#  EXCLUDE_FROM_ALL TRUE
+#  SOURCE_SUBDIR build/cmake
+#  OPTIONS
+#    "ZSTD_BUILD_PROGRAMS OFF"
+#    "ZSTD_BUILD_STATIC ON"
+#    "ZSTD_BUILD_TESTS OFF"
+#)
 
-CPMDeclarePackage(cpptrace-lib
-  NAME cpptrace-lib
-  GIT_TAG v0.5.4-mostafa
-  GIT_REPOSITORY git@github.com:MoustaphaSaad/cpptrace.git
+CPMDeclarePackage(libdwarf
+  NAME libdwarf
+  GIT_TAG v0.9.2
+  GIT_REPOSITORY git@github.com:jeremy-rifkin/libdwarf-lite.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
   OPTIONS
-    "CPPTRACE_UNWIND_WITH_WINAPI ${TAHA2_CPPTRACE_USE_WINAPI_UNWIND}"
+    "PIC_ALWAYS ON"
+    "BUILD_DWARFDUMP OFF"
+    "ENABLE_DECOMPRESSION OFF"
+)
+
+CPMDeclarePackage(cpptrace-lib
+  NAME cpptrace-lib
+  GIT_TAG v0.5.4
+  GIT_REPOSITORY git@github.com:jeremy-rifkin/cpptrace.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "CPPTRACE_UNWIND_WITH_WINAPI ${WIN32}"
+    "CPPTRACE_USE_EXTERNAL_LIBDWARF ON"
 )
 
 CPMDeclarePackage(date
