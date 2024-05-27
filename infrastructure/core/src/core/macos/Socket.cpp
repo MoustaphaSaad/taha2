@@ -26,6 +26,16 @@ namespace core
 			  m_protocol(protocol)
 		{}
 
+		~MacSocket() override
+		{
+			if (m_handle != -1)
+			{
+				[[maybe_unused]] auto err = ::close(m_handle);
+				coreAssert(err != -1);
+				m_handle = -1;
+			}
+		}
+
 		bool close() override
 		{
 			if (m_handle == -1)
