@@ -218,12 +218,10 @@
 			"cacheVariables": {
 				"TRACY_ENABLE": "OFF",
 				"BUILD_SHARED_LIBS": "OFF",
-				"ENABLE_ASM": "OFF",
-				"CMAKE_C_FLAGS": "-D __linux__"
-			},
-			"environment": {
-				"CC": "emcc",
-				"CXX": "em++"
+				"CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+				"DISABLE_BUDGET_APP": "ON",
+				"DISABLE_RENDERER": "ON",
+				"DISABLE_COMPILER_CONSTRUCTION": "ON"
 			}
 		},
 		{
