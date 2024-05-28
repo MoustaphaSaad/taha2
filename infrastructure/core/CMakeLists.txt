@@ -35,7 +35,6 @@ target_sources(core PRIVATE
   include/core/Base64.h
   include/core/SHA1.h
   include/core/Rand.h
-  include/core/EventLoop.h
   include/core/ExecutionQueue.h
   include/core/Stacktrace.h
   include/core/Assert.h
@@ -45,11 +44,6 @@ target_sources(core PRIVATE
   include/core/Path.h
   include/core/CUtils.h
   include/core/BufferedReader.h
-  include/core/websocket/Handshake.h
-  include/core/websocket/MessageParser.h
-  include/core/websocket/Message.h
-  include/core/websocket/Server.h
-  include/core/websocket/Client.h
   include/core/ws/Message.h
   include/core/ws/Client.h
   include/core/ws/Handshake.h
@@ -69,10 +63,6 @@ target_sources(core PRIVATE
   src/core/Base64.cpp
   src/core/SHA1.cpp
   src/core/Assert.cpp
-  src/core/websocket/Handshake.cpp
-  src/core/websocket/MessageParser.cpp
-  src/core/websocket/Server.cpp
-  src/core/websocket/Client.cpp
   src/core/ws/Message.cpp
   src/core/ws/Client.cpp
   src/core/ws/Handshake.cpp
@@ -92,7 +82,6 @@ if (WIN32)
     src/core/winos/IMutex.h
     src/core/winos/Socket.cpp
     src/core/winos/Rand.cpp
-    src/core/winos/EventLoop.cpp
     src/core/winos/OS.cpp
     src/core/winos/IPCMutex.cpp
     src/core/winos/Path.cpp
@@ -111,7 +100,6 @@ elseif (APPLE)
     src/core/macos/IMutex.h
     src/core/macos/Socket.cpp
     src/core/macos/Rand.cpp
-    src/core/macos/EventLoop.cpp
     src/core/macos/OS.cpp
     src/core/macos/IPCMutex.cpp
     src/core/macos/Path.cpp
@@ -133,7 +121,6 @@ elseif (UNIX AND NOT APPLE)
     src/core/linux/IMutex.h
     src/core/linux/Socket.cpp
     src/core/linux/Rand.cpp
-    src/core/linux/EventLoop.cpp
     src/core/linux/OS.cpp
     src/core/linux/IPCMutex.cpp
     src/core/linux/Path.cpp

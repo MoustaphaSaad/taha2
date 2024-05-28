@@ -1,6 +1,6 @@
 add_subdirectory(budget-byte)
 add_subdirectory(budget-byte-cli)
 add_subdirectory(EInk)
-add_subdirectory(fin)
+#add_subdirectory(fin)
 add_subdirectory(fin-gui)
-add_subdirectory(fin-server)
+#add_subdirectory(fin-server)
