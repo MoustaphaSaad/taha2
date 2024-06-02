@@ -4,6 +4,8 @@ target_sources(minijava PRIVATE
   include/minijava/Token.h
   include/minijava/Unit.h
   include/minijava/Error.h
+  include/minijava/Scanner.h
+  src/minijava/Scanner.cpp
   src/minijava/Unit.cpp
 )
 target_link_libraries(minijava PRIVATE core)

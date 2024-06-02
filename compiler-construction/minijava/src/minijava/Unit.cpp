@@ -17,6 +17,6 @@ namespace minijava
 
 		auto filePath = core::String{path, allocator};
 
-		return core::unique_from<Unit>(allocator, std::move(filePath), absolutePathResult.releaseValue(), contentResult.releaseValue());
+		return core::unique_from<Unit>(allocator, std::move(filePath), absolutePathResult.releaseValue(), contentResult.releaseValue(), allocator);
 	}
 }

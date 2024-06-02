@@ -10,7 +10,7 @@ namespace minijava
 		int column = 0;
 	};
 
-	struct Unit;
+	class Unit;
 
 	struct Location
 	{
