@@ -2,6 +2,8 @@
 
 #include <core/StringView.h>
 
+#include <fmt/format.h>
+
 namespace minijava
 {
 	struct Position
@@ -89,5 +91,149 @@ namespace minijava
 		KIND m_kind = KIND_NONE;
 		core::StringView m_text;
 		Location m_location;
+	};
+}
+
+namespace fmt
+{
+	template<>
+	struct formatter<minijava::Token::KIND>
+	{
+		template<typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
+		{
+			return ctx.begin();
+		}
+
+		template<typename FormatContext>
+		auto format(minijava::Token::KIND kind, FormatContext& ctx)
+		{
+			const char* name = "";
+			switch (kind)
+			{
+			case minijava::Token::KIND_NONE:
+				name = "<NONE>";
+				break;
+			case minijava::Token::KIND_EOF:
+				name = "<EOF>";
+				break;
+
+			case minijava::Token::KIND_KEYWORD_BOOLEAN:
+				name = "boolean";
+				break;
+			case minijava::Token::KIND_KEYWORD_CLASS:
+				name = "class";
+				break;
+			case minijava::Token::KIND_KEYWORD_ELSE:
+				name = "else";
+				break;
+			case minijava::Token::KIND_KEYWORD_FALSE:
+				name = "false";
+				break;
+			case minijava::Token::KIND_KEYWORD_IF:
+				name = "if";
+				break;
+			case minijava::Token::KIND_KEYWORD_INT:
+				name = "int";
+				break;
+			case minijava::Token::KIND_KEYWORD_LENGTH:
+				name = "length";
+				break;
+			case minijava::Token::KIND_KEYWORD_MAIN:
+				name = "main";
+				break;
+			case minijava::Token::KIND_KEYWORD_NEW:
+				name = "new";
+				break;
+			case minijava::Token::KIND_KEYWORD_PUBLIC:
+				name = "public";
+				break;
+			case minijava::Token::KIND_KEYWORD_RETURN:
+				name = "return";
+				break;
+			case minijava::Token::KIND_KEYWORD_STATIC:
+				name = "static";
+				break;
+			case minijava::Token::KIND_KEYWORD_THIS:
+				name = "this";
+				break;
+			case minijava::Token::KIND_KEYWORD_TRUE:
+				name = "true";
+				break;
+			case minijava::Token::KIND_KEYWORD_VOID:
+				name = "void";
+				break;
+			case minijava::Token::KIND_KEYWORD_WHILE:
+				name = "while";
+				break;
+
+			case minijava::Token::KIND_OPERATOR_PLUS:
+				name = "+";
+				break;
+			case minijava::Token::KIND_OPERATOR_MINUS:
+				name = "-";
+				break;
+			case minijava::Token::KIND_OPERATOR_MULTIPLY:
+				name = "*";
+				break;
+			case minijava::Token::KIND_OPERATOR_LESS_THAN:
+				name = "<";
+				break;
+			case minijava::Token::KIND_OPERATOR_ASSIGN:
+				name = "=";
+				break;
+			case minijava::Token::KIND_OPERATOR_LOGIC_AND:
+				name = "&&";
+				break;
+			case minijava::Token::KIND_OPERATOR_LOGIC_NOT:
+				name = "!";
+				break;
+
+			case minijava::Token::KIND_SEMICOLON:
+				name = ";";
+				break;
+			case minijava::Token::KIND_DOT:
+				name = ".";
+				break;
+			case minijava::Token::KIND_COMMA:
+				name = ",";
+				break;
+			case minijava::Token::KIND_OPEN_BRACE:
+				name = "{";
+				break;
+			case minijava::Token::KIND_CLOSE_BRACE:
+				name = "}";
+				break;
+			case minijava::Token::KIND_OPEN_BRACKET:
+				name = "[";
+				break;
+			case minijava::Token::KIND_CLOSE_BRACKET:
+				name = "]";
+				break;
+			case minijava::Token::KIND_OPEN_PAREN:
+				name = "(";
+				break;
+			case minijava::Token::KIND_CLOSE_PAREN:
+				name = ")";
+				break;
+
+			case minijava::Token::KIND_LITERAL_INT:
+				name = "<LITERAL_INT>";
+				break;
+
+			case minijava::Token::KIND_ID:
+				name = "id";
+				break;
+
+			case minijava::Token::KIND_COMMENT:
+				name = "comment";
+				break;
+
+			default:
+				name = "<UNKNOWN>";
+				break;
+			}
+			return format_to(ctx.out(), fmt::runtime("{}"), name);
+		}
 	};
 }
