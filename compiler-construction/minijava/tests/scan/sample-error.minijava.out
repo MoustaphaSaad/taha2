@@ -1,0 +1,3 @@
+>>         return num > 5;
+>>                    ^   
+Error[.\compiler-construction\minijava\tests\scan\sample-error.minijava:3:19]: illegal token '>'

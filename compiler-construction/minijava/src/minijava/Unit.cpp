@@ -11,14 +11,16 @@ namespace minijava
 		auto absolutePathResult = core::Path::abs(path, allocator);
 		if (absolutePathResult.isError())
 			return absolutePathResult.releaseError();
+		auto absolutePath = absolutePathResult.releaseValue();
 
-		auto contentResult = core::File::content(allocator, path);
+		auto contentResult = core::File::content(allocator, absolutePath);
 		if (contentResult.isError())
 			return contentResult.releaseError();
+		auto content = contentResult.releaseValue();
 
 		auto filePath = core::String{path, allocator};
 
-		return core::unique_from<Unit>(allocator, std::move(filePath), absolutePathResult.releaseValue(), contentResult.releaseValue(), allocator);
+		return core::unique_from<Unit>(allocator, std::move(filePath), std::move(absolutePath), std::move(content), allocator);
 	}
 
 	bool Unit::scan()
@@ -31,10 +33,11 @@ namespace minijava
 		{
 			auto token = scanner.scan();
 
-			if (token.kind() == Token::KIND_EOF || token.kind() == Token::KIND_NONE)
+			if (token.kind() == Token::KIND_EOF)
 				break;
 
-			m_token.push(std::move(token));
+			if (token.kind() != Token::KIND_NONE)
+				m_token.push(std::move(token));
 		}
 
 		if (hasErrors())
