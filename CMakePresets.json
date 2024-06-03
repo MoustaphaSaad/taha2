@@ -212,6 +212,28 @@
 			}
 		},
 		{
+			"name": "ci-test-minijava-debug",
+			"inherits": "ninja-debug",
+			"displayName": "CI Test Minijava Debug",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"DISABLE_BUDGET_APP": "ON",
+				"DISABLE_RENDERER": "ON",
+				"DISABLE_COMPILER_CONSTRUCTION": "OFF"
+			}
+		},
+		{
+			"name": "ci-test-minijava-release",
+			"inherits": "ninja-release",
+			"displayName": "CI Test Minijava Release",
+			"binaryDir": "${sourceDir}/build/${presetName}",
+			"cacheVariables": {
+				"DISABLE_BUDGET_APP": "ON",
+				"DISABLE_RENDERER": "ON",
+				"DISABLE_COMPILER_CONSTRUCTION": "OFF"
+			}
+		},
+		{
 			"name": "emscripten-base",
 			"hidden": true,
 			"generator": "Unix Makefiles",
