@@ -1,4 +1,4 @@
-name: test math
+name: test minijava
 
 on:
   push:
@@ -38,4 +38,4 @@ jobs:
     - name: Build Tests
       run: cmake --build build/${{matrix.preset}} -j
     - name: Run Tests
-      run: ctest --test-dir ./build/${{matrix.preset}} --verbose
+      run: ctest --test-dir ./build/${{matrix.preset}}/compiler-construction/minijava --verbose
