@@ -33,6 +33,8 @@ namespace minijava
 		void dumpTokens(core::Stream* stream);
 		void dumpErrors(core::Stream* stream);
 
+		const core::Array<Token>& tokens() const { return m_token; }
+
 	private:
 		template<typename T, typename... TArgs>
 		friend inline core::Unique<T> core::unique_from(core::Allocator* allocator, TArgs&&... args);

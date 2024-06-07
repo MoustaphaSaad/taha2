@@ -10,7 +10,7 @@ namespace minijava
 	{
 		Token m_token;
 	public:
-		Identifier(Token token)
+		explicit Identifier(Token token)
 			: m_token(std::move(token))
 		{}
 
@@ -437,15 +437,15 @@ namespace minijava
 
 	class Program
 	{
-		MainClass m_main;
+		core::Unique<MainClass> m_main;
 		core::Array<core::Unique<ClassDecl>> m_classes;
 	public:
-		Program(MainClass main, core::Array<core::Unique<ClassDecl>> classes)
+		Program(core::Unique<MainClass> main, core::Array<core::Unique<ClassDecl>> classes)
 			: m_main(std::move(main)),
 			  m_classes(std::move(classes))
 		{}
 
-		const MainClass* main() const { return &m_main; }
+		MainClass* main() { return m_main.get(); }
 		const core::Array<core::Unique<ClassDecl>>& classes() const { return m_classes; }
 	};
 }

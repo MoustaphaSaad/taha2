@@ -36,6 +36,7 @@ namespace minijava
 			KIND_KEYWORD_FALSE,
 			KIND_KEYWORD_IF,
 			KIND_KEYWORD_INT,
+			KIND_KEYWORD_STRING,
 			KIND_KEYWORD_LENGTH,
 			KIND_KEYWORD_MAIN,
 			KIND_KEYWORD_NEW,
@@ -77,6 +78,7 @@ namespace minijava
 			KIND_COMMENT,
 		};
 
+		Token() = default;
 		Token(KIND kind, core::StringView text, Location location)
 			: m_kind(kind),
 			  m_text(text),
@@ -135,6 +137,9 @@ namespace fmt
 				break;
 			case minijava::Token::KIND_KEYWORD_INT:
 				name = "int";
+				break;
+			case minijava::Token::KIND_KEYWORD_STRING:
+				name = "string";
 				break;
 			case minijava::Token::KIND_KEYWORD_LENGTH:
 				name = "length";

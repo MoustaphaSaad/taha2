@@ -116,6 +116,7 @@ namespace minijava
 		else if (id == "false"_sv) return Token::KIND_KEYWORD_FALSE;
 		else if (id == "if"_sv) return Token::KIND_KEYWORD_IF;
 		else if (id == "int"_sv) return Token::KIND_KEYWORD_INT;
+		else if (id == "String"_sv) return Token::KIND_KEYWORD_STRING;
 		else if (id == "length"_sv) return Token::KIND_KEYWORD_LENGTH;
 		else if (id == "main"_sv) return Token::KIND_KEYWORD_MAIN;
 		else if (id == "new"_sv) return Token::KIND_KEYWORD_NEW;

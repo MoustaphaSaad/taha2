@@ -10,6 +10,8 @@ target_sources(minijava PRIVATE
   include/minijava/Error.h
   include/minijava/Scanner.h
   include/minijava/AST.h
+  include/minijava/Parser.h
+  src/minijava/Parser.cpp
   src/minijava/Scanner.cpp
   src/minijava/Unit.cpp
 )
