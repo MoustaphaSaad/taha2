@@ -282,11 +282,6 @@ namespace minijava
 		return expr;
 	}
 
-	core::Unique<Expr> Parser::parseExpr()
-	{
-		return parseAndExpr();
-	}
-
 	core::Unique<Stmt> Parser::parseStmt()
 	{
 		auto token = look();
@@ -368,5 +363,10 @@ namespace minijava
 //		auto mainClass = parseMainClass();
 //		Program program{}
 		return nullptr;
+	}
+
+	core::Unique<Expr> Parser::parseExpr()
+	{
+		return parseAndExpr();
 	}
 }

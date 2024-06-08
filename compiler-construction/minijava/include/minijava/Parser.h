@@ -25,7 +25,6 @@ namespace minijava
 		core::Unique<Expr> parseAddExpr();
 		core::Unique<Expr> parseCmpExpr();
 		core::Unique<Expr> parseAndExpr();
-		core::Unique<Expr> parseExpr();
 		core::Unique<Stmt> parseStmt();
 		core::Unique<BlockStmt> parseBlockStmt();
 		core::Unique<IfStmt> parseIfStmt();
@@ -34,5 +33,6 @@ namespace minijava
 		explicit Parser(Unit* unit, core::Allocator* allocator);
 
 		core::Unique<Program> parse();
+		core::Unique<Expr> parseExpr();
 	};
 }
