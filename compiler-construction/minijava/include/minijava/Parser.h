@@ -17,6 +17,7 @@ namespace minijava
 		Token eat();
 		Token eatKind(Token::KIND kind);
 		Token eatMust(Token::KIND kind);
+		core::Unique<Stmt> parseStmt();
 		core::Unique<BlockStmt> parseBlockStmt();
 		core::Unique<MainClass> parseMainClass();
 	public:

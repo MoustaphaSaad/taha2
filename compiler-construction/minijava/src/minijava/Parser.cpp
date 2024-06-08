@@ -47,9 +47,44 @@ namespace minijava
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
+	core::Unique<Stmt> Parser::parseStmt()
+	{
+		auto token = look();
+		if (token.kind() == Token::KIND_OPEN_BRACE)
+		{
+			return parseBlockStmt();
+		}
+		else if (token.kind() == Token::KIND_KEYWORD_IF)
+		{
+			// parse if statements
+			return nullptr;
+		}
+		else if (token.kind() == Token::KIND_KEYWORD_WHILE)
+		{
+			// parse while statements
+			return nullptr;
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+
 	core::Unique<BlockStmt> Parser::parseBlockStmt()
 	{
-		return nullptr;
+		core::Array<core::Unique<Stmt>> statements{m_allocator};
+
+		eatMust(Token::KIND_OPEN_BRACE);
+		{
+			while (auto stmt = parseStmt())
+			{
+				statements.push(std::move(stmt));
+				eatMust(Token::KIND_SEMICOLON);
+			}
+		}
+		eatMust(Token::KIND_CLOSE_BRACE);
+
+		return core::unique_from<BlockStmt>(m_allocator, std::move(statements));
 	}
 
 	core::Unique<MainClass> Parser::parseMainClass()
