@@ -47,9 +47,52 @@ namespace minijava
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
+	core::Unique<Expr> Parser::parseBaseExpr()
+	{
+		auto token = look();
+		core::Unique<Expr> expr;
+		if (token.kind() == Token::KIND_LITERAL_INT)
+		{
+			expr = core::unique_from<IntLiteralExpr>(m_allocator, eat());
+		}
+		else if (token.kind() == Token::KIND_KEYWORD_TRUE)
+		{
+			expr = core::unique_from<TrueExpr>(m_allocator, eat());
+		}
+		else if (token.kind() == Token::KIND_KEYWORD_FALSE)
+		{
+			expr = core::unique_from<FalseExpr>(m_allocator, eat());
+		}
+		else if (token.kind() == Token::KIND_KEYWORD_THIS)
+		{
+			expr = core::unique_from<ThisExpr>(m_allocator, eat());
+		}
+		else if (token.kind() == Token::KIND_ID)
+		{
+			expr = core::unique_from<IdentifierExpr>(m_allocator, eat());
+		}
+		else
+		{
+			m_unit->pushError(errf(m_allocator, token.location(), "unknown expression '{}'"_sv, token.text()));
+		}
+		return expr;
+	}
+
 	core::Unique<Expr> Parser::parseUnaryExpr()
 	{
-		return nullptr;
+		core::Unique<Expr> expr;
+
+		if (look().kind() == Token::KIND_OPERATOR_LOGIC_NOT)
+		{
+			auto op = eat();
+			expr = core::unique_from<NotExpr>(m_allocator, parseUnaryExpr());
+		}
+		else
+		{
+			expr = parseBaseExpr();
+		}
+
+		return expr;
 	}
 
 	core::Unique<Expr> Parser::parseMulExpr()

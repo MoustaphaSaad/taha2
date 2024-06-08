@@ -128,7 +128,15 @@ namespace minijava
 	};
 
 	class ThisExpr: public Expr
-	{};
+	{
+		Token m_token;
+	public:
+		ThisExpr(Token token)
+			: m_token(token)
+		{}
+
+		Token token() const { return m_token; }
+	};
 
 	class IdentifierExpr: public Expr
 	{
@@ -142,20 +150,36 @@ namespace minijava
 	};
 
 	class FalseExpr: public Expr
-	{};
+	{
+		Token m_token;
+	public:
+		FalseExpr(Token token)
+			: m_token(token)
+		{}
+
+		Token token() const { return m_token; }
+	};
 
 	class TrueExpr: public Expr
-	{};
+	{
+		Token m_token;
+	public:
+		TrueExpr(Token token)
+			: m_token(token)
+		{}
+
+		Token token() const { return m_token; }
+	};
 
 	class IntLiteralExpr: public Expr
 	{
-		int64_t m_value = 0;
+		Token m_value;
 	public:
-		IntLiteralExpr(int64_t value)
+		IntLiteralExpr(Token value)
 			: m_value(value)
 		{}
 
-		int64_t value() const { return m_value; }
+		Token value() const { return m_value; }
 	};
 
 	class ArrayLookupExpr: public Expr
