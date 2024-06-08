@@ -47,6 +47,65 @@ namespace minijava
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
+	core::Unique<Expr> Parser::parseAddExpr()
+	{
+		return nullptr;
+	}
+
+	core::Unique<Expr> Parser::parseCmpExpr()
+	{
+		auto token = look();
+		auto expr = parseAddExpr();
+
+		if (look().kind() == Token::KIND_OPERATOR_LESS_THAN)
+		{
+			auto op = eat();
+			auto rhs = parseAddExpr();
+			if (rhs == nullptr)
+			{
+				m_unit->pushError(errf(m_allocator, op.location(), "missing right hand side"_sv));
+			}
+			else
+			{
+				expr = core::unique_from<LessThanExpr>(m_allocator, std::move(expr), std::move(rhs));
+			}
+		}
+
+		return expr;
+	}
+
+	core::Unique<Expr> Parser::parseAndExpr()
+	{
+		auto token = look();
+		auto expr = parseCmpExpr();
+		while (true)
+		{
+			auto andToken = eatKind(Token::KIND_OPERATOR_LOGIC_AND);
+			if (andToken.kind() == Token::KIND_OPERATOR_LOGIC_AND)
+			{
+				auto rhs = parseCmpExpr();
+				if (rhs == nullptr)
+				{
+					m_unit->pushError(errf(m_allocator, andToken.location(), "missing right hand side"_sv));
+					break;
+				}
+
+				expr = core::unique_from<AndExpr>(m_allocator, std::move(expr), std::move(rhs));
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		return expr;
+	}
+
+	core::Unique<Expr> Parser::parseExpr()
+	{
+		return parseAndExpr();
+	}
+
 	core::Unique<Stmt> Parser::parseStmt()
 	{
 		auto token = look();

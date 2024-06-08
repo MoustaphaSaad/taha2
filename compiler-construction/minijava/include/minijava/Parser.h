@@ -17,8 +17,13 @@ namespace minijava
 		Token eat();
 		Token eatKind(Token::KIND kind);
 		Token eatMust(Token::KIND kind);
+		core::Unique<Expr> parseAddExpr();
+		core::Unique<Expr> parseCmpExpr();
+		core::Unique<Expr> parseAndExpr();
+		core::Unique<Expr> parseExpr();
 		core::Unique<Stmt> parseStmt();
 		core::Unique<BlockStmt> parseBlockStmt();
+		core::Unique<IfStmt> parseIfStmt();
 		core::Unique<MainClass> parseMainClass();
 	public:
 		explicit Parser(Unit* unit, core::Allocator* allocator);
