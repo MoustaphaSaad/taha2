@@ -6,6 +6,44 @@
 
 namespace minijava
 {
+	class AndExpr;
+	class LessThanExpr;
+	class PlusExpr;
+	class MinusExpr;
+	class TimesExpr;
+	class NotExpr;
+	class NewObjectExpr;
+	class NewArrayExpr;
+	class ThisExpr;
+	class IdentifierExpr;
+	class FalseExpr;
+	class TrueExpr;
+	class IntLiteralExpr;
+	class ArrayLookupExpr;
+	class ArrayLengthExpr;
+	class CallExpr;
+
+	class ASTVisitor
+	{
+	public:
+		virtual void visitAndExpr(AndExpr*) {}
+		virtual void visitLessThanExpr(LessThanExpr*) {}
+		virtual void visitPlusExpr(PlusExpr*) {}
+		virtual void visitMinusExpr(MinusExpr*) {}
+		virtual void visitTimesExpr(TimesExpr*) {}
+		virtual void visitNotExpr(NotExpr*) {}
+		virtual void visitNewObjectExpr(NewObjectExpr*) {}
+		virtual void visitNewArrayExpr(NewArrayExpr*) {}
+		virtual void visitThisExpr(ThisExpr*) {}
+		virtual void visitIdentifierExpr(IdentifierExpr*) {}
+		virtual void visitFalseExpr(FalseExpr*) {}
+		virtual void visitTrueExpr(TrueExpr*) {}
+		virtual void visitIntLiteralExpr(IntLiteralExpr*) {}
+		virtual void visitArrayLookupExpr(ArrayLookupExpr*) {}
+		virtual void visitArrayLengthExpr(ArrayLengthExpr*) {}
+		virtual void visitCallExpr(CallExpr*) {}
+	};
+
 	class Identifier
 	{
 		Token m_token;
@@ -22,6 +60,7 @@ namespace minijava
 	{
 	public:
 		virtual ~Expr() = default;
+		virtual void visit(ASTVisitor* visitor) = 0;
 	};
 
 	class AndExpr: public Expr
@@ -36,6 +75,11 @@ namespace minijava
 
 		Expr* operand1() const { return m_operand1.get(); }
 		Expr* operand2() const { return m_operand2.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitAndExpr(this);
+		}
 	};
 
 	class LessThanExpr: public Expr
@@ -50,6 +94,11 @@ namespace minijava
 
 		Expr* operand1() const { return m_operand1.get(); }
 		Expr* operand2() const { return m_operand2.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitLessThanExpr(this);
+		}
 	};
 
 	class PlusExpr: public Expr
@@ -64,6 +113,11 @@ namespace minijava
 
 		Expr* operand1() const { return m_operand1.get(); }
 		Expr* operand2() const { return m_operand2.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitPlusExpr(this);
+		}
 	};
 
 	class MinusExpr: public Expr
@@ -78,6 +132,11 @@ namespace minijava
 
 		Expr* operand1() const { return m_operand1.get(); }
 		Expr* operand2() const { return m_operand2.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitMinusExpr(this);
+		}
 	};
 
 	class TimesExpr: public Expr
@@ -92,6 +151,11 @@ namespace minijava
 
 		Expr* operand1() const { return m_operand1.get(); }
 		Expr* operand2() const { return m_operand2.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitTimesExpr(this);
+		}
 	};
 
 	class NotExpr: public Expr
@@ -103,6 +167,11 @@ namespace minijava
 		{}
 
 		Expr* value() const { return m_value.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitNotExpr(this);
+		}
 	};
 
 	class NewObjectExpr: public Expr
@@ -114,6 +183,11 @@ namespace minijava
 		{}
 
 		const Identifier* name() const { return &m_name; }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitNewObjectExpr(this);
+		}
 	};
 
 	class NewArrayExpr: public Expr
@@ -125,6 +199,11 @@ namespace minijava
 		{}
 
 		Expr* length() const { return m_length.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitNewArrayExpr(this);
+		}
 	};
 
 	class ThisExpr: public Expr
@@ -136,6 +215,11 @@ namespace minijava
 		{}
 
 		Token token() const { return m_token; }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitThisExpr(this);
+		}
 	};
 
 	class IdentifierExpr: public Expr
@@ -147,6 +231,11 @@ namespace minijava
 		{}
 
 		Token name() const { return m_name; }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitIdentifierExpr(this);
+		}
 	};
 
 	class FalseExpr: public Expr
@@ -158,6 +247,11 @@ namespace minijava
 		{}
 
 		Token token() const { return m_token; }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitFalseExpr(this);
+		}
 	};
 
 	class TrueExpr: public Expr
@@ -169,6 +263,11 @@ namespace minijava
 		{}
 
 		Token token() const { return m_token; }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitTrueExpr(this);
+		}
 	};
 
 	class IntLiteralExpr: public Expr
@@ -180,6 +279,11 @@ namespace minijava
 		{}
 
 		Token value() const { return m_value; }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitIntLiteralExpr(this);
+		}
 	};
 
 	class ArrayLookupExpr: public Expr
@@ -194,6 +298,11 @@ namespace minijava
 
 		Expr* name() const { return m_name.get(); }
 		Expr* index() const { return m_index.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitArrayLookupExpr(this);
+		}
 	};
 
 	class ArrayLengthExpr: public Expr
@@ -205,6 +314,11 @@ namespace minijava
 		{}
 
 		Expr* name() const { return m_name.get(); }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitArrayLengthExpr(this);
+		}
 	};
 
 	class CallExpr: public Expr
@@ -222,6 +336,11 @@ namespace minijava
 		Expr* base() const { return m_base.get(); }
 		const Identifier* name() const { return &m_name; }
 		const core::Array<core::Unique<Expr>>& arguments() const { return m_arguments; }
+
+		void visit(ASTVisitor* visitor) override
+		{
+			visitor->visitCallExpr(this);
+		}
 	};
 
 	class Stmt
