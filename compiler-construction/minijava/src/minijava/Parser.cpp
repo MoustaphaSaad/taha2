@@ -94,13 +94,14 @@ namespace minijava
 		}
 		else if (token.kind() == Token::KIND_KEYWORD_NEW)
 		{
-			if (auto className = eatMust(Token::KIND_ID); className.kind() == Token::KIND_ID)
+			eat();
+			if (auto className = eatKind(Token::KIND_ID); className.kind() == Token::KIND_ID)
 			{
 				eatMust(Token::KIND_OPEN_PAREN);
 				eatMust(Token::KIND_CLOSE_PAREN);
 				expr = core::unique_from<NewObjectExpr>(m_allocator, Identifier{className});
 			}
-			else if (auto intToken = eatMust(Token::KIND_KEYWORD_INT); intToken.kind() == Token::KIND_KEYWORD_INT)
+			else if (auto intToken = eatKind(Token::KIND_KEYWORD_INT); intToken.kind() == Token::KIND_KEYWORD_INT)
 			{
 				eatMust(Token::KIND_OPEN_BRACKET);
 				auto arrayCount = parseExpr();

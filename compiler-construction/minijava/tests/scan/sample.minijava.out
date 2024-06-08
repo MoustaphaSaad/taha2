@@ -6,7 +6,7 @@ Token: "static", Type: "static", Line: 2:11
 Token: "void", Type: "void", Line: 2:18
 Token: "main", Type: "main", Line: 2:23
 Token: "(", Type: "(", Line: 2:27
-Token: "String", Type: "id", Line: 2:28
+Token: "String", Type: "string", Line: 2:28
 Token: "[", Type: "[", Line: 2:34
 Token: "]", Type: "]", Line: 2:35
 Token: "a", Type: "id", Line: 2:37

@@ -12,6 +12,7 @@
 #include "minijava/Unit.h"
 #include "minijava/Scanner.h"
 #include "minijava/Parser.h"
+#include "minijava/ASTPrinter.h"
 
 constexpr auto HELP = R"""(MiniJava compiler usage:
 minijava COMMAND [OPTIONS] [files...]
@@ -182,7 +183,8 @@ int main(int argc, char* argv[])
 				minijava::Parser parser{unit.get(), &allocator};
 				auto expr = parser.parseExpr();
 
-				// TODO: dump the expression AST
+				minijava::ASTPrinter printer{&outputStream};
+				printer.visit(expr.get());
 
 				auto output = outputStream.releaseString();
 				if (output != expectedOutput)
@@ -199,9 +201,16 @@ int main(int argc, char* argv[])
 			else
 			{
 				if (unit->scan() == false)
+				{
 					unit->dumpErrors(core::File::STDOUT);
-				else
-					unit->dumpTokens(core::File::STDOUT);
+					return EXIT_FAILURE;
+				}
+
+				minijava::Parser parser{unit.get(), &allocator};
+				auto expr = parser.parseExpr();
+
+				minijava::ASTPrinter printer{core::File::STDOUT};
+				printer.visit(expr.get());
 			}
 		}
 

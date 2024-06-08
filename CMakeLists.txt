@@ -41,6 +41,8 @@ endif()
 include(CPM)
 CPMUsePackageLock(package-lock.cmake)
 
+enable_testing()
+
 add_subdirectory(external)
 add_subdirectory(infrastructure)
 
