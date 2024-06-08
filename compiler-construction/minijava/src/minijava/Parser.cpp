@@ -47,9 +47,29 @@ namespace minijava
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
-	core::Unique<Expr> Parser::parseMulExpr()
+	core::Unique<Expr> Parser::parseUnaryExpr()
 	{
 		return nullptr;
+	}
+
+	core::Unique<Expr> Parser::parseMulExpr()
+	{
+		auto expr = parseUnaryExpr();
+
+		while (look().kind() == Token::KIND_OPERATOR_MULTIPLY)
+		{
+			auto op = eat();
+			auto rhs = parseUnaryExpr();
+			if (rhs == nullptr)
+			{
+				m_unit->pushError(errf(m_allocator, op.location(), "missing right hand side"_sv));
+				break;
+			}
+
+			expr = core::unique_from<TimesExpr>(m_allocator, std::move(expr), std::move(rhs));
+		}
+
+		return expr;
 	}
 
 	core::Unique<Expr> Parser::parseAddExpr()
@@ -60,7 +80,6 @@ namespace minijava
 				kind == Token::KIND_OPERATOR_MINUS
 			);
 		};
-		auto token = look();
 		auto expr = parseMulExpr();
 
 		while (isAddToken(look().kind()))
@@ -91,7 +110,6 @@ namespace minijava
 
 	core::Unique<Expr> Parser::parseCmpExpr()
 	{
-		auto token = look();
 		auto expr = parseAddExpr();
 
 		if (look().kind() == Token::KIND_OPERATOR_LESS_THAN)
@@ -113,7 +131,6 @@ namespace minijava
 
 	core::Unique<Expr> Parser::parseAndExpr()
 	{
-		auto token = look();
 		auto expr = parseCmpExpr();
 		while (true)
 		{
