@@ -17,6 +17,8 @@ namespace minijava
 		Token eat();
 		Token eatKind(Token::KIND kind);
 		Token eatMust(Token::KIND kind);
+		core::Array<core::Unique<Expr>> parseArgs();
+		core::Unique<Expr> parseAtomExpr();
 		core::Unique<Expr> parseBaseExpr();
 		core::Unique<Expr> parseUnaryExpr();
 		core::Unique<Expr> parseMulExpr();

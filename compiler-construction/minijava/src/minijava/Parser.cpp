@@ -47,7 +47,28 @@ namespace minijava
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
-	core::Unique<Expr> Parser::parseBaseExpr()
+	core::Array<core::Unique<Expr>> Parser::parseArgs()
+	{
+		core::Array<core::Unique<Expr>> arguments{m_allocator};
+		if (eatKind(Token::KIND_OPEN_PAREN).kind() == Token::KIND_OPEN_PAREN)
+		{
+			if (eatKind(Token::KIND_CLOSE_PAREN).kind() != Token::KIND_CLOSE_PAREN)
+			{
+				while (true)
+				{
+					if (auto arg = parseExpr())
+						arguments.push(std::move(arg));
+
+					if (eatKind(Token::KIND_COMMA).kind() != Token::KIND_COMMA)
+						break;
+				}
+				eatMust(Token::KIND_CLOSE_PAREN);
+			}
+		}
+		return arguments;
+	}
+
+	core::Unique<Expr> Parser::parseAtomExpr()
 	{
 		auto token = look();
 		core::Unique<Expr> expr;
@@ -71,10 +92,73 @@ namespace minijava
 		{
 			expr = core::unique_from<IdentifierExpr>(m_allocator, eat());
 		}
+		else if (token.kind() == Token::KIND_KEYWORD_NEW)
+		{
+			if (auto className = eatMust(Token::KIND_ID); className.kind() == Token::KIND_ID)
+			{
+				eatMust(Token::KIND_OPEN_PAREN);
+				eatMust(Token::KIND_CLOSE_PAREN);
+				expr = core::unique_from<NewObjectExpr>(m_allocator, Identifier{className});
+			}
+			else if (auto intToken = eatMust(Token::KIND_KEYWORD_INT); intToken.kind() == Token::KIND_KEYWORD_INT)
+			{
+				eatMust(Token::KIND_OPEN_BRACKET);
+				auto arrayCount = parseExpr();
+				eatMust(Token::KIND_CLOSE_BRACKET);
+				expr = core::unique_from<NewArrayExpr>(m_allocator, std::move(arrayCount));
+			}
+			else
+			{
+				auto token = look();
+				m_unit->pushError(errf(m_allocator, token.location(), "unknown new expression type '{}'"_sv, token.text()));
+			}
+		}
+		else if (token.kind() == Token::KIND_OPEN_PAREN)
+		{
+			eat();
+			expr = parseExpr();
+			eatMust(Token::KIND_CLOSE_PAREN);
+		}
 		else
 		{
 			m_unit->pushError(errf(m_allocator, token.location(), "unknown expression '{}'"_sv, token.text()));
 		}
+		return expr;
+	}
+
+	core::Unique<Expr> Parser::parseBaseExpr()
+	{
+		auto expr = parseAtomExpr();
+
+		while (true)
+		{
+			if (eatKind(Token::KIND_DOT).kind() == Token::KIND_DOT)
+			{
+				if (eatKind(Token::KIND_KEYWORD_LENGTH).kind() == Token::KIND_KEYWORD_LENGTH)
+				{
+					expr = core::unique_from<ArrayLengthExpr>(m_allocator, std::move(expr));
+				}
+				else if (auto call = eatKind(Token::KIND_ID); call.kind() == Token::KIND_ID)
+				{
+					expr = core::unique_from<CallExpr>(m_allocator, std::move(expr), Identifier{call}, parseArgs());
+				}
+				else
+				{
+					break;
+				}
+			}
+			else if (eatKind(Token::KIND_OPEN_BRACKET).kind() == Token::KIND_OPEN_BRACKET)
+			{
+				auto index = parseExpr();
+				eatMust(Token::KIND_CLOSE_BRACKET);
+				expr = core::unique_from<ArrayLookupExpr>(m_allocator, std::move(expr), std::move(index));
+			}
+			else
+			{
+				break;
+			}
+		}
+
 		return expr;
 	}
 
