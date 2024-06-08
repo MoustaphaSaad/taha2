@@ -47,9 +47,46 @@ namespace minijava
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
-	core::Unique<Expr> Parser::parseAddExpr()
+	core::Unique<Expr> Parser::parseMulExpr()
 	{
 		return nullptr;
+	}
+
+	core::Unique<Expr> Parser::parseAddExpr()
+	{
+		auto isAddToken = +[](Token::KIND kind) {
+			return (
+				kind == Token::KIND_OPERATOR_PLUS ||
+				kind == Token::KIND_OPERATOR_MINUS
+			);
+		};
+		auto token = look();
+		auto expr = parseMulExpr();
+
+		while (isAddToken(look().kind()))
+		{
+			auto op = eat();
+			auto rhs = parseMulExpr();
+			if (rhs == nullptr)
+			{
+				m_unit->pushError(errf(m_allocator, op.location(), "missing right hand side"_sv));
+				break;
+			}
+			if (op.kind() == Token::KIND_OPERATOR_PLUS)
+			{
+				expr = core::unique_from<PlusExpr>(m_allocator, std::move(expr), std::move(rhs));
+			}
+			else if (op.kind() == Token::KIND_OPERATOR_MINUS)
+			{
+				expr = core::unique_from<MinusExpr>(m_allocator, std::move(expr), std::move(rhs));
+			}
+			else
+			{
+				coreUnreachable();
+			}
+		}
+
+		return expr;
 	}
 
 	core::Unique<Expr> Parser::parseCmpExpr()
