@@ -44,7 +44,8 @@ target_sources(core PRIVATE
   include/core/Path.h
   include/core/CUtils.h
   include/core/BufferedReader.h
-  include/core/Mimallocator.h
+  include/core/MiMallocator.h
+        include/core/Arena.h
   include/core/ws/Message.h
   include/core/ws/Client.h
   include/core/ws/Handshake.h
@@ -64,7 +65,8 @@ target_sources(core PRIVATE
   src/core/Base64.cpp
   src/core/SHA1.cpp
   src/core/Assert.cpp
-  src/core/Mimallocator.cpp
+  src/core/MiMallocator.cpp
+        src/core/Arena.cpp
   src/core/ws/Message.cpp
   src/core/ws/Client.cpp
   src/core/ws/Handshake.cpp

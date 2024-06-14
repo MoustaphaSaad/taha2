@@ -1,4 +1,4 @@
-#include "core/Mimallocator.h"
+#include "core/MiMallocator.h"
 
 #include <tracy/Tracy.hpp>
 
