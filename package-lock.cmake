@@ -137,3 +137,11 @@ CPMDeclarePackage(nanobench
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
 )
+
+CPMDeclarePackage(mimalloc
+  NAME mimalloc
+  GIT_TAG v2.1.7
+  GIT_REPOSITORY git@github.com:microsoft/mimalloc.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+)

@@ -44,6 +44,7 @@ target_sources(core PRIVATE
   include/core/Path.h
   include/core/CUtils.h
   include/core/BufferedReader.h
+  include/core/Mimallocator.h
   include/core/ws/Message.h
   include/core/ws/Client.h
   include/core/ws/Handshake.h
@@ -63,6 +64,7 @@ target_sources(core PRIVATE
   src/core/Base64.cpp
   src/core/SHA1.cpp
   src/core/Assert.cpp
+  src/core/Mimallocator.cpp
   src/core/ws/Message.cpp
   src/core/ws/Client.cpp
   src/core/ws/Handshake.cpp
@@ -133,6 +135,7 @@ CPMGetPackage(fmt)
 CPMGetPackage(spdlog)
 CPMGetPackage(libressl)
 CPMGetPackage(tracy)
+CPMGetPackage(mimalloc)
 if (UNIX)
 #  compression is disabled in libdwarf at the moment
 #  CPMGetPackage(zlib)
@@ -144,7 +147,7 @@ if (UNIX)
 #  add_dependencies(dwarf zlib zlibstatic)
 endif ()
 CPMGetPackage(cpptrace-lib)
-target_link_libraries(core PUBLIC utf8proc fmt spdlog ssl crypto tls TracyClient cpptrace-lib)
+target_link_libraries(core PUBLIC utf8proc fmt spdlog ssl crypto tls TracyClient cpptrace-lib mimalloc)
 target_link_libraries(core
   PRIVATE
   "$<$<PLATFORM_ID:Windows>:bcrypt;ws2_32>"
