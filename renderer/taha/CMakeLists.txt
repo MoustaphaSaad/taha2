@@ -33,8 +33,13 @@ if (WIN32 OR (UNIX AND NOT APPLE))
 			include/taha/vk/VkFrame.h
 			src/taha/vk/VkFrame.cpp
 	)
-	find_package(Vulkan REQUIRED)
-	target_link_libraries(taha PRIVATE Vulkan::Vulkan)
+	if (WIN32)
+		set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
+	elseif (UNIX AND NOT APPLE)
+		set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WAYLAND_KHR;VK_USE_PLATFORM_XLIB_KHR)
+	endif ()
+	CPMGetPackage(volk)
+	target_link_libraries(taha PRIVATE volk)
 endif ()
 
 if (UNIX AND NOT APPLE)

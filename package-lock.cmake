@@ -145,3 +145,11 @@ CPMDeclarePackage(mimalloc
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
 )
+
+CPMDeclarePackage(volk
+  NAME volk
+  GIT_TAG 1.3.270
+  GIT_REPOSITORY git@github.com:zeux/volk.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+)

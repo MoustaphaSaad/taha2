@@ -1,16 +1,13 @@
 #pragma once
 
+#include <volk.h>
+
 #include "taha/Exports.h"
 #include "taha/Renderer.h"
 
 #include <core/Log.h>
 #include <core/Result.h>
 #include <core/Unique.h>
-
-#if TAHA_OS_WINDOWS
-	#define VK_USE_PLATFORM_WIN32_KHR 1
-#endif
-#include <vulkan/vulkan.h>
 
 namespace taha
 {
