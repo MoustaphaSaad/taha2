@@ -196,6 +196,16 @@ namespace taha
 			return res;
 	}
 
+	static core::Array<VkExtensionProperties> enumeratePhysicalDeviceExtensions(VkPhysicalDevice device, core::Allocator* allocator)
+	{
+		uint32_t physicalDeviceExtensionCount = 0;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &physicalDeviceExtensionCount, nullptr);
+		core::Array<VkExtensionProperties> res{allocator};
+		res.resize_fill(physicalDeviceExtensionCount, VkExtensionProperties{});
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &physicalDeviceExtensionCount, res.data());
+		return res;
+	}
+
 	VkBool32 VKAPI_CALL VkRenderer::debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,
@@ -504,6 +514,9 @@ namespace taha
 		// create physical device
 		VkPhysicalDevice physicalDevice2 = VK_NULL_HANDLE;
 		RequiredQueueFamilies requiredQueueFamilies2{};
+		constexpr const char* requiredDeviceExtensions[] = {
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		};
 		{
 			uint32_t physicalDeviceCount = 0;
 			auto result = vkEnumeratePhysicalDevices(instance2, &physicalDeviceCount, nullptr);
@@ -524,6 +537,20 @@ namespace taha
 					continue;
 				requiredQueueFamilies2 = requiredQueueFamiliesResult.releaseValue();
 
+				auto extensions = enumeratePhysicalDeviceExtensions(device, allocator);
+				bool allExtensionsFound = true;
+				for (auto ext: requiredDeviceExtensions)
+				{
+					if (findExtensionByName(extensions, core::StringView{ext}) == SIZE_MAX)
+					{
+						allExtensionsFound = false;
+						break;
+					}
+				}
+
+				if (allExtensionsFound == false)
+					continue;
+
 				auto score = ratePhysicalDevice(device);
 				if (score > maxScore)
 				{
@@ -531,6 +558,9 @@ namespace taha
 					physicalDevice2 = device;
 				}
 			}
+
+			if (physicalDevice2 == VK_NULL_HANDLE)
+				return core::errf(allocator, "failed to find suitable physical device"_sv);
 		}
 
 		// create logical device
@@ -570,6 +600,8 @@ namespace taha
 				.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 				.queueCreateInfoCount = queuesCount,
 				.pQueueCreateInfos = queues,
+				.enabledExtensionCount = sizeof(requiredDeviceExtensions) / sizeof(*requiredDeviceExtensions),
+				.ppEnabledExtensionNames = requiredDeviceExtensions,
 				.pEnabledFeatures = &enabledFeatures,
 			};
 
