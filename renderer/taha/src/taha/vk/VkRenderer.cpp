@@ -244,6 +244,27 @@ namespace taha
 		}
 	};
 
+	static VkSurfaceFormatKHR chooseSwapchainFormat(const core::Array<VkSurfaceFormatKHR>& formats)
+	{
+		for (auto format: formats)
+		{
+			if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+				return format;
+		}
+		coreAssert(formats.count() > 0);
+		return formats[0];
+	}
+
+	static VkPresentModeKHR choosePresentMode(const core::Array<VkPresentModeKHR>& presentModes)
+	{
+		for (auto mode: presentModes)
+		{
+			if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+				return mode;
+		}
+		return VK_PRESENT_MODE_FIFO_KHR;
+	}
+
 	VkBool32 VKAPI_CALL VkRenderer::debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,
@@ -555,6 +576,8 @@ namespace taha
 		constexpr const char* requiredDeviceExtensions[] = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		};
+		VkSurfaceFormatKHR swapchainSurfaceFormat{};
+		VkPresentModeKHR swapchainPresentMode{};
 		{
 			uint32_t physicalDeviceCount = 0;
 			auto result = vkEnumeratePhysicalDevices(instance2, &physicalDeviceCount, nullptr);
@@ -598,6 +621,8 @@ namespace taha
 				{
 					maxScore = score;
 					physicalDevice2 = device;
+					swapchainSurfaceFormat = chooseSwapchainFormat(swapchainSupport.formats);
+					swapchainPresentMode = choosePresentMode(swapchainSupport.presentModes);
 				}
 			}
 
