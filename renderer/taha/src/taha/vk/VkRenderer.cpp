@@ -477,6 +477,8 @@ namespace taha
 			instanceExtensions.push(VK_KHR_SURFACE_EXTENSION_NAME);
 #if TAHA_OS_WINDOWS
 			instanceExtensions.push(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#elif TAHA_OS_LINUX
+			instanceExtensions.push(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
 #endif
 
 			if (enableValidation)
@@ -534,6 +536,7 @@ namespace taha
 		VkSurfaceKHR dummySurface2 = VK_NULL_HANDLE;
 		coreDefer { if (dummySurface2 != VK_NULL_HANDLE) vkDestroySurfaceKHR(instance2, dummySurface2, nullptr); };
 		{
+#if TAHA_OS_WINDOWS
 			constexpr TCHAR CLASS_NAME[] = L"DummyWindowClass";
 			WNDCLASSEX windowClass{};
 			windowClass.cbSize = sizeof(windowClass);
@@ -568,6 +571,32 @@ namespace taha
 			auto result = vkCreateWin32SurfaceKHR(instance2, &dummySurfaceCreateInfo, nullptr, &dummySurface2);
 			if (result != VK_SUCCESS)
 				return core::errf(allocator, "vkCreateWin32SurfaceKHR failed, ErrorCode({})"_sv, result);
+#elif TAHA_OS_LINUX
+			auto display = wl_display_connect(nullptr);
+			coreDefer{wl_display_disconnect(display);};
+
+			auto registry = wl_display_get_registry(display);
+			wl_compositor* compositor = nullptr;
+			wl_registry_listener listener{
+				.global = registryListener,
+				.global_remove = registryRemover,
+			};
+			wl_registry_add_listener(registry, &listener, &compositor);
+			coreDefer {wl_compositor_destroy(compositor);};
+			wl_display_roundtrip(display);
+
+			auto surface = wl_compositor_create_surface(compositor);
+			coreDefer {wl_surface_destroy(surface);};
+
+			VkWaylandSurfaceCreateInfoKHR dummySurfaceCreateInfo {
+				.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+				.display = display,
+				.surface = surface,
+			};
+			result = vkCreateWaylandSurfaceKHR(renderer->m_instance, &dummySurfaceCreateInfo, nullptr, &dummySurface2);
+			if (result != VK_SUCCESS)
+				return core::errf(allocator, "vkCreateWaylandSurfaceKHR failed, ErrorCode({})"_sv, result);
+#endif
 		}
 
 		// create physical device
@@ -686,281 +715,38 @@ namespace taha
 			vkGetDeviceQueue(logicalDevice2, requiredQueueFamilies2.presentFamily, 0, &presentQueue);
 		}
 
+		auto renderer = core::unique_from<VkRenderer>(allocator, log, allocator);
 
-		// old code
-		auto renderer = unique_from<VkRenderer>(allocator, log, allocator);
+		renderer->m_instance = instance2;
+		instance2 = VK_NULL_HANDLE;
 
-		VkApplicationInfo appInfo{
-			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-			.pApplicationName = "No App",
-			.applicationVersion = VK_MAKE_VERSION(0, 0, 0),
-			.pEngineName = "Taha Engine",
-			.engineVersion = VK_MAKE_VERSION(1, 0, 0),
-			.apiVersion = VK_API_VERSION_1_3,
-		};
+		renderer->m_debugMessenger = debugMessenger2;
+		debugMessenger2 = VK_NULL_HANDLE;
 
-		// layers
-		const char* validationLayers[] = {"VK_LAYER_KHRONOS_validation"};
+		renderer->m_physicalDevice = physicalDevice2;
+		physicalDevice2 = VK_NULL_HANDLE;
 
-		uint32_t availableLayersCount = 0;
-		auto result = vkEnumerateInstanceLayerProperties(&availableLayersCount, nullptr);
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkEnumerateInstanceLayerProperties failed, ErrorCode({})"_sv, result);
+		renderer->m_swapchainSurfaceFormat = swapchainSurfaceFormat;
+		renderer->m_swapchainPresentMode = swapchainPresentMode;
 
-		core::Array<VkLayerProperties> availableLayers{allocator};
-		availableLayers.resize_fill(availableLayersCount, VkLayerProperties{});
-		result = vkEnumerateInstanceLayerProperties(&availableLayersCount, availableLayers.data());
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkEnumerateInstanceLayerProperties failed, ErrorCode({})"_sv, result);
+		renderer->m_logicalDevice = logicalDevice2;
+		logicalDevice2 = VK_NULL_HANDLE;
 
-		for (auto requiredLayer: validationLayers)
-		{
-			bool found = false;
-			for (auto availableLayer: availableLayers)
-			{
-				log->trace("available layer: {}"_sv, availableLayer.layerName);
-				if (core::StringView{availableLayer.layerName} == core::StringView{requiredLayer})
-				{
-					found = true;
-					break;
-				}
-			}
-			if (found == false)
-				return core::errf(allocator, "failed to find layer '{}'"_sv, requiredLayer);
-		}
+		renderer->m_graphicsQueue = graphicsQueue;
+		renderer->m_presentQueue = presentQueue;
 
-// extensions
-#if TAHA_OS_WINDOWS
-		const char* extensions[] = {
-			VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
-#elif TAHA_OS_LINUX
-		const char* extensions[] = {
-			VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
-#endif
-
-		uint32_t availableExtensionsCount = 0;
-		result = vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, nullptr);
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkEnumerateInstanceExtensionProperties failed, ErrorCode({})"_sv, result);
-
-		core::Array<VkExtensionProperties> availableExtensions{allocator};
-		availableExtensions.resize_fill(availableExtensionsCount, VkExtensionProperties{});
-		result = vkEnumerateInstanceExtensionProperties(nullptr, &availableExtensionsCount, availableExtensions.data());
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkEnumerateInstanceExtensionProperties failed, ErrorCode({})"_sv, result);
-
-		for (auto requiredExtension: extensions)
-		{
-			bool found = false;
-			for (auto availableExtension: availableExtensions)
-			{
-				log->trace("extension: {}"_sv, availableExtension.extensionName);
-				if (core::StringView{availableExtension.extensionName} == core::StringView{requiredExtension})
-				{
-					found = true;
-					break;
-				}
-			}
-			if (found == false)
-				return core::errf(allocator, "failed to find extension '{}'"_sv, requiredExtension);
-		}
-
-		// debug messenger
-		VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo{
-			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-			.messageSeverity =
-				VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-			.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-						   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-						   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-			.pfnUserCallback = VkRenderer::debugCallback,
-			.pUserData = renderer.get()};
-
-		// create instance
-		VkInstanceCreateInfo createInfo{
-			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-			.pNext = &debugMessengerCreateInfo,
-			.pApplicationInfo = &appInfo,
-			.enabledLayerCount = sizeof(validationLayers) / sizeof(*validationLayers),
-			.ppEnabledLayerNames = validationLayers,
-			.enabledExtensionCount = sizeof(extensions) / sizeof(*extensions),
-			.ppEnabledExtensionNames = extensions,
-		};
-
-		result = vkCreateInstance(&createInfo, nullptr, &renderer->m_instance);
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkCreateInstance failed, ErrorCode({})"_sv, result);
-
-		// create debug messenger
-		auto createDebugUtilsMessengerEXTFn = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-			renderer->m_instance, "vkCreateDebugUtilsMessengerEXT");
-		if (createDebugUtilsMessengerEXTFn == nullptr)
-			return core::errf(
-				allocator, "vkGetInstanceProcAddr failed, failed to find 'vkCreateDebugUtilsMessengerEXT'"_sv);
-		renderer->m_destroyDebugMessengerFn = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-			renderer->m_instance, "vkDestroyDebugUtilsMessengerEXT");
-		if (renderer->m_destroyDebugMessengerFn == nullptr)
-			return core::errf(
-				allocator, "vkGetInstanceProcAddr failed, failed to find 'vkDestroyDebugUtilsMessengerEXT'"_sv);
-		result = createDebugUtilsMessengerEXTFn(
-			renderer->m_instance, &debugMessengerCreateInfo, nullptr, &renderer->m_debugMessenger);
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkCreateDebugUtilsMessengerEXT failed, ErrorCode({})"_sv, result);
-
-#if TAHA_OS_WINDOWS
-		constexpr TCHAR CLASS_NAME[] = L"DummyWindowClass";
-		WNDCLASSEX windowClass{};
-		windowClass.cbSize = sizeof(windowClass);
-		windowClass.lpfnWndProc = dummyWindowProc;
-		windowClass.hInstance = GetModuleHandle(nullptr);
-		windowClass.lpszClassName = CLASS_NAME;
-		RegisterClassEx(&windowClass);
-
-		auto dummyHwnd = CreateWindowEx(
-			0,
-			CLASS_NAME,
-			L"Dummy Window",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			nullptr,
-			nullptr,
-			GetModuleHandle(nullptr),
-			nullptr);
-		if (dummyHwnd == nullptr)
-			return core::errf(allocator, "CreateWindowEx failed, ErrorCode({})"_sv, GetLastError());
-		coreDefer { CloseWindow(dummyHwnd); };
-
-		VkWin32SurfaceCreateInfoKHR dummySurfaceCreateInfo{
-			.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-			.hinstance = GetModuleHandle(nullptr),
-			.hwnd = dummyHwnd,
-		};
-
-		VkSurfaceKHR dummySurface;
-		result = vkCreateWin32SurfaceKHR(renderer->m_instance, &dummySurfaceCreateInfo, nullptr, &dummySurface);
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkCreateWin32SurfaceKHR failed, ErrorCode({})"_sv, result);
-		auto instance = renderer->m_instance;
-		coreDefer { vkDestroySurfaceKHR(instance, dummySurface, nullptr); };
-#elif TAHA_OS_LINUX
-		auto display = wl_display_connect(nullptr);
-		coreDefer{wl_display_disconnect(display);};
-
-		auto registry = wl_display_get_registry(display);
-		wl_compositor* compositor = nullptr;
-		wl_registry_listener listener{
-			.global = registryListener,
-			.global_remove = registryRemover,
-		};
-		wl_registry_add_listener(registry, &listener, &compositor);
-		coreDefer {wl_compositor_destroy(compositor);};
-		wl_display_roundtrip(display);
-
-		auto surface = wl_compositor_create_surface(compositor);
-		coreDefer {wl_surface_destroy(surface);};
-
-		// TODO: handle this later
-		VkWaylandSurfaceCreateInfoKHR dummySurfaceCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
-			.display = display,
-			.surface = surface,
-		};
-		VkSurfaceKHR dummySurface = VK_NULL_HANDLE;
-		result = vkCreateWaylandSurfaceKHR(renderer->m_instance, &dummySurfaceCreateInfo, nullptr, &dummySurface);
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkCreateWaylandSurfaceKHR failed, ErrorCode({})"_sv, result);
-		auto instance = renderer->m_instance;
-		coreDefer {vkDestroySurfaceKHR(instance, dummySurface, nullptr);};
-#endif
-
-		// choose physical device
-		uint32_t deviceCount = 0;
-		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, nullptr);
-		if (deviceCount == 0)
-			return core::errf(allocator, "Failed to find GPUs with Vulkan support"_sv);
-		core::Array<VkPhysicalDevice> physicalDevices{allocator};
-		physicalDevices.resize_fill(deviceCount, {});
-		vkEnumeratePhysicalDevices(renderer->m_instance, &deviceCount, physicalDevices.data());
-
-		PhysicalDeviceCheckResult physicalDeviceCheckResult{};
-		for (auto device: physicalDevices)
-		{
-			physicalDeviceCheckResult = checkPhysicalDevice(device, dummySurface, allocator);
-			if (physicalDeviceCheckResult.suitable())
-			{
-				renderer->m_physicalDevice = device;
-				break;
-			}
-		}
-
-		if (renderer->m_physicalDevice == VK_NULL_HANDLE)
-			return core::errf(allocator, "cannot find suitable physical device"_sv);
-
-		VkPhysicalDeviceProperties deviceProperties;
-		vkGetPhysicalDeviceProperties(renderer->m_physicalDevice, &deviceProperties);
-		log->info(
-			"name: {}, driver version: {}.{}.{}"_sv,
-			deviceProperties.deviceName,
-			VK_VERSION_MAJOR(deviceProperties.driverVersion),
-			VK_VERSION_MINOR(deviceProperties.driverVersion),
-			VK_VERSION_PATCH(deviceProperties.driverVersion));
-
-		// create device
-		int uniqueQueues[2] = {physicalDeviceCheckResult.graphicsFamilyIndex, -1};
-		size_t uniqueQueuesCount = 1;
-		if (physicalDeviceCheckResult.presentationFamilyIndex != physicalDeviceCheckResult.graphicsFamilyIndex)
-		{
-			uniqueQueues[1] = physicalDeviceCheckResult.presentationFamilyIndex;
-			++uniqueQueuesCount;
-		}
-
-		float queuePriority = 1.0f;
-		core::Array<VkDeviceQueueCreateInfo> queueCreateInfos{allocator};
-		for (size_t i = 0; i < uniqueQueuesCount; ++i)
-		{
-			VkDeviceQueueCreateInfo queueCreateInfo{
-				.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-				.queueFamilyIndex = uint32_t(uniqueQueues[i]),
-				.queueCount = 1,
-				.pQueuePriorities = &queuePriority,
-			};
-			queueCreateInfos.push(queueCreateInfo);
-		}
-
-		VkDeviceCreateInfo deviceCreateInfo{
-			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			.queueCreateInfoCount = uint32_t(queueCreateInfos.count()),
-			.pQueueCreateInfos = queueCreateInfos.data(),
-			.enabledExtensionCount = sizeof(REQUIRED_DEVICE_EXTENSIONS) / sizeof(*REQUIRED_DEVICE_EXTENSIONS),
-			.ppEnabledExtensionNames = REQUIRED_DEVICE_EXTENSIONS,
-		};
-
-		result = vkCreateDevice(renderer->m_physicalDevice, &deviceCreateInfo, nullptr, &renderer->m_device);
-		if (result != VK_SUCCESS)
-			return core::errf(allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
-
-		vkGetDeviceQueue(
-			renderer->m_device, physicalDeviceCheckResult.graphicsFamilyIndex, 0, &renderer->m_graphicsQueue);
-
-		vkGetDeviceQueue(
-			renderer->m_device, physicalDeviceCheckResult.presentationFamilyIndex, 0, &renderer->m_presentQueue);
+		renderer->m_dummySurface = dummySurface2;
+		dummySurface2 = VK_NULL_HANDLE;
 
 		return renderer;
 	}
 
 	VkRenderer::~VkRenderer()
 	{
-		if (m_device != VK_NULL_HANDLE)
-			vkDestroyDevice(m_device, nullptr);
-
-		if (m_debugMessenger != VK_NULL_HANDLE)
-			m_destroyDebugMessengerFn(m_instance, m_debugMessenger, nullptr);
-
-		if (m_instance != VK_NULL_HANDLE)
-			vkDestroyInstance(m_instance, nullptr);
+		if (m_dummySurface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, m_dummySurface, nullptr);
+		if (m_logicalDevice != VK_NULL_HANDLE) vkDestroyDevice(m_logicalDevice, nullptr);
+		if (m_debugMessenger != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
+		if (m_instance != VK_NULL_HANDLE) vkDestroyInstance(m_instance, nullptr);
 	}
 
 	core::Unique<Frame> VkRenderer::createFrameForWindow(NativeWindowDesc desc)

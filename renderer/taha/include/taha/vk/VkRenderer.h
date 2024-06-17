@@ -24,11 +24,13 @@ namespace taha
 		core::Log* m_log = nullptr;
 		VkInstance m_instance = VK_NULL_HANDLE;
 		VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
-		PFN_vkDestroyDebugUtilsMessengerEXT m_destroyDebugMessengerFn = nullptr;
 		VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
-		VkDevice m_device = VK_NULL_HANDLE;
+		VkSurfaceFormatKHR m_swapchainSurfaceFormat = {};
+		VkPresentModeKHR m_swapchainPresentMode = {};
+		VkDevice m_logicalDevice = VK_NULL_HANDLE;
 		VkQueue m_graphicsQueue = VK_NULL_HANDLE;
 		VkQueue m_presentQueue = VK_NULL_HANDLE;
+		VkSurfaceKHR m_dummySurface = VK_NULL_HANDLE;
 
 		VkRenderer(core::Log* log, core::Allocator* allocator): m_allocator(allocator), m_log(log) {}
 
