@@ -265,6 +265,19 @@ namespace taha
 		return VK_PRESENT_MODE_FIFO_KHR;
 	}
 
+	static VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities, int width, int height)
+	{
+		if (capabilities.currentExtent.width != UINT32_MAX)
+			return capabilities.currentExtent;
+
+		VkExtent2D res {(uint32_t)width, (uint32_t)height};
+		if (res.width > capabilities.maxImageExtent.width) res.width = capabilities.maxImageExtent.width;
+		if (res.width < capabilities.minImageExtent.width) res.width = capabilities.minImageExtent.width;
+		if (res.height > capabilities.maxImageExtent.height) res.height = capabilities.maxImageExtent.height;
+		if (res.height < capabilities.minImageExtent.height) res.height = capabilities.minImageExtent.height;
+		return res;
+	}
+
 	VkBool32 VKAPI_CALL VkRenderer::debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,
@@ -605,8 +618,6 @@ namespace taha
 		constexpr const char* requiredDeviceExtensions[] = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		};
-		VkSurfaceFormatKHR swapchainSurfaceFormat{};
-		VkPresentModeKHR swapchainPresentMode{};
 		{
 			uint32_t physicalDeviceCount = 0;
 			auto result = vkEnumeratePhysicalDevices(instance2, &physicalDeviceCount, nullptr);
@@ -650,8 +661,6 @@ namespace taha
 				{
 					maxScore = score;
 					physicalDevice2 = device;
-					swapchainSurfaceFormat = chooseSwapchainFormat(swapchainSupport.formats);
-					swapchainPresentMode = choosePresentMode(swapchainSupport.presentModes);
 				}
 			}
 
@@ -726,8 +735,8 @@ namespace taha
 		renderer->m_physicalDevice = physicalDevice2;
 		physicalDevice2 = VK_NULL_HANDLE;
 
-		renderer->m_swapchainSurfaceFormat = swapchainSurfaceFormat;
-		renderer->m_swapchainPresentMode = swapchainPresentMode;
+		renderer->m_graphicsQueueFamily = requiredQueueFamilies2.graphicsFamily;
+		renderer->m_presentQueueFamily = requiredQueueFamilies2.presentFamily;
 
 		renderer->m_logicalDevice = logicalDevice2;
 		logicalDevice2 = VK_NULL_HANDLE;
@@ -758,12 +767,66 @@ namespace taha
 			.hwnd = desc.windowHandle,
 		};
 
-		VkSurfaceKHR surface;
+		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		auto result = vkCreateWin32SurfaceKHR(m_instance, &createInfo, nullptr, &surface);
 		if (result != VK_SUCCESS)
 			return nullptr;
+		coreDefer { if (surface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, surface, nullptr); };
 
-		return core::unique_from<VkFrame>(m_allocator, this, surface);
+		// create swapchain
+		auto swapchainSupport = SwapchainSupport2::query(m_physicalDevice, surface, m_allocator);
+		auto format = chooseSwapchainFormat(swapchainSupport.formats);
+		auto presentMode = choosePresentMode(swapchainSupport.presentModes);
+		auto extent = chooseSwapchainExtent(swapchainSupport.capabilities, desc.width, desc.height);
+
+		uint32_t imageCount = swapchainSupport.capabilities.minImageCount + 1;
+		if (swapchainSupport.capabilities.maxImageCount > 0 && imageCount > swapchainSupport.capabilities.maxImageCount)
+			imageCount = swapchainSupport.capabilities.maxImageCount;
+
+		VkSwapchainCreateInfoKHR swapchainCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+			.surface = surface,
+			.minImageCount = imageCount,
+			.imageFormat = format.format,
+			.imageColorSpace = format.colorSpace,
+			.imageExtent = extent,
+			.imageArrayLayers = 1,
+			.imageUsage =  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.preTransform = swapchainSupport.capabilities.currentTransform,
+			.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+			.presentMode = presentMode,
+			.clipped = VK_TRUE,
+			.oldSwapchain = VK_NULL_HANDLE,
+		};
+
+		uint32_t queueFamilyIndices[] = {m_graphicsQueueFamily, m_presentQueueFamily};
+		if (m_graphicsQueueFamily != m_presentQueueFamily)
+		{
+			swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			swapchainCreateInfo.queueFamilyIndexCount = 2;
+			swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
+		}
+		else
+		{
+			swapchainCreateInfo.imageSharingMode =VK_SHARING_MODE_EXCLUSIVE;
+		}
+
+		VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+		result = vkCreateSwapchainKHR(m_logicalDevice, &swapchainCreateInfo, nullptr, &swapchain);
+		if (result != VK_SUCCESS)
+			return nullptr;
+		coreDefer { if (swapchain != VK_NULL_HANDLE) vkDestroySwapchainKHR(m_logicalDevice, swapchain, nullptr); };
+			// return core::errf(m_allocator, "vkCreateSwapchainKHR failed, ErrorCode({})"_sv, result);
+
+		vkGetSwapchainImagesKHR(m_logicalDevice, swapchain, &imageCount, nullptr);
+		core::Array<VkImage> swapchainImages {m_allocator};
+		swapchainImages.resize_fill(imageCount, VK_NULL_HANDLE);
+		vkGetSwapchainImagesKHR(m_logicalDevice, swapchain, &imageCount, swapchainImages.data());
+
+		auto res = core::unique_from<VkFrame>(m_allocator, this, surface, swapchain, std::move(swapchainImages));
+		surface = VK_NULL_HANDLE;
+		swapchain = VK_NULL_HANDLE;
+		return res;
 #elif TAHA_OS_LINUX
 		VkWaylandSurfaceCreateInfoKHR createInfo{
 			.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,

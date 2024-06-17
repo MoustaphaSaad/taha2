@@ -25,8 +25,8 @@ namespace taha
 		VkInstance m_instance = VK_NULL_HANDLE;
 		VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
 		VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
-		VkSurfaceFormatKHR m_swapchainSurfaceFormat = {};
-		VkPresentModeKHR m_swapchainPresentMode = {};
+		uint32_t m_graphicsQueueFamily = 0;
+		uint32_t m_presentQueueFamily = 0;
 		VkDevice m_logicalDevice = VK_NULL_HANDLE;
 		VkQueue m_graphicsQueue = VK_NULL_HANDLE;
 		VkQueue m_presentQueue = VK_NULL_HANDLE;
