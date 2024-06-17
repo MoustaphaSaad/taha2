@@ -823,7 +823,44 @@ namespace taha
 		swapchainImages.resize_fill(imageCount, VK_NULL_HANDLE);
 		vkGetSwapchainImagesKHR(m_logicalDevice, swapchain, &imageCount, swapchainImages.data());
 
-		auto res = core::unique_from<VkFrame>(m_allocator, this, surface, swapchain, std::move(swapchainImages));
+		core::Array<VkImageView> swapchainImageViews{m_allocator};
+		for (size_t i = 0; i < swapchainImages.count(); ++i)
+		{
+			VkImageViewCreateInfo imageViewCreateInfo{
+				.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+				.image = swapchainImages[i],
+				.viewType = VK_IMAGE_VIEW_TYPE_2D,
+				.format = format.format,
+				.components = {
+					.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+					.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+					.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+					.a = VK_COMPONENT_SWIZZLE_IDENTITY,
+				},
+				.subresourceRange = {
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.baseMipLevel = 0,
+					.levelCount = 1,
+					.baseArrayLayer = 0,
+					.layerCount = 1,
+				},
+			};
+
+			VkImageView view = VK_NULL_HANDLE;
+			auto result = vkCreateImageView(m_logicalDevice, &imageViewCreateInfo, nullptr, &view);
+			if (result != VK_SUCCESS)
+				return nullptr;
+			swapchainImageViews.push(view);
+		}
+
+		auto res = core::unique_from<VkFrame>(
+			m_allocator,
+			this,
+			surface,
+			swapchain,
+			std::move(swapchainImages),
+			std::move(swapchainImageViews)
+		);
 		surface = VK_NULL_HANDLE;
 		swapchain = VK_NULL_HANDLE;
 		return res;
