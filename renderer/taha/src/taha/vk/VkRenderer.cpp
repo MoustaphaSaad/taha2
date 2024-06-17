@@ -206,6 +206,44 @@ namespace taha
 		return res;
 	}
 
+	struct SwapchainSupport2
+	{
+		VkSurfaceCapabilitiesKHR capabilities{};
+		core::Array<VkSurfaceFormatKHR> formats;
+		core::Array<VkPresentModeKHR> presentModes;
+
+		explicit SwapchainSupport2(core::Allocator* allocator)
+			: formats(allocator),
+			  presentModes(allocator)
+		{}
+
+		static SwapchainSupport2 query(VkPhysicalDevice device, VkSurfaceKHR surface, core::Allocator* allocator)
+		{
+			SwapchainSupport2 res{allocator};
+
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &res.capabilities);
+
+			uint32_t formatCount = 0;
+			vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+			if (formatCount != 0)
+			{
+				res.formats.resize_fill(formatCount, VkSurfaceFormatKHR{});
+				vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, res.formats.data());
+			}
+
+			uint32_t presentModeCount = 0;
+			vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+			if (presentModeCount != 0)
+			{
+				res.presentModes.resize_fill(presentModeCount, VkPresentModeKHR{});
+				vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, res.presentModes.data());
+			}
+			return res;
+		}
+	};
+
 	VkBool32 VKAPI_CALL VkRenderer::debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,
@@ -549,6 +587,10 @@ namespace taha
 				}
 
 				if (allExtensionsFound == false)
+					continue;
+
+				auto swapchainSupport = SwapchainSupport2::query(device, dummySurface2, allocator);
+				if (swapchainSupport.formats.count() == 0 || swapchainSupport.presentModes.count() == 0)
 					continue;
 
 				auto score = ratePhysicalDevice(device);
