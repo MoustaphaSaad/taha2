@@ -144,6 +144,8 @@ CPMDeclarePackage(mimalloc
   GIT_REPOSITORY git@github.com:microsoft/mimalloc.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "MI_WIN_REDIRECT OFF"
 )
 
 CPMDeclarePackage(volk
