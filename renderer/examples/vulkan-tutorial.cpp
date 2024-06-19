@@ -14,6 +14,10 @@
 class HelloTriangleApplication
 {
 public:
+	HelloTriangleApplication(core::Allocator* allocator)
+		: m_allocator(allocator)
+	{}
+
 	core::HumanError run()
 	{
 		if (auto err = initWindow()) return err;
@@ -68,7 +72,7 @@ int main()
 	core::Mimallocator allocator{};
 	core::Log log{&allocator};
 
-	HelloTriangleApplication app;
+	HelloTriangleApplication app{&allocator};
 	auto err = app.run();
 	if (err)
 	{
