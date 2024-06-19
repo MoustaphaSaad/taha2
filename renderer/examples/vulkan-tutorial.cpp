@@ -11,6 +11,74 @@
 
 #include <volk.h>
 
+class HelloTriangleApplication
+{
+public:
+	core::HumanError run()
+	{
+		if (auto err = initWindow()) return err;
+		if (auto err = initVulkan()) return err;
+		if (auto err = mainLoop()) return err;
+		if (auto err = cleanup()) return err;
+		return {};
+	}
+
+private:
+	core::HumanError initWindow()
+	{
+		if (glfwInit() == GLFW_FALSE)
+			return core::errf(m_allocator, "glfwInit failed"_sv);
+
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+		m_window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", nullptr, nullptr);
+		return {};
+	}
+
+	core::HumanError initVulkan()
+	{
+		return {};
+	}
+
+	core::HumanError mainLoop()
+	{
+		while (!glfwWindowShouldClose(m_window))
+		{
+			glfwPollEvents();
+		}
+		return {};
+	}
+
+	core::HumanError cleanup()
+	{
+		glfwDestroyWindow(m_window);
+		glfwTerminate();
+		return {};
+	}
+
+	core::Allocator* m_allocator = nullptr;
+	GLFWwindow* m_window = nullptr;
+	constexpr static uint32_t WINDOW_WIDTH = 800;
+	constexpr static uint32_t WINDOW_HEIGHT = 600;
+};
+
+int main()
+{
+	core::Mimallocator allocator{};
+	core::Log log{&allocator};
+
+	HelloTriangleApplication app;
+	auto err = app.run();
+	if (err)
+	{
+		log.critical("{}"_sv, err);
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 namespace fmt
 {
 	template <> struct formatter<VkResult>
@@ -63,44 +131,4 @@ namespace fmt
 			}
 		}
 	};
-}
-
-int main()
-{
-	core::Mimallocator allocator{};
-	core::Log log{&allocator};
-
-	auto result = volkInitialize();
-	if (result != VK_SUCCESS)
-	{
-		log.critical("volkInitialize failed, ErrorCode({})"_sv, result);
-		return EXIT_FAILURE;
-	}
-	coreDefer { volkFinalize(); };
-
-	if (glfwInit() == GLFW_FALSE)
-	{
-		log.critical("glfwInit failed"_sv);
-		return EXIT_FAILURE;
-	}
-	coreDefer { glfwTerminate(); };
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	auto window = glfwCreateWindow(800, 600, "Vulkan Window", nullptr, nullptr);
-	coreDefer { glfwDestroyWindow(window); };
-
-	uint32_t extensionCount = 0;
-	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-	log.info("{} extensions supported"_sv, extensionCount);
-
-	glm::mat4 matrix;
-	glm::vec4 vec;
-	auto test = matrix * vec;
-
-	while (!glfwWindowShouldClose(window))
-	{
-		glfwPollEvents();
-	}
-
-	return 0;
 }
