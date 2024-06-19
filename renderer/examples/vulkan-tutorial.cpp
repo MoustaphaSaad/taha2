@@ -20,7 +20,8 @@ public:
 	HelloTriangleApplication(core::Log* log, core::Allocator* allocator)
 		: m_allocator(allocator),
 		  m_log(log),
-		  m_swapchainImages(allocator)
+		  m_swapchainImages(allocator),
+		  m_swapchainImageViews(allocator)
 	{}
 
 	core::HumanError run()
@@ -62,6 +63,8 @@ private:
 
 		if (auto err = createSwapchain()) return err;
 
+		if (auto err = createImageViews()) return err;
+
 		return {};
 	}
 
@@ -76,6 +79,8 @@ private:
 
 	core::HumanError cleanup()
 	{
+		for (auto view: m_swapchainImageViews)
+			vkDestroyImageView(m_logicalDevice, view, nullptr);
 		if (m_swapchain != VK_NULL_HANDLE) vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
 		if (m_logicalDevice != VK_NULL_HANDLE) vkDestroyDevice(m_logicalDevice, nullptr);
 		if (m_surface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
@@ -366,6 +371,36 @@ private:
 		return {};
 	}
 
+	core::HumanError createImageViews()
+	{
+		m_swapchainImageViews.resize_fill(m_swapchainImages.count(), VK_NULL_HANDLE);
+		for (size_t i = 0; i < m_swapchainImages.count(); ++i)
+		{
+			VkImageViewCreateInfo createInfo{
+				.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+				.image = m_swapchainImages[i],
+				.viewType = VK_IMAGE_VIEW_TYPE_2D,
+				.format = m_swapchainFormat,
+				.components = {
+					.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+					.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+					.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+					.a = VK_COMPONENT_SWIZZLE_IDENTITY,
+				},
+				.subresourceRange = {
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.levelCount = 1,
+					.layerCount = 1
+				},
+			};
+
+			auto result = vkCreateImageView(m_logicalDevice, &createInfo, nullptr, &m_swapchainImageViews[i]);
+			if (result != VK_SUCCESS)
+				return core::errf(m_allocator, "vkCreateImageView failed, ErrorCode({})"_sv, result);
+		}
+		return {};
+	}
+
 	VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(const core::Array<VkSurfaceFormatKHR>& formats)
 	{
 		for (auto format: formats)
@@ -538,6 +573,7 @@ private:
 	VkFormat m_swapchainFormat = {};
 	VkExtent2D m_swapchainExtent = {};
 	core::Array<VkImage> m_swapchainImages;
+	core::Array<VkImageView> m_swapchainImageViews;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
