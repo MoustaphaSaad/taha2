@@ -19,7 +19,8 @@ class HelloTriangleApplication
 public:
 	HelloTriangleApplication(core::Log* log, core::Allocator* allocator)
 		: m_allocator(allocator),
-		  m_log(log)
+		  m_log(log),
+		  m_swapchainImages(allocator)
 	{}
 
 	core::HumanError run()
@@ -59,6 +60,8 @@ private:
 
 		if (auto err = createLogicalDevice()) return err;
 
+		if (auto err = createSwapchain()) return err;
+
 		return {};
 	}
 
@@ -73,6 +76,7 @@ private:
 
 	core::HumanError cleanup()
 	{
+		if (m_swapchain != VK_NULL_HANDLE) vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
 		if (m_logicalDevice != VK_NULL_HANDLE) vkDestroyDevice(m_logicalDevice, nullptr);
 		if (m_surface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
 		if (m_debugMessenger != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
@@ -220,26 +224,39 @@ private:
 			auto familyProperties = listPhysicalDeviceFamilyProperties(device);
 
 			coreAssert(familyProperties.count() < UINT32_MAX);
+			uint32_t graphicsQueueFamily = UINT32_MAX;
+			uint32_t presentQueueFamily = UINT32_MAX;
 			for (size_t i = 0; i < familyProperties.count(); ++i)
 			{
 				if (familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-					m_graphicsQueueFamily = (uint32_t)i;
+					graphicsQueueFamily = (uint32_t)i;
 
 				VkBool32 presentSupport = false;
 				vkGetPhysicalDeviceSurfaceSupportKHR(device, (uint32_t)i, m_surface, &presentSupport);
 
 				if (presentSupport)
-					m_presentQueueFamily = (uint32_t)i;
+					presentQueueFamily = (uint32_t)i;
 
-				if (m_graphicsQueueFamily != UINT32_MAX && m_presentQueueFamily != UINT32_MAX)
+				if (graphicsQueueFamily != UINT32_MAX && presentQueueFamily != UINT32_MAX)
 					break;
 			}
 
-			if (m_graphicsQueueFamily != UINT32_MAX && m_presentQueueFamily != UINT32_MAX)
-			{
-				m_physicalDevice = device;
-				break;
-			}
+			if (graphicsQueueFamily == UINT32_MAX || presentQueueFamily == UINT32_MAX)
+				continue;
+
+			auto extensions = listPhysicalDeviceExtensions(device);
+			for (auto requiredExtensionName: DEVICE_EXTENSIONS)
+				if (findExtensionByName(extensions, core::StringView{requiredExtensionName}) == SIZE_MAX)
+					continue;
+
+			auto swapchainSupport = querySwapchainSupport(device);
+			if (swapchainSupport.formats.count() == 0 || swapchainSupport.presentModes.count() == 0)
+				continue;
+
+			m_graphicsQueueFamily = graphicsQueueFamily;
+			m_presentQueueFamily = presentQueueFamily;
+			m_physicalDevice = device;
+			break;
 		}
 
 		if (m_physicalDevice == VK_NULL_HANDLE)
@@ -274,6 +291,8 @@ private:
 			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 			.queueCreateInfoCount = queuesCount,
 			.pQueueCreateInfos = queues,
+			.enabledExtensionCount = sizeof(DEVICE_EXTENSIONS) / sizeof(*DEVICE_EXTENSIONS),
+			.ppEnabledExtensionNames = DEVICE_EXTENSIONS,
 			.pEnabledFeatures = &deviceFeatures,
 		};
 
@@ -291,6 +310,162 @@ private:
 		vkGetDeviceQueue(m_logicalDevice, m_presentQueueFamily, 0, &m_presentQueue);
 
 		return {};
+	}
+
+	core::HumanError createSwapchain()
+	{
+		auto swapchainSupport = querySwapchainSupport(m_physicalDevice);
+		auto surfaceFormat = chooseSwapchainSurfaceFormat(swapchainSupport.formats);
+		auto presentMode = chooseSwapchainPresentMode(swapchainSupport.presentModes);
+		auto extent = chooseSwapchainExtent(swapchainSupport.capabilities);
+
+		uint32_t imageCount = swapchainSupport.capabilities.minImageCount + 1;
+		if (swapchainSupport.capabilities.maxImageCount > 0 &&
+			imageCount > swapchainSupport.capabilities.maxImageCount)
+			imageCount = swapchainSupport.capabilities.maxImageCount;
+
+		uint32_t queueFamilyIndices[] = {m_graphicsQueueFamily, m_presentQueueFamily};
+
+		VkSwapchainCreateInfoKHR createInfo{
+			.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+			.surface = m_surface,
+			.minImageCount = imageCount,
+			.imageFormat = surfaceFormat.format,
+			.imageColorSpace = surfaceFormat.colorSpace,
+			.imageExtent = extent,
+			.imageArrayLayers = 1,
+			.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.preTransform = swapchainSupport.capabilities.currentTransform,
+			.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+			.presentMode = presentMode,
+			.clipped = VK_TRUE,
+			.oldSwapchain = VK_NULL_HANDLE,
+		};
+
+		if (m_graphicsQueueFamily != m_presentQueueFamily)
+		{
+			createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			createInfo.queueFamilyIndexCount = 2;
+			createInfo.pQueueFamilyIndices = queueFamilyIndices;
+		}
+		else
+		{
+			createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		}
+
+		auto result = vkCreateSwapchainKHR(m_logicalDevice, &createInfo, nullptr, &m_swapchain);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateSwapchainKHR failed, ErrorCode({})"_sv, result);
+
+		vkGetSwapchainImagesKHR(m_logicalDevice, m_swapchain, &imageCount, nullptr);
+		m_swapchainImages.resize_fill(imageCount, VK_NULL_HANDLE);
+		vkGetSwapchainImagesKHR(m_logicalDevice, m_swapchain, &imageCount, m_swapchainImages.data());
+
+		m_swapchainFormat = surfaceFormat.format;
+		m_swapchainExtent = extent;
+		return {};
+	}
+
+	VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(const core::Array<VkSurfaceFormatKHR>& formats)
+	{
+		for (auto format: formats)
+			if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+				return format;
+		return formats[0];
+	}
+
+	VkPresentModeKHR chooseSwapchainPresentMode(const core::Array<VkPresentModeKHR>& modes)
+	{
+		for (auto mode: modes)
+			if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+				return mode;
+		return VK_PRESENT_MODE_FIFO_KHR;
+	}
+
+	VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities)
+	{
+		if (capabilities.currentExtent.width != UINT32_MAX)
+			return capabilities.currentExtent;
+
+		int width = 0;
+		int height = 0;
+		glfwGetFramebufferSize(m_window, &width, &height);
+
+		VkExtent2D actualExtent {
+			.width = (uint32_t)width,
+			.height = (uint32_t)height,
+		};
+
+		if (actualExtent.width < capabilities.minImageExtent.width)
+			actualExtent.width = capabilities.minImageExtent.width;
+		if (actualExtent.width > capabilities.maxImageExtent.width)
+			actualExtent.width = capabilities.maxImageExtent.width;
+
+		if (actualExtent.height < capabilities.minImageExtent.height)
+			actualExtent.height = capabilities.minImageExtent.height;
+		if (actualExtent.height > capabilities.maxImageExtent.height)
+			actualExtent.height = capabilities.maxImageExtent.height;
+
+		return actualExtent;
+	}
+
+	struct SwapchainSupportDetails
+	{
+		VkSurfaceCapabilitiesKHR capabilities;
+		core::Array<VkSurfaceFormatKHR> formats;
+		core::Array<VkPresentModeKHR> presentModes;
+
+		SwapchainSupportDetails(core::Allocator* allocator)
+			: formats(allocator),
+			  presentModes(allocator)
+		{}
+	};
+
+	SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device)
+	{
+		SwapchainSupportDetails result{m_allocator};
+
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_surface, &result.capabilities);
+
+		uint32_t formatCount = 0;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, nullptr);
+
+		if (formatCount != 0)
+		{
+			result.formats.resize_fill(formatCount, VkSurfaceFormatKHR{});
+			vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_surface, &formatCount, result.formats.data());
+		}
+
+		uint32_t presentModeCount = 0;
+		vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, nullptr);
+
+		if (presentModeCount != 0)
+		{
+			result.presentModes.resize_fill(presentModeCount, VkPresentModeKHR{});
+			vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_surface, &presentModeCount, result.presentModes.data());
+		}
+
+		return result;
+	}
+
+	size_t findExtensionByName(const core::Array<VkExtensionProperties>& extensions, core::StringView name)
+	{
+		for (size_t i = 0; i < extensions.count(); ++i)
+			if (core::StringView{extensions[i].extensionName} == name)
+				return i;
+		return SIZE_MAX;
+	}
+
+	core::Array<VkExtensionProperties> listPhysicalDeviceExtensions(VkPhysicalDevice device)
+	{
+		uint32_t extensionCount = 0;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+		core::Array<VkExtensionProperties> result{m_allocator};
+		result.resize_fill(extensionCount, VkExtensionProperties{});
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, result.data());
+
+		return result;
 	}
 
 	core::Array<VkQueueFamilyProperties> listPhysicalDeviceFamilyProperties(VkPhysicalDevice device)
@@ -359,9 +534,16 @@ private:
 	VkDevice m_logicalDevice = VK_NULL_HANDLE;
 	VkQueue m_graphicsQueue = VK_NULL_HANDLE;
 	VkQueue m_presentQueue = VK_NULL_HANDLE;
+	VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
+	VkFormat m_swapchainFormat = {};
+	VkExtent2D m_swapchainExtent = {};
+	core::Array<VkImage> m_swapchainImages;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
+	};
+	constexpr static const char* DEVICE_EXTENSIONS[] = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 	};
 	constexpr static uint32_t WINDOW_WIDTH = 800;
 	constexpr static uint32_t WINDOW_HEIGHT = 600;
