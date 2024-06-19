@@ -42,6 +42,11 @@ private:
 
 	core::HumanError initVulkan()
 	{
+		if (auto result = volkInitialize(); result != VK_SUCCESS)
+			return core::errf(m_allocator, "volkInitialize failed, ErrorCode({})"_sv, result);
+
+		if (auto err = createInstance()) return err;
+
 		return {};
 	}
 
@@ -56,13 +61,48 @@ private:
 
 	core::HumanError cleanup()
 	{
+		if (m_instance != VK_NULL_HANDLE) vkDestroyInstance(m_instance, nullptr);
+
+		volkFinalize();
+
 		glfwDestroyWindow(m_window);
 		glfwTerminate();
 		return {};
 	}
 
+	core::HumanError createInstance()
+	{
+		VkApplicationInfo applicationInfo {
+			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+			.pApplicationName = "Hello Triangle",
+			.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+			.pEngineName = "No Engine",
+			.engineVersion = VK_MAKE_VERSION(1, 0, 0),
+			.apiVersion = VK_API_VERSION_1_3,
+		};
+
+		uint32_t glfwExtensionCount = 0;
+		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		VkInstanceCreateInfo instanceInfo{
+			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+			.pApplicationInfo = &applicationInfo,
+			.enabledExtensionCount = glfwExtensionCount,
+			.ppEnabledExtensionNames = glfwExtensions,
+		};
+
+		auto result = vkCreateInstance(&instanceInfo, nullptr, &m_instance);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateInstance failed, ErrorCode({})"_sv, result);
+
+		volkLoadInstance(m_instance);
+
+		return {};
+	}
+
 	core::Allocator* m_allocator = nullptr;
 	GLFWwindow* m_window = nullptr;
+	VkInstance m_instance = VK_NULL_HANDLE;
 	constexpr static uint32_t WINDOW_WIDTH = 800;
 	constexpr static uint32_t WINDOW_HEIGHT = 600;
 };
