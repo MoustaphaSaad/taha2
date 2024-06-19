@@ -14,8 +14,9 @@
 class HelloTriangleApplication
 {
 public:
-	HelloTriangleApplication(core::Allocator* allocator)
-		: m_allocator(allocator)
+	HelloTriangleApplication(core::Log* log, core::Allocator* allocator)
+		: m_allocator(allocator),
+		  m_log(log)
 	{}
 
 	core::HumanError run()
@@ -47,6 +48,8 @@ private:
 
 		if (auto err = createInstance()) return err;
 
+		if (auto err = setupDebugMessenger()) return err;
+
 		return {};
 	}
 
@@ -61,6 +64,7 @@ private:
 
 	core::HumanError cleanup()
 	{
+		if (m_debugMessenger != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
 		if (m_instance != VK_NULL_HANDLE) vkDestroyInstance(m_instance, nullptr);
 
 		volkFinalize();
@@ -72,6 +76,10 @@ private:
 
 	core::HumanError createInstance()
 	{
+		if (m_enableValidationLayers)
+			if (auto err = checkValidationLayerSupport())
+				return err;
+
 		VkApplicationInfo applicationInfo {
 			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 			.pApplicationName = "Hello Triangle",
@@ -81,15 +89,24 @@ private:
 			.apiVersion = VK_API_VERSION_1_3,
 		};
 
-		uint32_t glfwExtensionCount = 0;
-		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		auto extensions = getRequiredExtensions();
 
 		VkInstanceCreateInfo instanceInfo{
 			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 			.pApplicationInfo = &applicationInfo,
-			.enabledExtensionCount = glfwExtensionCount,
-			.ppEnabledExtensionNames = glfwExtensions,
+			.enabledExtensionCount = (uint32_t)extensions.count(),
+			.ppEnabledExtensionNames = extensions.data(),
 		};
+
+		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+		if (m_enableValidationLayers)
+		{
+			instanceInfo.enabledLayerCount = sizeof(VALIDATION_LAYERS) / sizeof(*VALIDATION_LAYERS);
+			instanceInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
+
+			populateDebugMessengerCreateInfo(debugCreateInfo);
+			instanceInfo.pNext = &debugCreateInfo;
+		}
 
 		auto result = vkCreateInstance(&instanceInfo, nullptr, &m_instance);
 		if (result != VK_SUCCESS)
@@ -100,9 +117,127 @@ private:
 		return {};
 	}
 
+	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+														VkDebugUtilsMessageTypeFlagsEXT type,
+														const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+														void* pUserData)
+	{
+		auto log = (core::Log*)pUserData;
+
+		const char* typeName = "unknown";
+		if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+			typeName = "general";
+		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+			typeName = "validation";
+		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+			typeName = "performance";
+		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+			typeName = "binding";
+
+		if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
+		{
+			log->trace("[{}] {}"_sv, typeName, pCallbackData->pMessage);
+		}
+		else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+		{
+			log->info("[{}] {}"_sv, typeName, pCallbackData->pMessage);
+		}
+		else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			log->warn("[{}] {}"_sv, typeName, pCallbackData->pMessage);
+		}
+		else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+		{
+			log->error("[{}] {}"_sv, typeName, pCallbackData->pMessage);
+		}
+		else
+		{
+			coreUnreachable();
+		}
+
+		return VK_FALSE;
+	}
+
+	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+	{
+		createInfo = {
+			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+							   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+							   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+			.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+						   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+						   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+			.pfnUserCallback = debugCallback,
+			.pUserData = m_log,
+		};
+	}
+
+	core::HumanError setupDebugMessenger()
+	{
+		if (m_enableValidationLayers == false)
+			return {};
+
+		VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+		populateDebugMessengerCreateInfo(createInfo);
+
+		auto result = vkCreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateDebugUtilsMessengerEXT failed, ErrorCode({})"_sv, result);
+		return {};
+	}
+
+	core::Array<const char*> getRequiredExtensions()
+	{
+		uint32_t glfwExtensionCount = 0;
+		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+		core::Array<const char*> extensions{m_allocator};
+		for (uint32_t i = 0; i < glfwExtensionCount; ++i)
+			extensions.push(glfwExtensions[i]);
+
+		if (m_enableValidationLayers)
+			extensions.push(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		return extensions;
+	}
+
+	core::HumanError checkValidationLayerSupport()
+	{
+		auto layers = listInstanceLayers();
+		for (auto requiredLayer: VALIDATION_LAYERS)
+			if (findLayerByName(layers, core::StringView{requiredLayer}) == SIZE_MAX)
+				return core::errf(m_allocator, "required layer '{}' not found"_sv, requiredLayer);
+		return {};
+	}
+
+	core::Array<VkLayerProperties> listInstanceLayers()
+	{
+		uint32_t layerCount = 0;
+		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+		core::Array<VkLayerProperties> result{m_allocator};
+		result.resize_fill(layerCount, VkLayerProperties{});
+		vkEnumerateInstanceLayerProperties(&layerCount, result.data());
+
+		return result;
+	}
+
+	size_t findLayerByName(const core::Array<VkLayerProperties>& layers, core::StringView layerName)
+	{
+		for (size_t i = 0; i < layers.count(); ++i)
+			if (core::StringView{layers[i].layerName} == layerName)
+				return i;
+		return SIZE_MAX;
+	}
+
 	core::Allocator* m_allocator = nullptr;
+	core::Log* m_log = nullptr;
 	GLFWwindow* m_window = nullptr;
 	VkInstance m_instance = VK_NULL_HANDLE;
+	VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
+	bool m_enableValidationLayers = true;
+	constexpr static const char* VALIDATION_LAYERS[] = {
+		"VK_LAYER_KHRONOS_validation",
+	};
 	constexpr static uint32_t WINDOW_WIDTH = 800;
 	constexpr static uint32_t WINDOW_HEIGHT = 600;
 };
@@ -112,7 +247,7 @@ int main()
 	core::Mimallocator allocator{};
 	core::Log log{&allocator};
 
-	HelloTriangleApplication app{&allocator};
+	HelloTriangleApplication app{&log, &allocator};
 	auto err = app.run();
 	if (err)
 	{
