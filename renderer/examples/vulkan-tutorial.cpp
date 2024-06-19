@@ -2,14 +2,17 @@
 #include <core/Log.h>
 #include <core/MiMallocator.h>
 
+#include <volk.h>
+
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
 
 #define GLM_FORCE_RADIANS 1
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE 1
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
-
-#include <volk.h>
 
 class HelloTriangleApplication
 {
@@ -50,6 +53,8 @@ private:
 
 		if (auto err = setupDebugMessenger()) return err;
 
+		if (auto err = createSurface()) return err;
+
 		if (auto err = pickPhysicalDevice()) return err;
 
 		if (auto err = createLogicalDevice()) return err;
@@ -69,6 +74,7 @@ private:
 	core::HumanError cleanup()
 	{
 		if (m_logicalDevice != VK_NULL_HANDLE) vkDestroyDevice(m_logicalDevice, nullptr);
+		if (m_surface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
 		if (m_debugMessenger != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
 		if (m_instance != VK_NULL_HANDLE) vkDestroyInstance(m_instance, nullptr);
 
@@ -192,6 +198,14 @@ private:
 		return {};
 	}
 
+	core::HumanError createSurface()
+	{
+		auto result = glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_surface);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "glfwCreateWindowSurface failed, ErrorCode({})"_sv, result);
+		return {};
+	}
+
 	core::HumanError pickPhysicalDevice()
 	{
 		uint32_t deviceCount = 0;
@@ -209,13 +223,19 @@ private:
 			for (size_t i = 0; i < familyProperties.count(); ++i)
 			{
 				if (familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-				{
 					m_graphicsQueueFamily = (uint32_t)i;
+
+				VkBool32 presentSupport = false;
+				vkGetPhysicalDeviceSurfaceSupportKHR(device, (uint32_t)i, m_surface, &presentSupport);
+
+				if (presentSupport)
+					m_presentQueueFamily = (uint32_t)i;
+
+				if (m_graphicsQueueFamily != UINT32_MAX && m_presentQueueFamily != UINT32_MAX)
 					break;
-				}
 			}
 
-			if (m_graphicsQueueFamily != UINT32_MAX)
+			if (m_graphicsQueueFamily != UINT32_MAX && m_presentQueueFamily != UINT32_MAX)
 			{
 				m_physicalDevice = device;
 				break;
@@ -230,18 +250,30 @@ private:
 	core::HumanError createLogicalDevice()
 	{
 		float queuePriority = 1.0f;
-		VkDeviceQueueCreateInfo queueCreateInfo {
+		VkDeviceQueueCreateInfo graphicsQueueCreateInfo {
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 			.queueFamilyIndex = m_graphicsQueueFamily,
 			.queueCount = 1,
 			.pQueuePriorities = &queuePriority,
 		};
 
+		VkDeviceQueueCreateInfo presentQueueCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+			.queueFamilyIndex = m_presentQueueFamily,
+			.queueCount = 1,
+			.pQueuePriorities = &queuePriority,
+		};
+
+		VkDeviceQueueCreateInfo queues[] = {graphicsQueueCreateInfo, presentQueueCreateInfo};
+		uint32_t queuesCount = 2;
+		if (m_presentQueueFamily == m_graphicsQueueFamily)
+			queuesCount = 1;
+
 		VkPhysicalDeviceFeatures deviceFeatures{};
 		VkDeviceCreateInfo createInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			.queueCreateInfoCount = 1,
-			.pQueueCreateInfos = &queueCreateInfo,
+			.queueCreateInfoCount = queuesCount,
+			.pQueueCreateInfos = queues,
 			.pEnabledFeatures = &deviceFeatures,
 		};
 
@@ -256,6 +288,7 @@ private:
 			return core::errf(m_allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
 
 		vkGetDeviceQueue(m_logicalDevice, m_graphicsQueueFamily, 0, &m_graphicsQueue);
+		vkGetDeviceQueue(m_logicalDevice, m_presentQueueFamily, 0, &m_presentQueue);
 
 		return {};
 	}
@@ -319,10 +352,13 @@ private:
 	GLFWwindow* m_window = nullptr;
 	VkInstance m_instance = VK_NULL_HANDLE;
 	VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
+	VkSurfaceKHR m_surface = VK_NULL_HANDLE;
 	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 	uint32_t m_graphicsQueueFamily = UINT32_MAX;
+	uint32_t m_presentQueueFamily = UINT32_MAX;
 	VkDevice m_logicalDevice = VK_NULL_HANDLE;
 	VkQueue m_graphicsQueue = VK_NULL_HANDLE;
+	VkQueue m_presentQueue = VK_NULL_HANDLE;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
