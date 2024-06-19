@@ -50,6 +50,8 @@ private:
 
 		if (auto err = setupDebugMessenger()) return err;
 
+		if (auto err = pickPhysicalDevice()) return err;
+
 		return {};
 	}
 
@@ -187,6 +189,54 @@ private:
 		return {};
 	}
 
+	core::HumanError pickPhysicalDevice()
+	{
+		uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(m_instance, &deviceCount, nullptr);
+
+		core::Array<VkPhysicalDevice> devices{m_allocator};
+		devices.resize_fill(deviceCount, VK_NULL_HANDLE);
+		vkEnumeratePhysicalDevices(m_instance, &deviceCount, devices.data());
+
+		for (auto device: devices)
+		{
+			auto familyProperties = listPhysicalDeviceFamilyProperties(device);
+
+			uint32_t graphicsFamily = UINT32_MAX;
+			coreAssert(familyProperties.count() < UINT32_MAX);
+			for (size_t i = 0; i < familyProperties.count(); ++i)
+			{
+				if (familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				{
+					graphicsFamily = (uint32_t)i;
+					break;
+				}
+			}
+
+			if (graphicsFamily != UINT32_MAX)
+			{
+				m_physicalDevice = device;
+				break;
+			}
+		}
+
+		if (m_physicalDevice == VK_NULL_HANDLE)
+			return core::errf(m_allocator, "failed to find suitable physical device"_sv);
+		return {};
+	}
+
+	core::Array<VkQueueFamilyProperties> listPhysicalDeviceFamilyProperties(VkPhysicalDevice device)
+	{
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		core::Array<VkQueueFamilyProperties> result{m_allocator};
+		result.resize_fill(queueFamilyCount, VkQueueFamilyProperties{});
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, result.data());
+
+		return result;
+	}
+
 	core::Array<const char*> getRequiredExtensions()
 	{
 		uint32_t glfwExtensionCount = 0;
@@ -234,6 +284,7 @@ private:
 	GLFWwindow* m_window = nullptr;
 	VkInstance m_instance = VK_NULL_HANDLE;
 	VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
+	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
