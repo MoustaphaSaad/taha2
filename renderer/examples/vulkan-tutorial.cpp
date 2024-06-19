@@ -52,6 +52,8 @@ private:
 
 		if (auto err = pickPhysicalDevice()) return err;
 
+		if (auto err = createLogicalDevice()) return err;
+
 		return {};
 	}
 
@@ -66,6 +68,7 @@ private:
 
 	core::HumanError cleanup()
 	{
+		if (m_logicalDevice != VK_NULL_HANDLE) vkDestroyDevice(m_logicalDevice, nullptr);
 		if (m_debugMessenger != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
 		if (m_instance != VK_NULL_HANDLE) vkDestroyInstance(m_instance, nullptr);
 
@@ -202,18 +205,17 @@ private:
 		{
 			auto familyProperties = listPhysicalDeviceFamilyProperties(device);
 
-			uint32_t graphicsFamily = UINT32_MAX;
 			coreAssert(familyProperties.count() < UINT32_MAX);
 			for (size_t i = 0; i < familyProperties.count(); ++i)
 			{
 				if (familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 				{
-					graphicsFamily = (uint32_t)i;
+					m_graphicsQueueFamily = (uint32_t)i;
 					break;
 				}
 			}
 
-			if (graphicsFamily != UINT32_MAX)
+			if (m_graphicsQueueFamily != UINT32_MAX)
 			{
 				m_physicalDevice = device;
 				break;
@@ -222,6 +224,39 @@ private:
 
 		if (m_physicalDevice == VK_NULL_HANDLE)
 			return core::errf(m_allocator, "failed to find suitable physical device"_sv);
+		return {};
+	}
+
+	core::HumanError createLogicalDevice()
+	{
+		float queuePriority = 1.0f;
+		VkDeviceQueueCreateInfo queueCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+			.queueFamilyIndex = m_graphicsQueueFamily,
+			.queueCount = 1,
+			.pQueuePriorities = &queuePriority,
+		};
+
+		VkPhysicalDeviceFeatures deviceFeatures{};
+		VkDeviceCreateInfo createInfo{
+			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+			.queueCreateInfoCount = 1,
+			.pQueueCreateInfos = &queueCreateInfo,
+			.pEnabledFeatures = &deviceFeatures,
+		};
+
+		if (m_enableValidationLayers)
+		{
+			createInfo.enabledLayerCount = sizeof(VALIDATION_LAYERS) / sizeof(*VALIDATION_LAYERS);
+			createInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
+		}
+
+		auto result = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_logicalDevice);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
+
+		vkGetDeviceQueue(m_logicalDevice, m_graphicsQueueFamily, 0, &m_graphicsQueue);
+
 		return {};
 	}
 
@@ -285,6 +320,9 @@ private:
 	VkInstance m_instance = VK_NULL_HANDLE;
 	VkDebugUtilsMessengerEXT m_debugMessenger = VK_NULL_HANDLE;
 	VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+	uint32_t m_graphicsQueueFamily = UINT32_MAX;
+	VkDevice m_logicalDevice = VK_NULL_HANDLE;
+	VkQueue m_graphicsQueue = VK_NULL_HANDLE;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
