@@ -12,5 +12,6 @@ target_link_libraries(bench-model-transform core math nanobench)
 
 CPMGetPackage(glfw)
 CPMGetPackage(volk)
+CPMGetPackage(glm)
 add_executable(vulkan-tutorial vulkan-tutorial.cpp)
-target_link_libraries(vulkan-tutorial core math glfw volk)
+target_link_libraries(vulkan-tutorial core math glfw volk glm)

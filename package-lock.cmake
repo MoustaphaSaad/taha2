@@ -155,3 +155,13 @@ CPMDeclarePackage(volk
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
 )
+
+CPMDeclarePackage(glm
+  NAME glm
+  GIT_TAG 1.0.1
+  GIT_REPOSITORY git@github.com:g-truc/glm.git
+  GIT_SHALLOW TRUE
+  EXCLUDE_FROM_ALL TRUE
+  OPTIONS
+    "GLM_BUILD_LIBRARY OFF"
+)
