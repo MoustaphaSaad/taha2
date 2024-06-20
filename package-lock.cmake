@@ -146,6 +146,7 @@ CPMDeclarePackage(mimalloc
   EXCLUDE_FROM_ALL TRUE
   OPTIONS
     "MI_WIN_REDIRECT OFF"
+    "MI_BUILD_TESTS OFF"
 )
 
 CPMDeclarePackage(volk
