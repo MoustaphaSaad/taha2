@@ -119,6 +119,7 @@ int main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 				auto expectedOutput = expectedOutputResult.releaseValue();
+				expectedOutput.replace("\r\n"_sv, "\n"_sv);
 
 				core::MemoryStream outputStream{&allocator};
 
@@ -127,7 +128,8 @@ int main(int argc, char* argv[])
 				else
 					unit->dumpTokens(&outputStream);
 				auto output = outputStream.releaseString();
-				if (output != expectedOutput)
+				output.replace("\r\n"_sv, "\n"_sv);
+				if (core::StringView{output}.trim() != core::StringView{expectedOutput}.trim())
 				{
 					core::strf(core::File::STDOUT, "[{}]: {}"_sv, fmt::styled("FAIL", fmt::fg(fmt::color::red)), file);
 					return EXIT_FAILURE;
@@ -171,6 +173,7 @@ int main(int argc, char* argv[])
 					return EXIT_FAILURE;
 				}
 				auto expectedOutput = expectedOutputResult.releaseValue();
+				expectedOutput.replace("\r\n"_sv, "\n"_sv);
 
 				core::MemoryStream outputStream{&allocator};
 
@@ -187,7 +190,8 @@ int main(int argc, char* argv[])
 				printer.visit(expr.get());
 
 				auto output = outputStream.releaseString();
-				if (output != expectedOutput)
+				output.replace("\r\n"_sv, "\n"_sv);
+				if (core::StringView{output}.trim() != core::StringView{expectedOutput}.trim())
 				{
 					core::strf(core::File::STDOUT, "[{}]: {}"_sv, fmt::styled("FAIL", fmt::fg(fmt::color::red)), file);
 					return EXIT_FAILURE;
