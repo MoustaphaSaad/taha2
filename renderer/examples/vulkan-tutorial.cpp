@@ -1,6 +1,7 @@
 #include <core/File.h>
 #include <core/Log.h>
 #include <core/MiMallocator.h>
+#include <core/Path.h>
 
 #include <volk.h>
 
@@ -405,7 +406,63 @@ private:
 
 	core::HumanError createGraphicsPipeline()
 	{
+		auto vertShaderPath = core::Path::join(m_allocator, core::StringView{SHADERS_DIR}, "vert.spv"_sv);
+		auto fragShaderPath = core::Path::join(m_allocator, core::StringView{SHADERS_DIR}, "frag.spv"_sv);
+
+		auto vertShaderResult = core::File::content(m_allocator, vertShaderPath);
+		if (vertShaderResult.isError())
+			return vertShaderResult.releaseError();
+		auto vertShader = vertShaderResult.releaseValue();
+
+		auto fragShaderResult = core::File::content(m_allocator, fragShaderPath);
+		if (fragShaderResult.isError())
+			return fragShaderResult.releaseError();
+		auto fragShader = fragShaderResult.releaseValue();
+
+		auto vertShaderModuleResult = createShaderModule(core::Span<const std::byte>{vertShader});
+		if (vertShaderModuleResult.isError())
+			return vertShaderModuleResult.releaseError();
+		auto vertShaderModule = vertShaderModuleResult.releaseValue();
+		coreDefer { vkDestroyShaderModule(m_logicalDevice, vertShaderModule, nullptr); };
+
+		auto fragShaderModuleResult = createShaderModule(core::Span<const std::byte>{fragShader});
+		if (fragShaderModuleResult.isError())
+			return fragShaderModuleResult.releaseError();
+		auto fragShaderModule = fragShaderModuleResult.releaseValue();
+		coreDefer { vkDestroyShaderModule(m_logicalDevice, fragShaderModule, nullptr); };
+
+		VkPipelineShaderStageCreateInfo vertShaderStageInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.module = vertShaderModule,
+			.pName = "main",
+		};
+
+		VkPipelineShaderStageCreateInfo fragShaderStageInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.module = fragShaderModule,
+			.pName = "main",
+		};
+
+		VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
 		return {};
+	}
+
+	core::Result<VkShaderModule> createShaderModule(core::Span<const std::byte> code)
+	{
+		VkShaderModuleCreateInfo createInfo {
+			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+			.codeSize = code.sizeInBytes(),
+			.pCode = (uint32_t*)code.data(),
+		};
+
+		VkShaderModule module = VK_NULL_HANDLE;
+		auto result = vkCreateShaderModule(m_logicalDevice, &createInfo, nullptr, &module);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateShaderModule failed, ErrorCode({})"_sv, result);
+		return module;
 	}
 
 	VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(const core::Array<VkSurfaceFormatKHR>& formats)

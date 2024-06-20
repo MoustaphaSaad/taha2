@@ -20,3 +20,5 @@ CPMGetPackage(volk)
 CPMGetPackage(glm)
 add_executable(vulkan-tutorial vulkan-tutorial.cpp)
 target_link_libraries(vulkan-tutorial core math glfw volk glm)
+target_compile_definitions(vulkan-tutorial PUBLIC
+  -DSHADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
