@@ -65,6 +65,8 @@ private:
 
 		if (auto err = createImageViews()) return err;
 
+		if (auto err = createGraphicsPipeline()) return err;
+
 		return {};
 	}
 
@@ -398,6 +400,11 @@ private:
 			if (result != VK_SUCCESS)
 				return core::errf(m_allocator, "vkCreateImageView failed, ErrorCode({})"_sv, result);
 		}
+		return {};
+	}
+
+	core::HumanError createGraphicsPipeline()
+	{
 		return {};
 	}
 
