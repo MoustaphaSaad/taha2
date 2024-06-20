@@ -66,6 +66,8 @@ private:
 
 		if (auto err = createImageViews()) return err;
 
+		if (auto err = createRenderPass()) return err;
+
 		if (auto err = createGraphicsPipeline()) return err;
 
 		return {};
@@ -83,6 +85,7 @@ private:
 	core::HumanError cleanup()
 	{
 		if (m_pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
+		if (m_renderPass != VK_NULL_HANDLE) vkDestroyRenderPass(m_logicalDevice, m_renderPass, nullptr);
 		for (auto view: m_swapchainImageViews)
 			vkDestroyImageView(m_logicalDevice, view, nullptr);
 		if (m_swapchain != VK_NULL_HANDLE) vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
@@ -405,6 +408,45 @@ private:
 		return {};
 	}
 
+	core::HumanError createRenderPass()
+	{
+		VkAttachmentDescription colorAttachment {
+			.format = m_swapchainFormat,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		};
+
+		VkAttachmentReference colorAttachmentRef {
+			.attachment = 0,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		};
+
+		VkSubpassDescription subpass {
+			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount = 1,
+			.pColorAttachments = &colorAttachmentRef,
+		};
+
+		VkRenderPassCreateInfo renderPassInfo {
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.attachmentCount = 1,
+			.pAttachments = &colorAttachment,
+			.subpassCount = 1,
+			.pSubpasses = &subpass,
+		};
+
+		auto result = vkCreateRenderPass(m_logicalDevice, &renderPassInfo, nullptr, &m_renderPass);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateRenderPass failed, ErrorCode({})"_sv, result);
+
+		return {};
+	}
+
 	core::HumanError createGraphicsPipeline()
 	{
 		auto vertShaderPath = core::Path::join(m_allocator, core::StringView{SHADERS_DIR}, "vert.spv"_sv);
@@ -702,6 +744,7 @@ private:
 	VkExtent2D m_swapchainExtent = {};
 	core::Array<VkImage> m_swapchainImages;
 	core::Array<VkImageView> m_swapchainImageViews;
+	VkRenderPass m_renderPass = VK_NULL_HANDLE;
 	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
