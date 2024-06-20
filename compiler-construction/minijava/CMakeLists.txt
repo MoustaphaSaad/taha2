@@ -24,70 +24,25 @@ set(TESTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
 enable_testing()
 
-add_test(NAME scan-sample COMMAND
-  minijava scan --test ${TESTS_DIR}/scan/sample.minijava
-)
+function (minijava_test NAME)
+  add_test(NAME ${NAME} COMMAND minijava ${ARGN} WORKING_DIRECTORY ${TESTS_DIR})
+endfunction ()
 
-add_test(NAME scan-sample-error COMMAND
-  minijava scan --test ${TESTS_DIR}/scan/sample-error.minijava
-)
+minijava_test(scan-sample scan --test ./scan/sample.minijava)
+minijava_test(scan-sample-error scan --test ./scan/sample-error.minijava)
 
-add_test(NAME parse-expr-add COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/add.minijava
-)
-
-add_test(NAME parse-expr-add-mul COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/add-mul.minijava
-)
-
-add_test(NAME parse-expr-array-length COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/array-length.minijava
-)
-
-add_test(NAME parse-expr-array-lookup COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/array-lookup.minijava
-)
-
-add_test(NAME parse-expr-call COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/call.minijava
-)
-
-add_test(NAME parse-expr-false COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/false.minijava
-)
-
-add_test(NAME parse-expr-id COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/id.minijava
-)
-
-add_test(NAME parse-expr-int COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/int.minijava
-)
-
-add_test(NAME parse-expr-new-array COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/new-array.minijava
-)
-
-add_test(NAME parse-expr-new-object COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/new-object.minijava
-)
-
-add_test(NAME parse-expr-not COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/not.minijava
-)
-
-add_test(NAME parse-expr-paren COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/paren.minijava
-)
-
-add_test(NAME parse-expr-sub COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/sub.minijava
-)
-
-add_test(NAME parse-expr-this COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/this.minijava
-)
-
-add_test(NAME parse-expr-true COMMAND
-  minijava parse-expr --test ${TESTS_DIR}/parse-expr/true.minijava
-)
+minijava_test(parse-expr-add parse-expr --test ./parse-expr/add.minijava)
+minijava_test(parse-expr-add-mul parse-expr --test ./parse-expr/add-mul.minijava)
+minijava_test(parse-expr-array-length parse-expr --test ./parse-expr/array-length.minijava)
+minijava_test(parse-expr-array-lookup parse-expr --test ./parse-expr/array-lookup.minijava)
+minijava_test(parse-expr-call parse-expr --test ./parse-expr/call.minijava)
+minijava_test(parse-expr-false parse-expr --test ./parse-expr/false.minijava)
+minijava_test(parse-expr-id parse-expr --test ./parse-expr/id.minijava)
+minijava_test(parse-expr-int parse-expr --test ./parse-expr/int.minijava)
+minijava_test(parse-expr-new-array parse-expr --test ./parse-expr/new-array.minijava)
+minijava_test(parse-expr-new-object parse-expr --test ./parse-expr/new-object.minijava)
+minijava_test(parse-expr-not parse-expr --test ./parse-expr/not.minijava)
+minijava_test(parse-expr-paren parse-expr --test ./parse-expr/paren.minijava)
+minijava_test(parse-expr-sub parse-expr --test ./parse-expr/sub.minijava)
+minijava_test(parse-expr-this parse-expr --test ./parse-expr/this.minijava)
+minijava_test(parse-expr-true parse-expr --test ./parse-expr/true.minijava)
