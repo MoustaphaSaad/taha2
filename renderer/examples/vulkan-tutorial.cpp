@@ -84,6 +84,7 @@ private:
 
 	core::HumanError cleanup()
 	{
+		if (m_graphicsPipeline != VK_NULL_HANDLE) vkDestroyPipeline(m_logicalDevice, m_graphicsPipeline, nullptr);
 		if (m_pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
 		if (m_renderPass != VK_NULL_HANDLE) vkDestroyRenderPass(m_logicalDevice, m_renderPass, nullptr);
 		for (auto view: m_swapchainImageViews)
@@ -553,6 +554,28 @@ private:
 		if (result != VK_SUCCESS)
 			return core::errf(m_allocator, "vkCreatePipelineLayout failed, ErrorCode({})"_sv, result);
 
+		VkGraphicsPipelineCreateInfo pipelineInfo {
+			.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+			.stageCount = 2,
+			.pStages = shaderStages,
+			.pVertexInputState = &vertexInputInfo,
+			.pInputAssemblyState = &inputAssembly,
+			.pViewportState = &viewportState,
+			.pRasterizationState = &rasterizer,
+			.pMultisampleState = &multisampling,
+			.pColorBlendState = &colorBlending,
+			.pDynamicState = &dynamicState,
+			.layout = m_pipelineLayout,
+			.renderPass = m_renderPass,
+			.subpass = 0,
+			.basePipelineHandle = VK_NULL_HANDLE,
+			.basePipelineIndex = -1,
+		};
+
+		result = vkCreateGraphicsPipelines(m_logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateGraphicsPipelines failed, ErrorCode({})"_sv, result);
+
 		return {};
 	}
 
@@ -746,6 +769,7 @@ private:
 	core::Array<VkImageView> m_swapchainImageViews;
 	VkRenderPass m_renderPass = VK_NULL_HANDLE;
 	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+	VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
