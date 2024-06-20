@@ -82,6 +82,7 @@ private:
 
 	core::HumanError cleanup()
 	{
+		if (m_pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
 		for (auto view: m_swapchainImageViews)
 			vkDestroyImageView(m_logicalDevice, view, nullptr);
 		if (m_swapchain != VK_NULL_HANDLE) vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
@@ -447,6 +448,69 @@ private:
 
 		VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		};
+
+		VkPipelineInputAssemblyStateCreateInfo inputAssembly {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+			.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		};
+
+		VkPipelineViewportStateCreateInfo viewportState{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+			.viewportCount = 1,
+			.scissorCount = 1,
+		};
+
+		VkPipelineRasterizationStateCreateInfo rasterizer {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+			.depthClampEnable = VK_FALSE,
+			.rasterizerDiscardEnable = VK_FALSE,
+			.polygonMode = VK_POLYGON_MODE_FILL,
+			.cullMode = VK_CULL_MODE_BACK_BIT,
+			.frontFace = VK_FRONT_FACE_CLOCKWISE,
+			.depthBiasEnable = VK_FALSE,
+			.lineWidth = 1.0f,
+		};
+
+		VkPipelineMultisampleStateCreateInfo multisampling {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+			.sampleShadingEnable = VK_FALSE,
+		};
+
+		VkPipelineColorBlendAttachmentState colorBlendAttachment {
+			.blendEnable = VK_FALSE,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
+							  VK_COLOR_COMPONENT_G_BIT |
+							  VK_COLOR_COMPONENT_B_BIT |
+							  VK_COLOR_COMPONENT_A_BIT,
+		};
+
+		VkPipelineColorBlendStateCreateInfo colorBlending {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+			.logicOpEnable = VK_FALSE,
+			.logicOp = VK_LOGIC_OP_COPY,
+			.attachmentCount = 1,
+			.pAttachments = &colorBlendAttachment,
+		};
+
+		VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+		VkPipelineDynamicStateCreateInfo dynamicState {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+			.dynamicStateCount = sizeof(dynamicStates) / sizeof(*dynamicStates),
+			.pDynamicStates = dynamicStates,
+		};
+
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		};
+
+		auto result = vkCreatePipelineLayout(m_logicalDevice, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreatePipelineLayout failed, ErrorCode({})"_sv, result);
+
 		return {};
 	}
 
@@ -638,6 +702,7 @@ private:
 	VkExtent2D m_swapchainExtent = {};
 	core::Array<VkImage> m_swapchainImages;
 	core::Array<VkImageView> m_swapchainImageViews;
+	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
