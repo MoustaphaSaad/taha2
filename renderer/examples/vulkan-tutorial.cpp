@@ -22,7 +22,8 @@ public:
 		: m_allocator(allocator),
 		  m_log(log),
 		  m_swapchainImages(allocator),
-		  m_swapchainImageViews(allocator)
+		  m_swapchainImageViews(allocator),
+		  m_swapchainFramebuffers(allocator)
 	{}
 
 	core::HumanError run()
@@ -70,6 +71,8 @@ private:
 
 		if (auto err = createGraphicsPipeline()) return err;
 
+		if (auto err = createFramebuffers()) return err;
+
 		return {};
 	}
 
@@ -84,6 +87,9 @@ private:
 
 	core::HumanError cleanup()
 	{
+		for (auto framebuffer: m_swapchainFramebuffers)
+			vkDestroyFramebuffer(m_logicalDevice, framebuffer, nullptr);
+
 		if (m_graphicsPipeline != VK_NULL_HANDLE) vkDestroyPipeline(m_logicalDevice, m_graphicsPipeline, nullptr);
 		if (m_pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
 		if (m_renderPass != VK_NULL_HANDLE) vkDestroyRenderPass(m_logicalDevice, m_renderPass, nullptr);
@@ -579,6 +585,33 @@ private:
 		return {};
 	}
 
+	core::HumanError createFramebuffers()
+	{
+		m_swapchainFramebuffers.resize_fill(m_swapchainImageViews.count(), VK_NULL_HANDLE);
+
+		for (size_t i = 0; i < m_swapchainImageViews.count(); ++i)
+		{
+			VkImageView attachments[] = {
+				m_swapchainImageViews[i]
+			};
+
+			VkFramebufferCreateInfo framebufferCreateInfo {
+				.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+				.renderPass = m_renderPass,
+				.attachmentCount = 1,
+				.pAttachments = attachments,
+				.width = m_swapchainExtent.width,
+				.height = m_swapchainExtent.height,
+				.layers = 1
+			};
+
+			auto result = vkCreateFramebuffer(m_logicalDevice, &framebufferCreateInfo, nullptr, &m_swapchainFramebuffers[i]);
+			if (result != VK_SUCCESS)
+				return core::errf(m_allocator, "vkCreateFramebuffer failed, ErrorCode({})"_sv, result);
+		}
+		return {};
+	}
+
 	core::Result<VkShaderModule> createShaderModule(core::Span<const std::byte> code)
 	{
 		VkShaderModuleCreateInfo createInfo {
@@ -770,6 +803,7 @@ private:
 	VkRenderPass m_renderPass = VK_NULL_HANDLE;
 	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 	VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
+	core::Array<VkFramebuffer> m_swapchainFramebuffers;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
