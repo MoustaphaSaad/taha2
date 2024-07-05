@@ -73,6 +73,8 @@ private:
 
 		if (auto err = createFramebuffers()) return err;
 
+		if (auto err = createCommandPool()) return err;
+
 		return {};
 	}
 
@@ -87,6 +89,8 @@ private:
 
 	core::HumanError cleanup()
 	{
+		vkDestroyCommandPool(m_logicalDevice, m_commandPool, nullptr);
+
 		for (auto framebuffer: m_swapchainFramebuffers)
 			vkDestroyFramebuffer(m_logicalDevice, framebuffer, nullptr);
 
@@ -612,6 +616,68 @@ private:
 		return {};
 	}
 
+	core::HumanError createCommandPool()
+	{
+		VkCommandPoolCreateInfo poolInfo {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			.queueFamilyIndex = m_graphicsQueueFamily,
+		};
+
+		auto result = vkCreateCommandPool(m_logicalDevice, &poolInfo, nullptr, &m_commandPool);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateCommandPool failed, ErrorCode({})"_sv, result);
+		return {};
+	}
+
+	core::HumanError recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
+	{
+		VkCommandBufferBeginInfo beginInfo {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		};
+
+		auto result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkBeginCommandBuffer failed, ErrorCode({})"_sv, result);
+
+		VkClearValue clearColor {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}};
+		VkRenderPassBeginInfo renderPassInfo {
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.renderPass = m_renderPass,
+			.framebuffer = m_swapchainFramebuffers[imageIndex],
+			.renderArea = {
+				.extent = m_swapchainExtent,
+			},
+			.clearValueCount = 1,
+			.pClearValues = &clearColor,
+		};
+
+		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
+
+		VkViewport viewport{
+			.width = (float)m_swapchainExtent.width,
+			.height = (float)m_swapchainExtent.height,
+			.maxDepth = 1.0f
+		};
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+		VkRect2D scissor{
+			.extent = m_swapchainExtent,
+		};
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+		vkCmdEndRenderPass(commandBuffer);
+
+		result = vkEndCommandBuffer(commandBuffer);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkEndCommandBuffer failed, ErrorCode({})"_sv, result);
+		return {};
+	}
+
 	core::Result<VkShaderModule> createShaderModule(core::Span<const std::byte> code)
 	{
 		VkShaderModuleCreateInfo createInfo {
@@ -804,6 +870,7 @@ private:
 	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 	VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
 	core::Array<VkFramebuffer> m_swapchainFramebuffers;
+	VkCommandPool m_commandPool;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
