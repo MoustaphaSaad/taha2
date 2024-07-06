@@ -12,7 +12,7 @@ CPMDeclarePackage(doctest
 
 CPMDeclarePackage(utf8proc
   NAME utf8proc
-  GIT_TAG v2.8.0
+  GIT_TAG v2.9.0
   GIT_REPOSITORY git@github.com:JuliaStrings/utf8proc.git
   GIT_SHALLOW TRUE
   EXCLUDE_FROM_ALL TRUE
