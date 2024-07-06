@@ -7,7 +7,11 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#define GLFW_EXPOSE_NATIVE_WIN32
+#if TAHA_OS_WINDOWS
+#define GLFW_EXPOSE_NATIVE_WIN32 1
+#elif TAHA_OS_LINUX
+#define GLFW_EXPOSE_NATIVE_WAYLAND 1
+#endif
 #include <GLFW/glfw3native.h>
 
 #define GLM_FORCE_RADIANS 1
@@ -463,6 +467,7 @@ private:
 		auto vertShaderPath = core::Path::join(m_allocator, core::StringView{SHADERS_DIR}, "vert.spv"_sv);
 		auto fragShaderPath = core::Path::join(m_allocator, core::StringView{SHADERS_DIR}, "frag.spv"_sv);
 
+		m_log->debug("vert path: {}"_sv, vertShaderPath);
 		auto vertShaderResult = core::File::content(m_allocator, vertShaderPath);
 		if (vertShaderResult.isError())
 			return vertShaderResult.releaseError();

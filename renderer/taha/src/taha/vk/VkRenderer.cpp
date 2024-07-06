@@ -606,7 +606,7 @@ namespace taha
 				.display = display,
 				.surface = surface,
 			};
-			result = vkCreateWaylandSurfaceKHR(renderer->m_instance, &dummySurfaceCreateInfo, nullptr, &dummySurface2);
+			auto result = vkCreateWaylandSurfaceKHR(instance2, &dummySurfaceCreateInfo, nullptr, &dummySurface2);
 			if (result != VK_SUCCESS)
 				return core::errf(allocator, "vkCreateWaylandSurfaceKHR failed, ErrorCode({})"_sv, result);
 #endif
@@ -876,7 +876,14 @@ namespace taha
 		if (result != VK_SUCCESS)
 			return nullptr;
 
-		return core::unique_from<VkFrame>(m_allocator, this, surface);
+		return core::unique_from<VkFrame>(
+			m_allocator,
+			this,
+			surface,
+			VK_NULL_HANDLE,
+			core::Array<VkImage>{m_allocator},
+			core::Array<VkImageView>{m_allocator}
+		);
 #endif
 
 		return nullptr;
