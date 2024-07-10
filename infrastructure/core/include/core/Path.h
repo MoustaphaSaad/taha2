@@ -15,8 +15,9 @@ namespace core
 		template<typename ... TArgs>
 		static void join(String& result, StringView first, TArgs&& ... args)
 		{
-			if (!(result.endsWith("/"_sv) && result.endsWith("\\"_sv)))
-				result.push(Rune{'/'});
+			if (result.count() > 0)
+				if (!(result.endsWith("/"_sv) || result.endsWith("\\"_sv)))
+					result.push(Rune{'/'});
 			result.push(first);
 			join(result, std::forward<TArgs>(args)...);
 		}
@@ -38,7 +39,7 @@ namespace core
 		{
 			String result{allocator};
 
-			path = path.trimLeft("\\/"_sv);
+			path = path.trimLeft();
 			Rune prev{'\0'};
 			for (auto c: path.runes())
 			{

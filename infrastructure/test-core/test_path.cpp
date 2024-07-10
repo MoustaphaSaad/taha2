@@ -25,4 +25,10 @@ TEST_CASE("core::Path::join")
 		auto res = core::Path::join(&allocator, "C:/ABC"_sv, "def.txt"_sv);
 		REQUIRE(res == "C:/ABC/def.txt"_sv);
 	}
+
+	SUBCASE("linux absolute path")
+	{
+		auto res = core::Path::join(&allocator, "/ABC"_sv, "def.txt"_sv);
+		REQUIRE(res == "/ABC/def.txt"_sv);
+	}
 }
