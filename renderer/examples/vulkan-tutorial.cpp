@@ -79,6 +79,10 @@ private:
 
 		if (auto err = createCommandPool()) return err;
 
+		if (auto err = createCommandBuffer()) return err;
+
+		if (auto err = createSyncObjects()) return err;
+
 		return {};
 	}
 
@@ -87,12 +91,64 @@ private:
 		while (!glfwWindowShouldClose(m_window))
 		{
 			glfwPollEvents();
+			drawFrame();
 		}
+
+		vkDeviceWaitIdle(m_logicalDevice);
 		return {};
+	}
+
+	void drawFrame()
+	{
+		vkWaitForFences(m_logicalDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
+		vkResetFences(m_logicalDevice, 1, &m_inFlightFence);
+
+		uint32_t imageIndex = 0;
+		vkAcquireNextImageKHR(m_logicalDevice, m_swapchain, UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+		vkResetCommandBuffer(m_commandBuffer, 0);
+		recordCommandBuffer(m_commandBuffer, imageIndex);
+
+		VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphore};
+		VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+		VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphore};
+		VkSubmitInfo submitInfo{
+			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.waitSemaphoreCount = 1,
+			.pWaitSemaphores = waitSemaphores,
+			.pWaitDstStageMask = waitStages,
+			.commandBufferCount = 1,
+			.pCommandBuffers = &m_commandBuffer,
+			.signalSemaphoreCount = 1,
+			.pSignalSemaphores = signalSemaphores,
+		};
+
+		auto result = vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFence);
+		if (result != VK_SUCCESS)
+		{
+			// return core::errf(m_allocator, "vkQueueSubmit failed, ErrorCode({})"_sv, result);
+			// TODO: handle this later
+		}
+
+		VkSwapchainKHR swapchains[] = {m_swapchain};
+		VkPresentInfoKHR presentInfo {
+			.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+			.waitSemaphoreCount = 1,
+			.pWaitSemaphores = signalSemaphores,
+			.swapchainCount = 1,
+			.pSwapchains = swapchains,
+			.pImageIndices = &imageIndex,
+		};
+
+		vkQueuePresentKHR(m_presentQueue, &presentInfo);
 	}
 
 	core::HumanError cleanup()
 	{
+		vkDestroySemaphore(m_logicalDevice, m_imageAvailableSemaphore, nullptr);
+		vkDestroySemaphore(m_logicalDevice, m_renderFinishedSemaphore, nullptr);
+		vkDestroyFence(m_logicalDevice, m_inFlightFence, nullptr);
+
 		vkDestroyCommandPool(m_logicalDevice, m_commandPool, nullptr);
 
 		for (auto framebuffer: m_swapchainFramebuffers)
@@ -447,12 +503,23 @@ private:
 			.pColorAttachments = &colorAttachmentRef,
 		};
 
+		VkSubpassDependency dependency{
+			.srcSubpass = VK_SUBPASS_EXTERNAL,
+			.dstSubpass = 0,
+			.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = 0,
+			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		};
+
 		VkRenderPassCreateInfo renderPassInfo {
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 			.attachmentCount = 1,
 			.pAttachments = &colorAttachment,
 			.subpassCount = 1,
 			.pSubpasses = &subpass,
+			.dependencyCount = 1,
+			.pDependencies = &dependency,
 		};
 
 		auto result = vkCreateRenderPass(m_logicalDevice, &renderPassInfo, nullptr, &m_renderPass);
@@ -635,6 +702,48 @@ private:
 		return {};
 	}
 
+	core::HumanError createCommandBuffer()
+	{
+		VkCommandBufferAllocateInfo commandBufferAllocateInfo {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool = m_commandPool,
+			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount = 1,
+		};
+
+		auto result = vkAllocateCommandBuffers(m_logicalDevice, &commandBufferAllocateInfo, &m_commandBuffer);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkAllocateCommandBuffers failed, ErrorCode({})"_sv, result);
+
+		return {};
+	}
+
+	core::HumanError createSyncObjects()
+	{
+		VkSemaphoreCreateInfo semaphoreInfo{
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+		};
+
+		auto result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_imageAvailableSemaphore);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
+
+		result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphore);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
+
+		VkFenceCreateInfo fenceInfo {
+			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
+		};
+
+		result = vkCreateFence(m_logicalDevice, &fenceInfo, nullptr, &m_inFlightFence);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateFence failed, ErrorCode({})"_sv, result);
+
+		return {};
+	}
+
 	core::HumanError recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 	{
 		VkCommandBufferBeginInfo beginInfo {
@@ -647,7 +756,7 @@ private:
 
 		VkClearValue clearColor {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}};
 		VkRenderPassBeginInfo renderPassInfo {
-			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 			.renderPass = m_renderPass,
 			.framebuffer = m_swapchainFramebuffers[imageIndex],
 			.renderArea = {
@@ -875,7 +984,11 @@ private:
 	VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 	VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
 	core::Array<VkFramebuffer> m_swapchainFramebuffers;
-	VkCommandPool m_commandPool;
+	VkCommandPool m_commandPool = VK_NULL_HANDLE;
+	VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
+	VkSemaphore m_imageAvailableSemaphore = VK_NULL_HANDLE;
+	VkSemaphore m_renderFinishedSemaphore = VK_NULL_HANDLE;
+	VkFence m_inFlightFence = VK_NULL_HANDLE;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
