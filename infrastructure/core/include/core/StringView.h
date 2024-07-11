@@ -206,7 +206,7 @@ namespace core
 			return trimLeftPredicate([&](Rune r) { return cutset.find(r) != SIZE_MAX; });
 		}
 
-		StringView trimLeft() const;
+		CORE_EXPORT StringView trimLeft() const;
 
 		template <typename TFunc> StringView trimRightPredicate(TFunc&& predicate) const
 		{

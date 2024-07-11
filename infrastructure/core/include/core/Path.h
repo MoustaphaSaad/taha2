@@ -8,8 +8,6 @@ namespace core
 {
 	class Path
 	{
-		static size_t volumeNameLen(StringView path);
-
 		static void join(String& result) {}
 
 		template<typename ... TArgs>
