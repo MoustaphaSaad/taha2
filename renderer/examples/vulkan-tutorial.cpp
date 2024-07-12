@@ -19,6 +19,8 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
 class HelloTriangleApplication
 {
 public:
@@ -27,7 +29,11 @@ public:
 		  m_log(log),
 		  m_swapchainImages(allocator),
 		  m_swapchainImageViews(allocator),
-		  m_swapchainFramebuffers(allocator)
+		  m_swapchainFramebuffers(allocator),
+		  m_commandBuffers(allocator),
+		  m_imageAvailableSemaphores(allocator),
+		  m_renderFinishedSemaphores(allocator),
+		  m_inFlightFences(allocator)
 	{}
 
 	core::HumanError run()
@@ -79,7 +85,7 @@ private:
 
 		if (auto err = createCommandPool()) return err;
 
-		if (auto err = createCommandBuffer()) return err;
+		if (auto err = createCommandBuffers()) return err;
 
 		if (auto err = createSyncObjects()) return err;
 
@@ -100,30 +106,30 @@ private:
 
 	void drawFrame()
 	{
-		vkWaitForFences(m_logicalDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
-		vkResetFences(m_logicalDevice, 1, &m_inFlightFence);
+		vkWaitForFences(m_logicalDevice, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+		vkResetFences(m_logicalDevice, 1, &m_inFlightFences[m_currentFrame]);
 
 		uint32_t imageIndex = 0;
-		vkAcquireNextImageKHR(m_logicalDevice, m_swapchain, UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+		vkAcquireNextImageKHR(m_logicalDevice, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-		vkResetCommandBuffer(m_commandBuffer, 0);
-		recordCommandBuffer(m_commandBuffer, imageIndex);
+		vkResetCommandBuffer(m_commandBuffers[m_currentFrame], 0);
+		recordCommandBuffer(m_commandBuffers[m_currentFrame], imageIndex);
 
-		VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphore};
+		VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[m_currentFrame]};
 		VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-		VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphore};
+		VkSemaphore signalSemaphores[] = {m_renderFinishedSemaphores[m_currentFrame]};
 		VkSubmitInfo submitInfo{
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.waitSemaphoreCount = 1,
 			.pWaitSemaphores = waitSemaphores,
 			.pWaitDstStageMask = waitStages,
 			.commandBufferCount = 1,
-			.pCommandBuffers = &m_commandBuffer,
+			.pCommandBuffers = &m_commandBuffers[m_currentFrame],
 			.signalSemaphoreCount = 1,
 			.pSignalSemaphores = signalSemaphores,
 		};
 
-		auto result = vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFence);
+		auto result = vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFences[m_currentFrame]);
 		if (result != VK_SUCCESS)
 		{
 			// return core::errf(m_allocator, "vkQueueSubmit failed, ErrorCode({})"_sv, result);
@@ -141,13 +147,19 @@ private:
 		};
 
 		vkQueuePresentKHR(m_presentQueue, &presentInfo);
+
+		++m_currentFrame;
+		m_currentFrame %= MAX_FRAMES_IN_FLIGHT;
 	}
 
 	core::HumanError cleanup()
 	{
-		vkDestroySemaphore(m_logicalDevice, m_imageAvailableSemaphore, nullptr);
-		vkDestroySemaphore(m_logicalDevice, m_renderFinishedSemaphore, nullptr);
-		vkDestroyFence(m_logicalDevice, m_inFlightFence, nullptr);
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+		{
+			vkDestroySemaphore(m_logicalDevice, m_imageAvailableSemaphores[i], nullptr);
+			vkDestroySemaphore(m_logicalDevice, m_renderFinishedSemaphores[i], nullptr);
+			vkDestroyFence(m_logicalDevice, m_inFlightFences[i], nullptr);
+		}
 
 		vkDestroyCommandPool(m_logicalDevice, m_commandPool, nullptr);
 
@@ -702,16 +714,18 @@ private:
 		return {};
 	}
 
-	core::HumanError createCommandBuffer()
+	core::HumanError createCommandBuffers()
 	{
+		m_commandBuffers.resize_fill(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+
 		VkCommandBufferAllocateInfo commandBufferAllocateInfo {
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 			.commandPool = m_commandPool,
 			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			.commandBufferCount = 1,
+			.commandBufferCount = (uint32_t)m_commandBuffers.count(),
 		};
 
-		auto result = vkAllocateCommandBuffers(m_logicalDevice, &commandBufferAllocateInfo, &m_commandBuffer);
+		auto result = vkAllocateCommandBuffers(m_logicalDevice, &commandBufferAllocateInfo, m_commandBuffers.data());
 		if (result != VK_SUCCESS)
 			return core::errf(m_allocator, "vkAllocateCommandBuffers failed, ErrorCode({})"_sv, result);
 
@@ -720,26 +734,33 @@ private:
 
 	core::HumanError createSyncObjects()
 	{
+		m_imageAvailableSemaphores.resize_fill(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		m_renderFinishedSemaphores.resize_fill(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+		m_inFlightFences.resize_fill(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
+
 		VkSemaphoreCreateInfo semaphoreInfo{
 			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 		};
-
-		auto result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_imageAvailableSemaphore);
-		if (result != VK_SUCCESS)
-			return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
-
-		result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphore);
-		if (result != VK_SUCCESS)
-			return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
 
 		VkFenceCreateInfo fenceInfo {
 			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 		};
 
-		result = vkCreateFence(m_logicalDevice, &fenceInfo, nullptr, &m_inFlightFence);
-		if (result != VK_SUCCESS)
-			return core::errf(m_allocator, "vkCreateFence failed, ErrorCode({})"_sv, result);
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+		{
+			auto result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]);
+			if (result != VK_SUCCESS)
+				return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
+
+			result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]);
+			if (result != VK_SUCCESS)
+				return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
+
+			result = vkCreateFence(m_logicalDevice, &fenceInfo, nullptr, &m_inFlightFences[i]);
+			if (result != VK_SUCCESS)
+				return core::errf(m_allocator, "vkCreateFence failed, ErrorCode({})"_sv, result);
+		}
 
 		return {};
 	}
@@ -985,10 +1006,11 @@ private:
 	VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
 	core::Array<VkFramebuffer> m_swapchainFramebuffers;
 	VkCommandPool m_commandPool = VK_NULL_HANDLE;
-	VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
-	VkSemaphore m_imageAvailableSemaphore = VK_NULL_HANDLE;
-	VkSemaphore m_renderFinishedSemaphore = VK_NULL_HANDLE;
-	VkFence m_inFlightFence = VK_NULL_HANDLE;
+	core::Array<VkCommandBuffer> m_commandBuffers;
+	core::Array<VkSemaphore> m_imageAvailableSemaphores;
+	core::Array<VkSemaphore> m_renderFinishedSemaphores;
+	core::Array<VkFence> m_inFlightFences;
+	size_t m_currentFrame = 0;
 	bool m_enableValidationLayers = true;
 	constexpr static const char* VALIDATION_LAYERS[] = {
 		"VK_LAYER_KHRONOS_validation",
