@@ -21,6 +21,46 @@
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+struct Vertex
+{
+	glm::vec2 pos;
+	glm::vec3 color;
+
+	static VkVertexInputBindingDescription getBindingDescription()
+	{
+		return VkVertexInputBindingDescription {
+			.binding = 0,
+			.stride = sizeof(Vertex),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		};
+	}
+
+	static core::Array<VkVertexInputAttributeDescription> getAttributeDescriptions(core::Allocator* allocator)
+	{
+		core::Array<VkVertexInputAttributeDescription> res{allocator};
+		res.resize(2);
+		res[0] = VkVertexInputAttributeDescription{
+			.location = 0,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Vertex, pos),
+		};
+		res[1] = VkVertexInputAttributeDescription{
+			.location = 1,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex, color),
+		};
+		return res;
+	}
+};
+
+constexpr Vertex VERTICES[] = {
+	Vertex{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	Vertex{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+};
+
 class HelloTriangleApplication
 {
 public:
@@ -642,8 +682,14 @@ private:
 
 		VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+		auto bindingDescription = Vertex::getBindingDescription();
+		auto attributeDescriptions = Vertex::getAttributeDescriptions(m_allocator);
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+			.vertexBindingDescriptionCount = 1,
+			.pVertexBindingDescriptions = &bindingDescription,
+			.vertexAttributeDescriptionCount = (uint32_t)attributeDescriptions.count(),
+			.pVertexAttributeDescriptions = attributeDescriptions.data(),
 		};
 
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly {
