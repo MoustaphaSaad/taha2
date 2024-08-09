@@ -56,7 +56,7 @@ struct Vertex
 };
 
 constexpr Vertex VERTICES[] = {
-	Vertex{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	Vertex{{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
 	Vertex{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
 	Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
 };
@@ -132,6 +132,8 @@ private:
 		if (auto err = createFramebuffers()) return err;
 
 		if (auto err = createCommandPool()) return err;
+
+		if (auto err = createVertexBuffer()) return err;
 
 		if (auto err = createCommandBuffers()) return err;
 
@@ -224,6 +226,9 @@ private:
 	core::HumanError cleanup()
 	{
 		cleanupSwapchain();
+
+		if (m_vertexBuffer != VK_NULL_HANDLE) vkDestroyBuffer(m_logicalDevice, m_vertexBuffer, nullptr);
+		if (m_vertexBufferMemory != VK_NULL_HANDLE) vkFreeMemory(m_logicalDevice, m_vertexBufferMemory, nullptr);
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 		{
@@ -868,6 +873,64 @@ private:
 		return {};
 	}
 
+	core::Result<uint32_t> findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+	{
+		VkPhysicalDeviceMemoryProperties memoryProperties{};
+		vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memoryProperties);
+
+		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
+		{
+			if (typeFilter & (1 << i) &&
+				(memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+			{
+				return i;
+			}
+		}
+
+		return core::errf(m_allocator, "failed to find suitable memory type!"_sv);
+	}
+
+	core::HumanError createVertexBuffer()
+	{
+		VkBufferCreateInfo bufferInfo{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.size = sizeof(VERTICES),
+			.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		};
+
+		auto result = vkCreateBuffer(m_logicalDevice, &bufferInfo, nullptr, &m_vertexBuffer);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkCreateBuffer failed, ErrorCode({})"_sv, result);
+
+		VkMemoryRequirements memoryRequirements{};
+		vkGetBufferMemoryRequirements(m_logicalDevice, m_vertexBuffer, &memoryRequirements);
+
+		auto memoryTypeResult = findMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+		if (memoryTypeResult.isError())
+			return memoryTypeResult.releaseError();
+		auto memoryType = memoryTypeResult.releaseValue();
+
+		VkMemoryAllocateInfo allocInfo{
+			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+			.allocationSize = memoryRequirements.size,
+			.memoryTypeIndex = memoryType,
+		};
+
+		result = vkAllocateMemory(m_logicalDevice, &allocInfo, nullptr, &m_vertexBufferMemory);
+		if (result != VK_SUCCESS)
+			return core::errf(m_allocator, "vkAllocateMemory failed, ErrorCode({})"_sv, result);
+
+		vkBindBufferMemory(m_logicalDevice, m_vertexBuffer, m_vertexBufferMemory, 0);
+
+		void* data{};
+		vkMapMemory(m_logicalDevice, m_vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+		memcpy(data, VERTICES, sizeof(VERTICES));
+		vkUnmapMemory(m_logicalDevice, m_vertexBufferMemory);
+
+		return {};
+	}
+
 	core::HumanError recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 	{
 		VkCommandBufferBeginInfo beginInfo {
@@ -894,6 +957,10 @@ private:
 
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
+		VkBuffer vertexBuffers[] = {m_vertexBuffer};
+		VkDeviceSize offsets[] = {0};
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
 		VkViewport viewport{
 			.width = (float)m_swapchainExtent.width,
 			.height = (float)m_swapchainExtent.height,
@@ -906,7 +973,7 @@ private:
 		};
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+		vkCmdDraw(commandBuffer, sizeof(VERTICES) / sizeof(*VERTICES), 1, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffer);
 
@@ -1113,6 +1180,8 @@ private:
 	core::Array<VkSemaphore> m_imageAvailableSemaphores;
 	core::Array<VkSemaphore> m_renderFinishedSemaphores;
 	core::Array<VkFence> m_inFlightFences;
+	VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
 	size_t m_currentFrame = 0;
 	bool m_enableValidationLayers = true;
 	bool m_framebufferResized = false;
