@@ -890,23 +890,23 @@ private:
 		return core::errf(m_allocator, "failed to find suitable memory type!"_sv);
 	}
 
-	core::HumanError createVertexBuffer()
+	core::HumanError createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 	{
-		VkBufferCreateInfo bufferInfo{
+		VkBufferCreateInfo bufferInfo {
 			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-			.size = sizeof(VERTICES),
-			.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			.size = size,
+			.usage = usage,
 			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		};
 
-		auto result = vkCreateBuffer(m_logicalDevice, &bufferInfo, nullptr, &m_vertexBuffer);
+		auto result = vkCreateBuffer(m_logicalDevice, &bufferInfo, nullptr, &buffer);
 		if (result != VK_SUCCESS)
 			return core::errf(m_allocator, "vkCreateBuffer failed, ErrorCode({})"_sv, result);
 
 		VkMemoryRequirements memoryRequirements{};
-		vkGetBufferMemoryRequirements(m_logicalDevice, m_vertexBuffer, &memoryRequirements);
+		vkGetBufferMemoryRequirements(m_logicalDevice, buffer, &memoryRequirements);
 
-		auto memoryTypeResult = findMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+		auto memoryTypeResult = findMemoryType(memoryRequirements.memoryTypeBits, properties);
 		if (memoryTypeResult.isError())
 			return memoryTypeResult.releaseError();
 		auto memoryType = memoryTypeResult.releaseValue();
@@ -917,16 +917,87 @@ private:
 			.memoryTypeIndex = memoryType,
 		};
 
-		result = vkAllocateMemory(m_logicalDevice, &allocInfo, nullptr, &m_vertexBufferMemory);
+		result = vkAllocateMemory(m_logicalDevice, &allocInfo, nullptr, &bufferMemory);
 		if (result != VK_SUCCESS)
 			return core::errf(m_allocator, "vkAllocateMemory failed, ErrorCode({})"_sv, result);
 
-		vkBindBufferMemory(m_logicalDevice, m_vertexBuffer, m_vertexBufferMemory, 0);
+		vkBindBufferMemory(m_logicalDevice, buffer, bufferMemory, 0);
+		return {};
+	}
+
+	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+	{
+		VkCommandBufferAllocateInfo allocInfo{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool = m_commandPool,
+			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount = 1,
+		};
+
+		VkCommandBuffer commandBuffer{};
+		vkAllocateCommandBuffers(m_logicalDevice, &allocInfo, &commandBuffer);
+
+		VkCommandBufferBeginInfo beginInfo{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+		};
+		vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+		VkBufferCopy copyRegion{
+			.size = size,
+		};
+		vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+		vkEndCommandBuffer(commandBuffer);
+
+		VkSubmitInfo submitInfo{
+			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.commandBufferCount = 1,
+			.pCommandBuffers = &commandBuffer,
+		};
+
+		vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+		vkQueueWaitIdle(m_graphicsQueue);
+
+		vkFreeCommandBuffers(m_logicalDevice, m_commandPool, 1, &commandBuffer);
+	}
+
+	core::HumanError createVertexBuffer()
+	{
+		VkDeviceSize bufferSize = sizeof(VERTICES);
+
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
+		auto err = createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			stagingBuffer,
+			stagingBufferMemory
+		);
+		if (err)
+			return err;
+		coreDefer {
+			vkDestroyBuffer(m_logicalDevice, stagingBuffer, nullptr);
+			vkFreeMemory(m_logicalDevice, stagingBufferMemory, nullptr);
+		};
 
 		void* data{};
-		vkMapMemory(m_logicalDevice, m_vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-		memcpy(data, VERTICES, sizeof(VERTICES));
-		vkUnmapMemory(m_logicalDevice, m_vertexBufferMemory);
+		vkMapMemory(m_logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+		memcpy(data, VERTICES, bufferSize);
+		vkUnmapMemory(m_logicalDevice, stagingBufferMemory);
+
+		err = createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			m_vertexBuffer,
+			m_vertexBufferMemory
+		);
+		if (err)
+			return err;
+
+		copyBuffer(stagingBuffer, m_vertexBuffer, bufferSize);
 
 		return {};
 	}
