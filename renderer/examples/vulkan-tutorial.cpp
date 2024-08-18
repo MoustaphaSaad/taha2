@@ -56,9 +56,14 @@ struct Vertex
 };
 
 constexpr Vertex VERTICES[] = {
-	Vertex{{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-	Vertex{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-	Vertex{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+	Vertex{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	Vertex{{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+	Vertex{{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}},
+	Vertex{{-0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}},
+};
+
+constexpr uint16_t INDICES[] = {
+	0, 1, 2, 2, 3, 0
 };
 
 class HelloTriangleApplication
@@ -134,6 +139,8 @@ private:
 		if (auto err = createCommandPool()) return err;
 
 		if (auto err = createVertexBuffer()) return err;
+
+		if (auto err = createIndexBuffer()) return err;
 
 		if (auto err = createCommandBuffers()) return err;
 
@@ -226,6 +233,9 @@ private:
 	core::HumanError cleanup()
 	{
 		cleanupSwapchain();
+
+		if (m_indexBuffer != VK_NULL_HANDLE) vkDestroyBuffer(m_logicalDevice, m_indexBuffer, nullptr);
+		if (m_indexBufferMemory != VK_NULL_HANDLE) vkFreeMemory(m_logicalDevice, m_indexBufferMemory, nullptr);
 
 		if (m_vertexBuffer != VK_NULL_HANDLE) vkDestroyBuffer(m_logicalDevice, m_vertexBuffer, nullptr);
 		if (m_vertexBufferMemory != VK_NULL_HANDLE) vkFreeMemory(m_logicalDevice, m_vertexBufferMemory, nullptr);
@@ -1002,6 +1012,45 @@ private:
 		return {};
 	}
 
+	core::HumanError createIndexBuffer()
+	{
+		VkDeviceSize bufferSize = sizeof(INDICES);
+
+		VkBuffer stagingBuffer = VK_NULL_HANDLE;
+		VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
+		auto err = createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			stagingBuffer,
+			stagingBufferMemory
+		);
+		if (err)
+			return err;
+		coreDefer {
+			vkDestroyBuffer(m_logicalDevice, stagingBuffer, nullptr);
+			vkFreeMemory(m_logicalDevice, stagingBufferMemory, nullptr);
+		};
+
+		void* data = nullptr;
+		vkMapMemory(m_logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+		memcpy(data, INDICES, bufferSize);
+		vkUnmapMemory(m_logicalDevice, stagingBufferMemory);
+
+		err = createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			m_indexBuffer,
+			m_indexBufferMemory
+		);
+		if (err)
+			return err;
+
+		copyBuffer(stagingBuffer, m_indexBuffer, bufferSize);
+		return {};
+	}
+
 	core::HumanError recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 	{
 		VkCommandBufferBeginInfo beginInfo {
@@ -1031,6 +1080,7 @@ private:
 		VkBuffer vertexBuffers[] = {m_vertexBuffer};
 		VkDeviceSize offsets[] = {0};
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+		vkCmdBindIndexBuffer(commandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
 		VkViewport viewport{
 			.width = (float)m_swapchainExtent.width,
@@ -1044,7 +1094,7 @@ private:
 		};
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		vkCmdDraw(commandBuffer, sizeof(VERTICES) / sizeof(*VERTICES), 1, 0, 0);
+		vkCmdDrawIndexed(commandBuffer, sizeof(INDICES)/sizeof(*INDICES), 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffer);
 
@@ -1253,6 +1303,8 @@ private:
 	core::Array<VkFence> m_inFlightFences;
 	VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
+	VkBuffer m_indexBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
 	size_t m_currentFrame = 0;
 	bool m_enableValidationLayers = true;
 	bool m_framebufferResized = false;
