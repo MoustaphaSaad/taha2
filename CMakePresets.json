@@ -18,7 +18,8 @@
 				"rhs": "Windows"
 			},
 			"cacheVariables": {
-				"TRACY_ENABLE": "OFF"
+				"TRACY_ENABLE": "OFF",
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
 			}
 		},
 		{
@@ -90,7 +91,8 @@
 			"hidden": true,
 			"generator": "Ninja",
 			"cacheVariables": {
-				"TRACY_ENABLE": "OFF"
+				"TRACY_ENABLE": "OFF",
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
 			}
 		},
 		{
@@ -243,7 +245,8 @@
 				"CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
 				"DISABLE_BUDGET_APP": "ON",
 				"DISABLE_RENDERER": "ON",
-				"DISABLE_COMPILER_CONSTRUCTION": "ON"
+				"DISABLE_COMPILER_CONSTRUCTION": "ON",
+				"CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
 			}
 		},
 		{
