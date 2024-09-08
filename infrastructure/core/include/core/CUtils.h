@@ -13,7 +13,7 @@ namespace core
 	template <typename F> struct DeferClosure
 	{
 		F f;
-		explicit DeferClosure(F f): f(f) {}
+		DeferClosure(F f): f(f) {}
 		~DeferClosure() { f(); }
 	};
 

@@ -18,8 +18,8 @@ namespace core
 		coreAssert(res == 0);
 	}
 
-	ConditionVariable::ConditionVariable(ConditionVariable&& other) = default;
-	ConditionVariable& ConditionVariable::operator=(ConditionVariable&& other) = default;
+	ConditionVariable::ConditionVariable(ConditionVariable&& other) noexcept = default;
+	ConditionVariable& ConditionVariable::operator=(ConditionVariable&& other) noexcept = default;
 
 	ConditionVariable::~ConditionVariable()
 	{
