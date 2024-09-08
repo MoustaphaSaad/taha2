@@ -67,11 +67,10 @@ namespace core
 	Buffer::Buffer(String&& str)
 	{
 		m_allocator = str.m_allocator;
-		m_memory = Span<std::byte>{(std::byte*)str.m_ptr, str.m_capacity};
+		m_memory = Span<std::byte>{(std::byte*)str.m_memory.data(), str.m_memory.count()};
 		m_count = str.m_count;
 
-		str.m_ptr = nullptr;
-		str.m_capacity = 0;
+		str.m_memory = Span<char>{};
 		str.m_count = 0;
 	}
 

@@ -7,58 +7,54 @@ namespace core
 {
 	void String::destroy()
 	{
-		if (m_allocator == nullptr || m_ptr == nullptr)
+		if (m_allocator == nullptr || m_memory.empty())
 			return;
 
-		m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
-		m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
+		m_allocator->releaseT(m_memory);
+		m_allocator->freeT(m_memory);
 	}
 
 	void String::copyFrom(const String& other)
 	{
 		m_allocator = other.m_allocator;
 		m_count = other.m_count;
-		m_capacity = m_count + 1;
 
-		m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char)).data();
-		m_allocator->commit(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
+		m_memory = m_allocator->allocT<char>(m_count + 1);
+		m_allocator->commitT(m_memory);
 
-		::memcpy(m_ptr, other.m_ptr, m_count);
-		m_ptr[m_count] = '\0';
+		::memcpy(m_memory.data(), other.m_memory.data(), m_count);
+		m_memory[m_count] = '\0';
 	}
 
 	void String::moveFrom(String&& other)
 	{
 		m_allocator = other.m_allocator;
-		m_ptr = other.m_ptr;
+		m_memory = other.m_memory;
 		m_count = other.m_count;
-		m_capacity = other.m_capacity;
 
 		other.m_allocator = nullptr;
-		other.m_ptr = nullptr;
+		other.m_memory = Span<char>{};
 		other.m_count = 0;
-		other.m_capacity = 0;
 	}
 
 	void String::grow(size_t new_capacity)
 	{
-		auto new_ptr = (char*)m_allocator->alloc(new_capacity, alignof(char)).data();
-		m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, m_count});
+		auto new_memory = m_allocator->allocT<char>(new_capacity);
+		m_allocator->commitT(new_memory.sliceLeft(m_count));
 
-		::memcpy(new_ptr, m_ptr, m_count);
+		::memcpy(new_memory.data(), m_memory.data(), m_count);
 
-		m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
-		m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
+		m_allocator->releaseT(m_memory);
+		m_allocator->freeT(m_memory);
 
-		m_ptr = new_ptr;
-		m_capacity = new_capacity;
+		m_memory = new_memory;
 	}
 
 	void String::ensureSpaceExists(size_t count)
 	{
-		if (m_count + count > m_capacity)
+		if (m_count + count > m_memory.count())
 		{
-			auto new_capacity = m_capacity * 2;
+			auto new_capacity = m_memory.count() * 2;
 			if (new_capacity == 0)
 				new_capacity = 8;
 
@@ -75,13 +71,12 @@ namespace core
 		if (str.count() != 0)
 		{
 			m_count = str.count();
-			m_capacity = m_count + 1;
 
-			m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
+			m_memory = m_allocator->allocT<char>(m_count + 1);
+			m_allocator->commitT(m_memory);
 
-			::memcpy(m_ptr, str.begin(), m_count);
-			m_ptr[m_count] = '\0';
+			::memcpy(m_memory.data(), str.begin(), m_count);
+			m_memory[m_count] = '\0';
 		}
 	}
 
@@ -92,8 +87,7 @@ namespace core
 			buffer.push((std::byte)'\0');
 
 		m_allocator = buffer.m_allocator;
-		m_ptr = (char*)buffer.m_memory.data();
-		m_capacity = buffer.m_memory.count();
+		m_memory = Span<char>{(char*)buffer.m_memory.data(), buffer.m_memory.count()};
 		m_count = buffer.m_count - 1;
 
 		buffer.m_memory = Span<std::byte>{};
@@ -103,11 +97,11 @@ namespace core
 	void String::resize(size_t new_count)
 	{
 		// +1 for the null terminator
-		if (new_count + 1 > m_capacity)
+		if (new_count + 1 > m_memory.count())
 			grow(new_count + 1);
 
 		m_count = new_count;
-		m_ptr[m_count] = '\0';
+		m_memory[m_count] = '\0';
 	}
 
 	void String::push(StringView str)
@@ -115,8 +109,8 @@ namespace core
 		auto len = m_count;
 		resize(m_count + (str.count() + 1));
 		--m_count;
-		::memcpy(m_ptr + len, str.begin(), str.count());
-		m_ptr[m_count] = '\0';
+		::memcpy(m_memory.sliceRight(len).data(), str.begin(), str.count());
+		m_memory[m_count] = '\0';
 	}
 
 	void String::push(Rune r)
@@ -125,19 +119,19 @@ namespace core
 		// +5 = 4 for the rune + 1 for the null termination
 		ensureSpaceExists(m_count + 5);
 
-		auto width = Rune::encode(r, m_ptr + m_count);
+		auto width = Rune::encode(r, m_memory.data() + m_count);
 		coreAssert(width > 0 && width <= 4);
 		m_count += width;
-		m_ptr[m_count] = '\0';
+		m_memory[m_count] = '\0';
 	}
 
 	void String::pushByte(char v)
 	{
 		// +2 = 1 for the byte + 1 for the null termination
 		ensureSpaceExists(m_count + 2);
-		m_ptr[m_count] = v;
+		m_memory[m_count] = v;
 		++m_count;
-		m_ptr[m_count] = '\0';
+		m_memory[m_count] = '\0';
 	}
 
 	size_t String::find(StringView str, size_t start) const
@@ -179,7 +173,7 @@ namespace core
 			{
 				// push the remaining content
 				if (it < m_count)
-					out.push(StringView{m_ptr + it, m_count - it});
+					out.push(StringView{m_memory.data() + it, m_count - it});
 
 				// exit we finished the string
 				break;
@@ -187,7 +181,7 @@ namespace core
 
 			// push the preceding content
 			if (search_it > it)
-				out.push(StringView{m_ptr + it, search_it - it});
+				out.push(StringView{m_memory.data() + it, search_it - it});
 
 			// push the replacement string
 			out.push(replace);

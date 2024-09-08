@@ -23,8 +23,7 @@ namespace core
 		friend class Buffer;
 
 		Allocator* m_allocator = nullptr;
-		char* m_ptr = nullptr;
-		size_t m_capacity = 0;
+		Span<char> m_memory;
 		size_t m_count = 0;
 
 		CORE_EXPORT void destroy();
@@ -84,23 +83,23 @@ namespace core
 		char& operator[](size_t i)
 		{
 			coreAssert(i < m_count);
-			return m_ptr[i];
+			return m_memory[i];
 		}
 
 		const char& operator[](size_t i) const
 		{
 			coreAssert(i < m_count);
-			return m_ptr[i];
+			return m_memory[i];
 		}
 
-		operator StringView() const { return StringView{m_ptr, m_count}; }
-		explicit operator Span<const std::byte>() const { return Span<const std::byte>{(const std::byte*)m_ptr, m_count}; }
+		operator StringView() const { return StringView{m_memory.sliceLeft(m_count)}; }
+		explicit operator Span<const std::byte>() const { return Span<const std::byte>{(const std::byte*)m_memory.data(), m_count}; }
 
 		size_t count() const { return m_count; }
-		size_t capacity() const { return m_capacity; }
-		size_t runeCount() const { return Rune::count(m_ptr, m_ptr + m_count); }
-		char* data() { return m_ptr; }
-		const char* data() const { return m_ptr; }
+		size_t capacity() const { return m_memory.count(); }
+		size_t runeCount() const { return Rune::count(m_memory.data(), m_memory.data() + m_count); }
+		char* data() { return m_memory.data(); }
+		const char* data() const { return m_memory.data(); }
 		Allocator* allocator() const { return m_allocator; }
 
 		CORE_EXPORT void resize(size_t new_count);
@@ -133,10 +132,10 @@ namespace core
 		StringRunes runes() const { return StringView{*this}.runes(); }
 		size_t findFirstByte(StringView str, size_t start = 0) const { return StringView{*this}.findFirstByte(str, start); }
 
-		const char* begin() const { return m_ptr; }
-		char* begin() { return m_ptr; }
-		const char* end() const { return m_ptr + m_count; }
-		char* end() { return m_ptr + m_count; }
+		const char* begin() const { return m_memory.begin(); }
+		char* begin() { return m_memory.begin(); }
+		const char* end() const { return m_memory.sliceLeft(m_count).end(); }
+		char* end() { return m_memory.sliceLeft(m_count).end(); }
 
 		Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const { return StringView{*this}.split(delim, skipEmpty, allocator); }
 

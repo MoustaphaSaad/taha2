@@ -96,6 +96,10 @@ namespace core
 
 		StringView(const Span<std::byte>& span): m_begin((const char*)span.data()), m_count(span.count()) {}
 
+		StringView(const Span<const char>& span): m_begin(span.data()), m_count(span.count()) {}
+
+		StringView(const Span<char>& span): m_begin(span.data()), m_count(span.count()) {}
+
 		operator Span<std::byte>() const { return Span<std::byte>{(std::byte*)m_begin, m_count}; }
 
 		operator Span<const std::byte>() const { return Span<const std::byte>{(std::byte*)m_begin, m_count}; }
