@@ -124,11 +124,11 @@ namespace core
 		{
 			for (size_t i = 0; i < m_valuesCount; ++i)
 				m_values[i].~T();
-			m_allocator->release(m_values, sizeof(T) * m_valuesCapacity);
-			m_allocator->free(m_values, sizeof(T) * m_valuesCapacity);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
 
-			m_allocator->release(m_slots, sizeof(HashSlot) * m_slotsCount);
-			m_allocator->free(m_slots, sizeof(HashSlot) * m_slotsCount);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
 
 			m_slots = nullptr;
 			m_slotsCount = 0;
@@ -157,8 +157,8 @@ namespace core
 			for (size_t i = 0; i < m_valuesCount; ++i)
 				::new (m_values + i) T(other.m_values[i]);
 
-			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slotsCount, alignof(HashSlot));
-			m_allocator->commit(m_slots, sizeof(HashSlot) * m_slotsCount);
+			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slotsCount, alignof(HashSlot)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
 			for (size_t i = 0; i < m_slotsCount; ++i)
 				::new (m_slots + i) HashSlot();
 
@@ -341,8 +341,8 @@ namespace core
 
 		void reserveExact(size_t new_count)
 		{
-			auto new_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * new_count, alignof(HashSlot));
-			m_allocator->commit(new_slots, sizeof(HashSlot) * new_count);
+			auto new_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * new_count, alignof(HashSlot)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)new_slots, sizeof(HashSlot) * new_count});
 			for (size_t i = 0; i < new_count; ++i)
 				::new (new_slots + i) HashSlot();
 
@@ -380,8 +380,8 @@ namespace core
 				}
 			}
 
-			m_allocator->release(m_slots, sizeof(HashSlot) * m_slotsCount);
-			m_allocator->free(m_slots, sizeof(HashSlot) * m_slotsCount);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
 			m_slots = new_slots;
 			m_slotsCount = new_count;
 		}
@@ -400,8 +400,8 @@ namespace core
 
 		void valuesGrow(size_t new_capacity)
 		{
-			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * new_capacity, alignof(T));
-			m_allocator->commit(new_ptr, sizeof(T) * m_valuesCount);
+			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * new_capacity, alignof(T)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(T) * m_valuesCount});
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
@@ -411,8 +411,8 @@ namespace core
 				m_values[i].~T();
 			}
 
-			m_allocator->release(m_values, sizeof(T) * m_valuesCapacity);
-			m_allocator->free(m_values, sizeof(T) * m_valuesCapacity);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
 
 			m_values = new_ptr;
 			m_valuesCapacity = new_capacity;
@@ -437,7 +437,7 @@ namespace core
 		void valuesPush(R&& key)
 		{
 			valuesEnsureSpaceExists();
-			m_allocator->commit(m_values + m_valuesCount, sizeof(T));
+			m_allocator->commit(Span<std::byte>{(std::byte*)m_values + m_valuesCount, sizeof(T)});
 			::new (m_values + m_valuesCount) T(std::forward<R>(key));
 			++m_valuesCount;
 		}
@@ -673,11 +673,11 @@ namespace core
 		{
 			for (size_t i = 0; i < m_valuesCount; ++i)
 				m_values[i].~KeyValue();
-			m_allocator->release(m_values, sizeof(KeyValue<TKey, TValue>) * m_valuesCapacity);
-			m_allocator->free(m_values, sizeof(KeyValue<TKey, TValue>) * m_valuesCapacity);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(KeyValue<TKey, TValue>) * m_valuesCapacity});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(KeyValue<TKey, TValue>) * m_valuesCapacity});
 
-			m_allocator->release(m_slots, sizeof(HashSlot) * m_slotsCount);
-			m_allocator->free(m_slots, sizeof(HashSlot) * m_slotsCount);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
 
 			m_slots = nullptr;
 			m_slotsCount = 0;
@@ -701,13 +701,13 @@ namespace core
 			m_valuesCount = other.m_valuesCount;
 			m_valuesCapacity = m_valuesCount;
 
-			m_values = (KeyValue<const TKey, TValue>*)m_allocator->alloc(sizeof(KeyValue<const TKey, TValue>) * m_valuesCount, alignof(KeyValue<const TKey, TValue>));
-			m_allocator->commit(m_values, sizeof(TValue) * m_valuesCount);
+			m_values = (KeyValue<const TKey, TValue>*)m_allocator->alloc(sizeof(KeyValue<const TKey, TValue>) * m_valuesCount, alignof(KeyValue<const TKey, TValue>)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)m_values, sizeof(TValue) * m_valuesCount});
 			for (size_t i = 0; i < m_valuesCount; ++i)
 				::new (m_values + i) KeyValue<const TKey, TValue>(other.m_values[i]);
 
-			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slotsCount, alignof(HashSlot));
-			m_allocator->commit(m_slots, sizeof(HashSlot) * m_slotsCount);
+			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slotsCount, alignof(HashSlot)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
 			for (size_t i = 0; i < m_slotsCount; ++i)
 				::new (m_slots + i) HashSlot();
 
@@ -890,8 +890,8 @@ namespace core
 
 		void reserveExact(size_t new_count)
 		{
-			auto new_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * new_count, alignof(HashSlot));
-			m_allocator->commit(new_slots, sizeof(HashSlot) * new_count);
+			auto new_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * new_count, alignof(HashSlot)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)new_slots, sizeof(HashSlot) * new_count});
 			for (size_t i = 0; i < new_count; ++i)
 				::new (new_slots + i) HashSlot();
 
@@ -929,8 +929,8 @@ namespace core
 				}
 			}
 
-			m_allocator->release(m_slots, sizeof(HashSlot) * m_slotsCount);
-			m_allocator->free(m_slots, sizeof(HashSlot) * m_slotsCount);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
 			m_slots = new_slots;
 			m_slotsCount = new_count;
 		}
@@ -949,8 +949,8 @@ namespace core
 
 		void valuesGrow(size_t new_capacity)
 		{
-			auto new_ptr = (KeyValue<const TKey, TValue>*)m_allocator->alloc(sizeof(KeyValue<const TKey, TValue>) * new_capacity, alignof(KeyValue<const TKey, TValue>));
-			m_allocator->commit(new_ptr, sizeof(*m_values) * m_valuesCount);
+			auto new_ptr = (KeyValue<const TKey, TValue>*)m_allocator->alloc(sizeof(KeyValue<const TKey, TValue>) * new_capacity, alignof(KeyValue<const TKey, TValue>)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(*m_values) * m_valuesCount});
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<KeyValue<const TKey, TValue>>)
@@ -960,8 +960,8 @@ namespace core
 				m_values[i].~KeyValue();
 			}
 
-			m_allocator->release(m_values, sizeof(*m_values) * m_valuesCapacity);
-			m_allocator->free(m_values, sizeof(*m_values) * m_valuesCapacity);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(*m_values) * m_valuesCapacity});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(*m_values) * m_valuesCapacity});
 
 			m_values = new_ptr;
 			m_valuesCapacity = new_capacity;
@@ -986,7 +986,7 @@ namespace core
 		void valuesPush(R&& key, U&& value)
 		{
 			valuesEnsureSpaceExists();
-			m_allocator->commit(m_values + m_valuesCount, sizeof(KeyValue<const TKey, TValue>));
+			m_allocator->commit(Span<std::byte>{(std::byte*)(m_values + m_valuesCount), sizeof(KeyValue<const TKey, TValue>)});
 			::new (m_values + m_valuesCount) KeyValue<const TKey, TValue>{std::forward<R>(key), std::forward<U>(value)};
 			++m_valuesCount;
 		}

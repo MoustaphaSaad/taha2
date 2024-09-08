@@ -10,8 +10,8 @@ namespace core
 		if (m_allocator == nullptr || m_ptr == nullptr)
 			return;
 
-		m_allocator->release(m_ptr, m_capacity);
-		m_allocator->free(m_ptr, m_capacity);
+		m_allocator->release(Span<std::byte>{m_ptr, m_capacity});
+		m_allocator->free(Span<std::byte>{m_ptr, m_capacity});
 	}
 
 	void Buffer::copyFrom(const core::Buffer& other)
@@ -20,8 +20,8 @@ namespace core
 		m_count = other.m_count;
 		m_capacity = m_count;
 
-		m_ptr = (std::byte*)m_allocator->alloc(m_capacity, alignof(std::byte));
-		m_allocator->commit(m_ptr, m_capacity);
+		m_ptr = m_allocator->alloc(m_capacity, alignof(std::byte)).data();
+		m_allocator->commit(Span<std::byte>{m_ptr, m_capacity});
 
 		::memcpy(m_ptr, other.m_ptr, m_capacity);
 	}
@@ -41,13 +41,13 @@ namespace core
 
 	void Buffer::grow(size_t new_capacity)
 	{
-		auto new_ptr = (std::byte*)m_allocator->alloc(new_capacity, alignof(std::byte));
-		m_allocator->commit(new_ptr, m_count);
+		auto new_ptr = m_allocator->alloc(new_capacity, alignof(std::byte)).data();
+		m_allocator->commit(Span<std::byte>{new_ptr, m_count});
 
 		::memcpy(new_ptr, m_ptr, m_count);
 
-		m_allocator->release(m_ptr, m_capacity);
-		m_allocator->free(m_ptr, m_capacity);
+		m_allocator->release(Span<std::byte>{m_ptr, m_capacity});
+		m_allocator->free(Span<std::byte>{m_ptr, m_capacity});
 
 		m_ptr = new_ptr;
 		m_capacity = new_capacity;
@@ -92,15 +92,15 @@ namespace core
 		if (new_count > m_capacity)
 		{
 			grow(new_count);
-			m_allocator->commit(m_ptr + m_count, new_count - m_count);
+			m_allocator->commit(Span<std::byte>{m_ptr + m_count, new_count - m_count});
 		}
 		else if (new_count < m_capacity)
 		{
-			m_allocator->release(m_ptr + new_count, m_count - new_count);
+			m_allocator->release(Span<std::byte>{m_ptr + new_count, m_count - new_count});
 		}
 		else
 		{
-			m_allocator->commit(m_ptr + m_count, new_count - m_count);
+			m_allocator->commit(Span<std::byte>{m_ptr + m_count, new_count - m_count});
 		}
 
 		m_count = new_count;
@@ -108,7 +108,7 @@ namespace core
 
 	void Buffer::clear()
 	{
-		m_allocator->release(m_ptr, m_count);
+		m_allocator->release(Span<std::byte>{m_ptr, m_count});
 		m_count = 0;
 	}
 }

@@ -7,28 +7,28 @@
 
 namespace core
 {
-	void* VirtualMem::alloc(size_t size, size_t)
+	Span<std::byte> VirtualMem::alloc(size_t size, size_t)
 	{
-		auto res = mmap(nullptr, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+		auto res = (std::byte*)mmap(nullptr, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 		TracyAllocS(res, size, 10);
-		return res;
+		return Span<std::byte>{res, size};
 	}
 
-	void VirtualMem::commit(void* ptr, size_t size)
+	void VirtualMem::commit(Span<std::byte> bytes)
 	{
-		[[maybe_unused]] auto res = mprotect(ptr, size, PROT_READ | PROT_WRITE);
+		[[maybe_unused]] auto res = mprotect(bytes.data(), bytes.sizeInBytes(), PROT_READ | PROT_WRITE);
 		coreAssert(res == 0);
 	}
 
-	void VirtualMem::release(void* ptr, size_t size)
+	void VirtualMem::release(Span<std::byte> bytes)
 	{
-		[[maybe_unused]] auto res = mprotect(ptr, size, PROT_NONE);
+		[[maybe_unused]] auto res = mprotect(bytes.data(), bytes.sizeInBytes(), PROT_NONE);
 		coreAssert(res == 0);
 	}
 
-	void VirtualMem::free(void* ptr, size_t size)
+	void VirtualMem::free(Span<std::byte> bytes)
 	{
-		TracyFreeS(ptr, 10);
-		munmap(ptr, size);
+		TracyFreeS(bytes.data(), 10);
+		munmap(bytes.data(), bytes.sizeInBytes());
 	}
 }

@@ -4,26 +4,26 @@
 
 namespace core
 {
-	void* Arena::alloc(size_t size, size_t)
+	Span<std::byte> Arena::alloc(size_t size, size_t)
 	{
-		auto res = mi_heap_malloc(m_heap, size);
+		auto res = (std::byte*)mi_heap_malloc(m_heap, size);
 		TracyAllocS(res, size, 10);
-		return res;
+		return Span<std::byte>{res, size};
 	}
 
-	void Arena::commit(void* ptr, size_t size)
+	void Arena::commit(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void Arena::release(void* ptr, size_t size)
+	void Arena::release(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void Arena::free(void* ptr, size_t)
+	void Arena::free(Span<std::byte> bytes)
 	{
-		TracyFreeS(ptr, 10);
+		TracyFreeS(bytes.data(), 10);
 		// do nothing
 	}
 }

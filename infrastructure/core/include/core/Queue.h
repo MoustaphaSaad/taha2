@@ -30,8 +30,8 @@ namespace core
 			{
 				auto next = node->next;
 				node->~Node();
-				m_allocator->release(node, sizeof(Node));
-				m_allocator->free(node, sizeof(Node));
+				m_allocator->release(Span<std::byte>{(std::byte*)node, sizeof(Node)});
+				m_allocator->free(Span<std::byte>{(std::byte*)node, sizeof(Node)});
 				node = next;
 			}
 		}
@@ -110,8 +110,8 @@ namespace core
 		template<typename R>
 		void push_back(R&& value)
 		{
-			auto node = (Node*)m_allocator->alloc(sizeof(Node), alignof(Node));
-			m_allocator->commit(node, sizeof(Node));
+			auto node = (Node*)m_allocator->alloc(sizeof(Node), alignof(Node)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)node, sizeof(Node)});
 			new (node) Node{ nullptr, nullptr, std::forward<R>(value) };
 			if (m_tail)
 			{
@@ -181,8 +181,8 @@ namespace core
 			else
 				m_head = nullptr;
 			node->~Node();
-			m_allocator->release(node, sizeof(Node));
-			m_allocator->free(node, sizeof(Node));
+			m_allocator->release(Span<std::byte>{(std::byte*)node, sizeof(Node)});
+			m_allocator->free(Span<std::byte>{(std::byte*)node, sizeof(Node)});
 			--m_count;
 		}
 
@@ -196,8 +196,8 @@ namespace core
 			else
 				m_tail = nullptr;
 			node->~Node();
-			m_allocator->release(node, sizeof(Node));
-			m_allocator->free(node, sizeof(Node));
+			m_allocator->release(Span<std::byte>{(std::byte*)node, sizeof(Node)});
+			m_allocator->free(Span<std::byte>{(std::byte*)node, sizeof(Node)});
 			--m_count;
 		}
 

@@ -851,15 +851,15 @@ namespace core::msgpack
 
 	Value::Value(StringView value, Allocator* allocator) : m_kind{KIND_STRING}
 	{
-		m_string = (String*)allocator->alloc(sizeof(String), alignof(String));
-		allocator->commit(m_string, sizeof(String));
+		m_string = (String*)allocator->alloc(sizeof(String), alignof(String)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_string, sizeof(String)});
 		new (m_string) String{value, allocator};
 	}
 
 	Value::Value(const std::byte* data, size_t size, Allocator* allocator) : m_kind{KIND_BYTES}
 	{
-		m_bytes = (Buffer*)allocator->alloc(sizeof(Buffer), alignof(Buffer));
-		allocator->commit(m_bytes, sizeof(Buffer));
+		m_bytes = (Buffer*)allocator->alloc(sizeof(Buffer), alignof(Buffer)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_bytes, sizeof(Buffer)});
 		new (m_bytes) Buffer{allocator};
 		m_bytes->push(data, size);
 	}
@@ -867,16 +867,16 @@ namespace core::msgpack
 	Value::Value(Array<Value> value) : m_kind{KIND_ARRAY}
 	{
 		auto allocator = value.allocator();
-		m_array = (Array<Value>*)allocator->alloc(sizeof(Array<Value>), alignof(Array<Value>));
-		allocator->commit(m_array, sizeof(Array<Value>));
+		m_array = (Array<Value>*)allocator->alloc(sizeof(Array<Value>), alignof(Array<Value>)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_array, sizeof(Array<Value>)});
 		new (m_array) Array<Value>{std::move(value)};
 	}
 
 	Value::Value(Map<String, Value> value) : m_kind{KIND_MAP}
 	{
 		auto allocator = value.allocator();
-		m_map = (Map<String, Value>*)allocator->alloc(sizeof(Map<String, Value>), alignof(Map<String, Value>));
-		allocator->commit(m_map, sizeof(Map<String, Value>));
+		m_map = (Map<String, Value>*)allocator->alloc(sizeof(Map<String, Value>), alignof(Map<String, Value>)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_map, sizeof(Map<String, Value>)});
 		new (m_map) Map<String, Value>{std::move(value)};
 	}
 
@@ -932,8 +932,8 @@ namespace core::msgpack
 		destroy();
 		m_kind = KIND_STRING;
 		auto allocator = value.allocator();
-		m_string = (String*)allocator->alloc(sizeof(String), alignof(String));
-		allocator->commit(m_string, sizeof(*m_string));
+		m_string = (String*)allocator->alloc(sizeof(String), alignof(String)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_string, sizeof(*m_string)});
 		new (m_string) String{std::move(value)};
 		return *this;
 	}
@@ -943,8 +943,8 @@ namespace core::msgpack
 		destroy();
 		m_kind = KIND_BYTES;
 		auto allocator = value.allocator();
-		m_bytes = (Buffer*)allocator->alloc(sizeof(Buffer), alignof(Buffer));
-		allocator->commit(m_bytes, sizeof(*m_bytes));
+		m_bytes = (Buffer*)allocator->alloc(sizeof(Buffer), alignof(Buffer)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_bytes, sizeof(*m_bytes)});
 		new (m_bytes) Buffer{std::move(value)};
 		return *this;
 	}
@@ -954,8 +954,8 @@ namespace core::msgpack
 		destroy();
 		m_kind = KIND_ARRAY;
 		auto allocator = value.allocator();
-		m_array = (Array<Value>*)allocator->alloc(sizeof(Array<Value>), alignof(Array<Value>));
-		allocator->commit(m_array, sizeof(*m_array));
+		m_array = (Array<Value>*)allocator->alloc(sizeof(Array<Value>), alignof(Array<Value>)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_array, sizeof(*m_array)});
 		new (m_array) Array<Value>{std::move(value)};
 		return *this;
 	}
@@ -965,8 +965,8 @@ namespace core::msgpack
 		destroy();
 		m_kind = KIND_MAP;
 		auto allocator = value.allocator();
-		m_map = (Map<String, Value>*)allocator->alloc(sizeof(Map<String, Value>), alignof(Map<String, Value>));
-		allocator->commit(m_map, sizeof(*m_map));
+		m_map = (Map<String, Value>*)allocator->alloc(sizeof(Map<String, Value>), alignof(Map<String, Value>)).data();
+		allocator->commit(Span<std::byte>{(std::byte*)m_map, sizeof(*m_map)});
 		new (m_map) Map<String, Value>{std::move(value)};
 		return *this;
 	}
@@ -976,8 +976,8 @@ namespace core::msgpack
 		coreAssert(m_kind == KIND_STRING);
 		auto allocator = m_string->allocator();
 		auto res = std::move(*m_string);
-		allocator->release(m_string, sizeof(*m_string));
-		allocator->free(m_string, sizeof(*m_string));
+		allocator->release(Span<std::byte>{(std::byte*)m_string, sizeof(*m_string)});
+		allocator->free(Span<std::byte>{(std::byte*)m_string, sizeof(*m_string)});
 		return res;
 	}
 
@@ -986,8 +986,8 @@ namespace core::msgpack
 		coreAssert(m_kind == KIND_BYTES);
 		auto allocator = m_bytes->allocator();
 		auto res = std::move(*m_bytes);
-		allocator->release(m_bytes, sizeof(*m_bytes));
-		allocator->free(m_bytes, sizeof(*m_bytes));
+		allocator->release(Span<std::byte>{(std::byte*)m_bytes, sizeof(*m_bytes)});
+		allocator->free(Span<std::byte>{(std::byte*)m_bytes, sizeof(*m_bytes)});
 		return res;
 	}
 
@@ -996,8 +996,8 @@ namespace core::msgpack
 		coreAssert(m_kind == KIND_ARRAY);
 		auto allocator = m_array->allocator();
 		auto res = std::move(*m_array);
-		allocator->release(m_array, sizeof(*m_array));
-		allocator->free(m_array, sizeof(*m_array));
+		allocator->release(Span<std::byte>{(std::byte*)m_array, sizeof(*m_array)});
+		allocator->free(Span<std::byte>{(std::byte*)m_array, sizeof(*m_array)});
 		return res;
 	}
 
@@ -1006,8 +1006,8 @@ namespace core::msgpack
 		coreAssert(m_kind == KIND_MAP);
 		auto allocator = m_map->allocator();
 		auto res = std::move(*m_map);
-		allocator->release(m_map, sizeof(*m_map));
-		allocator->free(m_map, sizeof(*m_map));
+		allocator->release(Span<std::byte>{(std::byte*)m_map, sizeof(*m_map)});
+		allocator->free(Span<std::byte>{(std::byte*)m_map, sizeof(*m_map)});
 		return res;
 	}
 
@@ -1019,32 +1019,32 @@ namespace core::msgpack
 		{
 			auto allocator = m_string->allocator();
 			m_string->~String();
-			allocator->release(m_string, sizeof(*m_string));
-			allocator->free(m_string, sizeof(*m_string));
+			allocator->release(Span<std::byte>{(std::byte*)m_string, sizeof(*m_string)});
+			allocator->free(Span<std::byte>{(std::byte*)m_string, sizeof(*m_string)});
 			break;
 		}
 		case KIND_BYTES:
 		{
 			auto allocator = m_bytes->allocator();
 			m_bytes->~Buffer();
-			allocator->release(m_bytes, sizeof(*m_bytes));
-			allocator->free(m_bytes, sizeof(*m_bytes));
+			allocator->release(Span<std::byte>{(std::byte*)m_bytes, sizeof(*m_bytes)});
+			allocator->free(Span<std::byte>{(std::byte*)m_bytes, sizeof(*m_bytes)});
 			break;
 		}
 		case KIND_ARRAY:
 		{
 			auto allocator = m_array->allocator();
 			m_array->~Array<Value>();
-			allocator->release(m_array, sizeof(*m_array));
-			allocator->free(m_array, sizeof(*m_array));
+			allocator->release(Span<std::byte>{(std::byte*)m_array, sizeof(*m_array)});
+			allocator->free(Span<std::byte>{(std::byte*)m_array, sizeof(*m_array)});
 			break;
 		}
 		case KIND_MAP:
 		{
 			auto allocator = m_map->allocator();
 			m_map->~Map<String, Value>();
-			allocator->release(m_map, sizeof(*m_map));
-			allocator->free(m_map, sizeof(*m_map));
+			allocator->release(Span<std::byte>{(std::byte*)m_map, sizeof(*m_map)});
+			allocator->free(Span<std::byte>{(std::byte*)m_map, sizeof(*m_map)});
 			break;
 		}
 		default:
@@ -1079,32 +1079,32 @@ namespace core::msgpack
 		case KIND_STRING:
 		{
 			auto allocator = other.m_string->allocator();
-			m_string = (String*)allocator->alloc(sizeof(String), alignof(String));
-			allocator->commit(m_string, sizeof(String));
+			m_string = (String*)allocator->alloc(sizeof(String), alignof(String)).data();
+			allocator->commit(Span<std::byte>{(std::byte*)m_string, sizeof(String)});
 			new (m_string) String{*other.m_string};
 			break;
 		}
 		case KIND_BYTES:
 		{
 			auto allocator = other.m_bytes->allocator();
-			m_bytes = (Buffer*)allocator->alloc(sizeof(Buffer), alignof(Buffer));
-			allocator->commit(m_bytes, sizeof(Buffer));
+			m_bytes = (Buffer*)allocator->alloc(sizeof(Buffer), alignof(Buffer)).data();
+			allocator->commit(Span<std::byte>{(std::byte*)m_bytes, sizeof(Buffer)});
 			new (m_bytes) Buffer{*other.m_bytes};
 			break;
 		}
 		case KIND_ARRAY:
 		{
 			auto allocator = other.m_array->allocator();
-			m_array = (Array<Value>*)allocator->alloc(sizeof(Array<Value>), alignof(Array<Value>));
-			allocator->commit(m_array, sizeof(Array<Value>));
+			m_array = (Array<Value>*)allocator->alloc(sizeof(Array<Value>), alignof(Array<Value>)).data();
+			allocator->commit(Span<std::byte>{(std::byte*)m_array, sizeof(Array<Value>)});
 			new (m_array) Array<Value>{*other.m_array};
 			break;
 		}
 		case KIND_MAP:
 		{
 			auto allocator = other.m_map->allocator();
-			m_map = (Map<String, Value>*)allocator->alloc(sizeof(Map<String, Value>), alignof(Map<String, Value>));
-			allocator->commit(m_map, sizeof(Map<String, Value>));
+			m_map = (Map<String, Value>*)allocator->alloc(sizeof(Map<String, Value>), alignof(Map<String, Value>)).data();
+			allocator->commit(Span<std::byte>{(std::byte*)m_map, sizeof(Map<String, Value>)});
 			new (m_map) Map<String, Value>{*other.m_map};
 			break;
 		}

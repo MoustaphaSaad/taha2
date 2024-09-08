@@ -10,8 +10,8 @@ namespace core
 		if (m_allocator == nullptr || m_ptr == nullptr)
 			return;
 
-		m_allocator->release(m_ptr, m_capacity);
-		m_allocator->free(m_ptr, m_capacity);
+		m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
+		m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
 	}
 
 	void String::copyFrom(const String& other)
@@ -20,8 +20,8 @@ namespace core
 		m_count = other.m_count;
 		m_capacity = m_count + 1;
 
-		m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char));
-		m_allocator->commit(m_ptr, m_capacity);
+		m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char)).data();
+		m_allocator->commit(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
 
 		::memcpy(m_ptr, other.m_ptr, m_count);
 		m_ptr[m_count] = '\0';
@@ -42,13 +42,13 @@ namespace core
 
 	void String::grow(size_t new_capacity)
 	{
-		auto new_ptr = (char*)m_allocator->alloc(new_capacity, alignof(char));
-		m_allocator->commit(new_ptr, m_count);
+		auto new_ptr = (char*)m_allocator->alloc(new_capacity, alignof(char)).data();
+		m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, m_count});
 
 		::memcpy(new_ptr, m_ptr, m_count);
 
-		m_allocator->release(m_ptr, m_capacity);
-		m_allocator->free(m_ptr, m_capacity);
+		m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
+		m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
 
 		m_ptr = new_ptr;
 		m_capacity = new_capacity;
@@ -77,8 +77,8 @@ namespace core
 			m_count = str.count();
 			m_capacity = m_count + 1;
 
-			m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char));
-			m_allocator->commit(m_ptr, m_capacity);
+			m_ptr = (char*)m_allocator->alloc(m_capacity, alignof(char)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)m_ptr, m_capacity});
 
 			::memcpy(m_ptr, str.begin(), m_count);
 			m_ptr[m_count] = '\0';

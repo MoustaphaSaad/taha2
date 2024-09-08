@@ -6,26 +6,26 @@
 
 namespace core
 {
-	void* Mimallocator::alloc(size_t size, size_t)
+	Span<std::byte> Mimallocator::alloc(size_t size, size_t)
 	{
-		auto res = mi_malloc(size);
+		auto res = (std::byte*)mi_malloc(size);
 		TracyAllocS(res, size, 10);
-		return res;
+		return Span<std::byte>{res, size};
 	}
 
-	void Mimallocator::commit(void* ptr, size_t size)
+	void Mimallocator::commit(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void Mimallocator::release(void* ptr, size_t size)
+	void Mimallocator::release(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void Mimallocator::free(void* ptr, size_t)
+	void Mimallocator::free(Span<std::byte> bytes)
 	{
-		TracyFreeS(ptr, 10);
-		mi_free(ptr);
+		TracyFreeS(bytes.data(), 10);
+		mi_free(bytes.data());
 	}
 }

@@ -18,35 +18,36 @@ namespace core
 		}
 	}
 
-	void* FastLeak::alloc(size_t size, size_t)
+	Span<std::byte> FastLeak::alloc(size_t size, size_t)
 	{
 		if (size == 0)
-			return nullptr;
+			return Span<std::byte>{};
 
 		atomic_count.fetch_add(1);
 		atomic_size.fetch_add(size);
 
-		return ::malloc(size);
+		auto ptr = (std::byte*)::malloc(size);
+		return Span<std::byte>{ptr, size};
 	}
 
-	void FastLeak::commit(void*, size_t)
+	void FastLeak::commit(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void FastLeak::release(void*, size_t)
+	void FastLeak::release(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void FastLeak::free(void* ptr, size_t size)
+	void FastLeak::free(Span<std::byte> bytes)
 	{
-		if (ptr == nullptr)
+		if (bytes.sizeInBytes() == 0)
 			return;
 
 		atomic_count.fetch_sub(1);
-		atomic_size.fetch_sub(size);
+		atomic_size.fetch_sub(bytes.sizeInBytes());
 
-		::free(ptr);
+		::free(bytes.data());
 	}
 }

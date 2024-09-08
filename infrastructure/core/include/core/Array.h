@@ -23,8 +23,8 @@ namespace core
 
 			for (size_t i = 0; i < m_count; ++i)
 				m_ptr[i].~T();
-			m_allocator->release(m_ptr, m_capacity * sizeof(T));
-			m_allocator->free(m_ptr, m_capacity * sizeof(T));
+			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, m_capacity * sizeof(T)});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, m_capacity * sizeof(T)});
 		}
 
 		void copyFrom(const Array& other)
@@ -32,8 +32,8 @@ namespace core
 			m_allocator = other.m_allocator;
 			m_count = other.m_count;
 			m_capacity = m_count;
-			m_ptr = (T*)m_allocator->alloc(sizeof(T) * m_capacity, alignof(T));
-			m_allocator->commit(m_ptr, sizeof(T) * m_capacity);
+			m_ptr = (T*)m_allocator->alloc(sizeof(T) * m_capacity, alignof(T)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
 			for (size_t i = 0; i < m_count; ++i)
 				::new (m_ptr + i) T(other.m_ptr[i]);
 		}
@@ -53,8 +53,8 @@ namespace core
 
 		void grow(size_t new_capacity)
 		{
-			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * new_capacity, alignof(T));
-			m_allocator->commit(new_ptr, sizeof(T) * m_count);
+			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * new_capacity, alignof(T)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(T) * m_count});
 			for (size_t i = 0; i < m_count; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
@@ -64,8 +64,8 @@ namespace core
 				m_ptr[i].~T();
 			}
 
-			m_allocator->release(m_ptr, sizeof(T) * m_capacity);
-			m_allocator->free(m_ptr, sizeof(T) * m_capacity);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
 
 			m_ptr = new_ptr;
 			m_capacity = new_capacity;
@@ -128,7 +128,7 @@ namespace core
 		void push(const T& v)
 		{
 			ensureSpaceExists();
-			m_allocator->commit(m_ptr + m_count, sizeof(T));
+			m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), sizeof(T)});
 			::new (m_ptr + m_count) T(v);
 			++m_count;
 		}
@@ -136,7 +136,7 @@ namespace core
 		void push(T&& v)
 		{
 			ensureSpaceExists();
-			m_allocator->commit(m_ptr + m_count, sizeof(T));
+			m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), sizeof(T)});
 			::new (m_ptr + m_count) T(std::move(v));
 			++m_count;
 		}
@@ -144,7 +144,7 @@ namespace core
 		template <typename... TArgs> void emplace(TArgs&&... args)
 		{
 			ensureSpaceExists();
-			m_allocator->commit(m_ptr + m_count, sizeof(T));
+			m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), sizeof(T)});
 			::new (m_ptr + m_count) T(std::forward<TArgs>(args)...);
 			++m_count;
 		}
@@ -153,7 +153,7 @@ namespace core
 		{
 			coreAssert(m_count > 0);
 			m_ptr[m_count - 1].~T();
-			m_allocator->release(m_ptr + m_count - 1, sizeof(T));
+			m_allocator->release(Span<std::byte>{(std::byte*)(m_ptr + m_count - 1), sizeof(T)});
 			--m_count;
 		}
 
@@ -161,7 +161,7 @@ namespace core
 		{
 			for (size_t i = 0; i < m_count; ++i)
 				m_ptr[i].~T();
-			m_allocator->release(m_ptr, sizeof(T) * m_count);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_count});
 			m_count = 0;
 		}
 
@@ -172,7 +172,7 @@ namespace core
 			if (new_count > m_count)
 			{
 				ensureSpaceExists(new_count - m_count);
-				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizeof(T));
+				m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), (new_count - m_count) * sizeof(T)});
 				for (; m_count < new_count; ++m_count)
 					::new (m_ptr + m_count) T();
 			}
@@ -180,7 +180,7 @@ namespace core
 			{
 				for (size_t i = new_count; i < m_count; ++i)
 					m_ptr[i].~T();
-				m_allocator->release(m_ptr + new_count, (m_count - new_count) * sizeof(T));
+				m_allocator->release(Span<std::byte>{(std::byte*)(m_ptr + new_count), (m_count - new_count) * sizeof(T)});
 				m_count = new_count;
 			}
 		}
@@ -190,7 +190,7 @@ namespace core
 			if (new_count > m_count)
 			{
 				ensureSpaceExists(new_count - m_count);
-				m_allocator->commit(m_ptr + m_count, (new_count - m_count) * sizeof(T));
+				m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), (new_count - m_count) * sizeof(T)});
 				for (; m_count < new_count; ++m_count)
 					::new (m_ptr + m_count) T(value);
 			}
@@ -198,7 +198,7 @@ namespace core
 			{
 				for (size_t i = new_count; i < m_count; ++i)
 					m_ptr[i].~T();
-				m_allocator->release(m_ptr + new_count, (m_count - new_count) * sizeof(T));
+				m_allocator->release(Span<std::byte>{(std::byte*)(m_ptr + new_count), (m_count - new_count) * sizeof(T)});
 				m_count = new_count;
 			}
 		}
@@ -208,8 +208,8 @@ namespace core
 			if (m_capacity == m_count)
 				return;
 
-			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * m_count, alignof(T));
-			m_allocator->commit(new_ptr, sizeof(T) * m_count);
+			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * m_count, alignof(T)).data();
+			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(T) * m_count});
 			for (size_t i = 0; i < m_count; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
@@ -219,8 +219,8 @@ namespace core
 				m_ptr[i].~T();
 			}
 
-			m_allocator->release(m_ptr, sizeof(T) * m_capacity);
-			m_allocator->free(m_ptr, sizeof(T) * m_capacity);
+			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
+			m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
 
 			m_capacity = m_count;
 			m_ptr = new_ptr;

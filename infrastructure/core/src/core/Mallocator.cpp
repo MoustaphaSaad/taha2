@@ -6,26 +6,26 @@
 
 namespace core
 {
-	void* Mallocator::alloc(size_t size, size_t)
+	Span<std::byte> Mallocator::alloc(size_t size, size_t)
 	{
-		auto res = malloc(size);
+		auto res = (std::byte*)malloc(size);
 		TracyAllocS(res, size, 10);
-		return res;
+		return Span<std::byte>{res, size};
 	}
 
-	void Mallocator::commit(void* ptr, size_t size)
+	void Mallocator::commit(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void Mallocator::release(void* ptr, size_t size)
+	void Mallocator::release(Span<std::byte>)
 	{
 		// do nothing
 	}
 
-	void Mallocator::free(void* ptr, size_t)
+	void Mallocator::free(Span<std::byte> bytes)
 	{
 		TracyFreeS(ptr, 10);
-		::free(ptr);
+		::free(bytes.data());
 	}
 }

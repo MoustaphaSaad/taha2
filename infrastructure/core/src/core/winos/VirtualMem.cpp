@@ -6,26 +6,26 @@
 
 namespace core
 {
-	void* VirtualMem::alloc(size_t size, size_t)
+	Span<std::byte> VirtualMem::alloc(size_t size, size_t)
 	{
-		auto res = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
+		auto res = (std::byte*)VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
 		TracyAllocS(res, size, 10);
-		return res;
+		return Span<std::byte>{res, size};
 	}
 
-	void VirtualMem::commit(void* ptr, size_t size)
+	void VirtualMem::commit(Span<std::byte> bytes)
 	{
-		VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
+		VirtualAlloc(bytes.data(), bytes.sizeInBytes(), MEM_COMMIT, PAGE_READWRITE);
 	}
 
-	void VirtualMem::release(void* ptr, size_t size)
+	void VirtualMem::release(Span<std::byte> bytes)
 	{
-		VirtualFree(ptr, size, MEM_DECOMMIT);
+		VirtualFree(bytes.data(), bytes.sizeInBytes(), MEM_DECOMMIT);
 	}
 
-	void VirtualMem::free(void* ptr, size_t size)
+	void VirtualMem::free(Span<std::byte> bytes)
 	{
-		TracyFreeS(ptr, 10);
-		VirtualFree(ptr, size, MEM_RELEASE);
+		TracyFreeS(bytes.data(), 10);
+		VirtualFree(bytes.data(), bytes.sizeInBytes(), MEM_RELEASE);
 	}
 }
