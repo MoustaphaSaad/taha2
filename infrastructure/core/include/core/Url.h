@@ -27,15 +27,16 @@ namespace core
 		Map<StringView, size_t> m_keyToIndex;
 
 	public:
-		using KeyIterator = Map<StringView, size_t>::iterator;
+		using KeyIterator = Map<StringView, size_t>::Iterator;
+		using KeyConstIterator = Map<StringView, size_t>::ConstIterator;
 
 		CORE_EXPORT static Result<UrlQuery> parse(StringView query, Allocator* allocator);
 
 		CORE_EXPORT explicit UrlQuery(Allocator* allocator);
 
 		CORE_EXPORT void add(StringView key, StringView value);
-		CORE_EXPORT const KeyIterator find(StringView key) const;
-		CORE_EXPORT StringView get(const KeyIterator) const;
+		CORE_EXPORT KeyConstIterator find(StringView key) const;
+		CORE_EXPORT StringView get(KeyConstIterator) const;
 
 		size_t count() const { return m_keyValues.count(); }
 		const KeyValue& operator[](size_t index) const { return m_keyValues[index]; }

@@ -577,12 +577,12 @@ namespace core
 		m_keyToIndex.insert(m_keyValues[m_keyValues.count() - 1].key, index);
 	}
 
-	const UrlQuery::KeyIterator UrlQuery::find(StringView key) const
+	UrlQuery::KeyConstIterator UrlQuery::find(StringView key) const
 	{
 		return m_keyToIndex.lookup(key);
 	}
 
-	StringView UrlQuery::get(const KeyIterator it) const
+	StringView UrlQuery::get(KeyConstIterator it) const
 	{
 		coreAssert(it != m_keyToIndex.end());
 		return m_keyValues[it->value].value;

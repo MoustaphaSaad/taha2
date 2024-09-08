@@ -18,6 +18,8 @@ namespace core
 			, m_count(size)
 		{}
 
+		operator Span<const T>() const { return Span<const T>{m_ptr, m_count}; }
+
 		T* begin() { return m_ptr; }
 		const T* begin() const { return m_ptr; }
 

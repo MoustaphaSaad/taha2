@@ -104,15 +104,13 @@ namespace core
 	class Set
 	{
 		Allocator* m_allocator = nullptr;
-		HashSlot* m_slots = nullptr;
-		size_t m_slotsCount = 0;
+		Span<HashSlot> m_slots;
 		size_t m_deletedCount = 0;
 		size_t m_usedCountThreshold = 0;
 		size_t m_usedCountShrinkThreshold = 0;
 		size_t m_deletedCountThreshold = 0;
-		T* m_values = nullptr;
+		Span<T> m_values;
 		size_t m_valuesCount = 0;
-		size_t m_valuesCapacity = 0;
 
 		struct Search_Result
 		{
@@ -124,47 +122,43 @@ namespace core
 		{
 			for (size_t i = 0; i < m_valuesCount; ++i)
 				m_values[i].~T();
-			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
+			m_allocator->releaseT(m_values);
+			m_allocator->freeT(m_values);
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->releaseT(m_slots);
+			m_allocator->freeT(m_slots);
 
-			m_slots = nullptr;
-			m_slotsCount = 0;
+			m_slots = Span<HashSlot>{};
 			m_deletedCount = 0;
 			m_usedCountThreshold = 0;
 			m_usedCountShrinkThreshold = 0;
 			m_deletedCountThreshold = 0;
-			m_values = nullptr;
+			m_values = Span<T>{};
 			m_valuesCount = 0;
-			m_valuesCapacity = 0;
 		}
 
 		void copyFrom(const Set& other)
 		{
 			m_allocator = other.m_allocator;
-			m_slotsCount = other.count;
 			m_deletedCount = other.m_deletedCount;
 			m_usedCountThreshold = other.m_usedCountThreshold;
 			m_usedCountShrinkThreshold = other.m_usedCountShrinkThreshold;
 			m_deletedCountThreshold = other.m_deletedCountThreshold;
 			m_valuesCount = other.m_valuesCount;
-			m_valuesCapacity = m_valuesCount;
 
-			m_values = (T*)m_allocator->alloc(sizeof(T) * m_valuesCount, alignof(T));
-			m_allocator->commit(m_values, sizeof(T) * m_valuesCount);
+			m_values = m_allocator->allocT<T>(m_valuesCount);
+			m_allocator->commitT(m_values);
 			for (size_t i = 0; i < m_valuesCount; ++i)
-				::new (m_values + i) T(other.m_values[i]);
+				::new (&m_values[i]) T(other.m_values[i]);
 
-			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slotsCount, alignof(HashSlot)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
-			for (size_t i = 0; i < m_slotsCount; ++i)
-				::new (m_slots + i) HashSlot();
+			m_slots = m_allocator->allocT<HashSlot>(other.m_slots.count());
+			m_allocator->commitT(m_slots);
+			for (auto& slot: m_slots)
+				::new (&slot) HashSlot();
 
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
-				auto res = findSlotForInsert(m_slots, m_slotsCount, m_values, m_values[i]);
+				auto res = findSlotForInsert(m_slots, m_values, m_values[i]);
 				auto& slot = m_slots[res.index];
 				auto flags = slot.flags();
 				switch (flags)
@@ -189,33 +183,29 @@ namespace core
 		{
 			m_allocator = other.m_allocator;
 			m_slots = other.m_slots;
-			m_slotsCount = other.m_slotsCount;
 			m_deletedCount = other.m_deletedCount;
 			m_usedCountThreshold = other.m_usedCountThreshold;
 			m_usedCountShrinkThreshold = other.m_usedCountShrinkThreshold;
 			m_deletedCountThreshold = other.m_deletedCountThreshold;
 			m_values = other.m_values;
 			m_valuesCount = other.m_valuesCount;
-			m_valuesCapacity = other.m_valuesCapacity;
 
-			other.m_slots = nullptr;
-			other.m_slotsCount = 0;
+			other.m_slots = Span<HashSlot>{};
 			other.m_deletedCount = 0;
 			other.m_usedCountThreshold = 0;
 			other.m_usedCountShrinkThreshold = 0;
 			other.m_deletedCountThreshold = 0;
-			other.m_values = nullptr;
+			other.m_values = Span<T>{};
 			other.m_valuesCount = 0;
-			other.m_valuesCapacity = 0;
 		}
 
 		Search_Result
-		findSlotForInsert(const HashSlot* _slots, size_t _slots_count, const T* _values, const T& key)
+		findSlotForInsert(Span<const HashSlot> _slots, Span<const T> _values, const T& key)
 		{
 			Search_Result res{};
-			res.hash = THash{}(key, size_t(_slots));
+			res.hash = THash{}(key, size_t(_slots.data()));
 
-			auto cap = _slots_count;
+			auto cap = _slots.count();
 			if (cap == 0) return res;
 
 			auto index = res.hash & (cap - 1);
@@ -292,9 +282,9 @@ namespace core
 		Search_Result findSlotForLookup(const T& key) const
 		{
 			Search_Result res{};
-			res.hash = THash{}(key, size_t(m_slots));
+			res.hash = THash{}(key, size_t(m_slots.data()));
 
-			auto cap = m_slotsCount;
+			auto cap = m_slots.count();
 			if (cap == 0) return res;
 
 			auto index = res.hash & (cap - 1);
@@ -341,10 +331,10 @@ namespace core
 
 		void reserveExact(size_t new_count)
 		{
-			auto new_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * new_count, alignof(HashSlot)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)new_slots, sizeof(HashSlot) * new_count});
-			for (size_t i = 0; i < new_count; ++i)
-				::new (new_slots + i) HashSlot();
+			auto new_slots = m_allocator->allocT<HashSlot>(new_count);
+			m_allocator->commitT(new_slots);
+			for (auto& slot: new_slots)
+				::new (&slot) HashSlot();
 
 			m_deletedCount = 0;
 			// if 12/16th of table is occupied, grow
@@ -359,7 +349,7 @@ namespace core
 			{
 				for (size_t i = 0; i < m_valuesCount; ++i)
 				{
-					auto res = findSlotForInsert(new_slots, new_count, m_values, m_values[i]);
+					auto res = findSlotForInsert(new_slots, m_values, m_values[i]);
 					auto& slot = new_slots[res.index];
 					auto flags = slot.flags();
 					switch (flags)
@@ -380,54 +370,52 @@ namespace core
 				}
 			}
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->releaseT(m_slots);
+			m_allocator->freeT(m_slots);
 			m_slots = new_slots;
-			m_slotsCount = new_count;
 		}
 
 		void maintainSpaceComplexity()
 		{
-			if (m_slotsCount == 0)
+			if (m_slots.count() == 0)
 			{
 				reserveExact(8);
 			}
 			else if (m_valuesCount + 1 > m_usedCountThreshold)
 			{
-				reserveExact(m_slotsCount * 2);
+				reserveExact(m_slots.count() * 2);
 			}
 		}
 
 		void valuesGrow(size_t new_capacity)
 		{
-			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * new_capacity, alignof(T)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(T) * m_valuesCount});
+			auto new_values = m_allocator->allocT<T>(new_capacity);
+			m_allocator->commitT(new_values);
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
-					::new (new_ptr + i) T(std::move(m_values[i]));
+					::new (&new_values[i]) T(std::move(m_values[i]));
 				else
-					::new (new_ptr + i) T(m_values[i]);
+					::new (&new_values[i]) T(m_values[i]);
 				m_values[i].~T();
 			}
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(T) * m_valuesCapacity});
+			m_allocator->releaseT(m_values);
+			m_allocator->freeT(m_values);
 
-			m_values = new_ptr;
-			m_valuesCapacity = new_capacity;
+			m_values = new_values;
 		}
 
 		void valuesEnsureSpaceExists(size_t i = 1)
 		{
-			if (m_valuesCount + i > m_valuesCapacity)
+			if (m_valuesCount + i > m_values.count())
 			{
-				size_t new_capacity = m_valuesCapacity * 2;
+				size_t new_capacity = m_values.count() * 2;
 				if (new_capacity == 0)
 					new_capacity = 8;
 
-				if (new_capacity < m_valuesCapacity + i)
-					new_capacity = m_valuesCapacity + i;
+				if (new_capacity < m_values.count() + i)
+					new_capacity = m_values.count() + i;
 
 				valuesGrow(new_capacity);
 			}
@@ -437,8 +425,8 @@ namespace core
 		void valuesPush(R&& key)
 		{
 			valuesEnsureSpaceExists();
-			m_allocator->commit(Span<std::byte>{(std::byte*)m_values + m_valuesCount, sizeof(T)});
-			::new (m_values + m_valuesCount) T(std::forward<R>(key));
+			m_allocator->commitT(m_values.slice(m_valuesCount, m_valuesCount + 1));
+			::new (&m_values[m_valuesCount]) T(std::forward<R>(key));
 			++m_valuesCount;
 		}
 
@@ -448,7 +436,8 @@ namespace core
 		}
 
 	public:
-		using iterator = T*;
+		using Iterator = T*;
+		using ConstIterator = T const*;
 
 		explicit Set(Allocator* a)
 			: m_allocator(a)
@@ -488,7 +477,7 @@ namespace core
 		{
 			maintainSpaceComplexity();
 
-			auto res = findSlotForInsert(m_slots, m_slotsCount, m_values, key);
+			auto res = findSlotForInsert(m_slots, m_values, key);
 
 			auto& slot = m_slots[res.index];
 			auto flags = slot.flags();
@@ -524,10 +513,10 @@ namespace core
 
 		void clear()
 		{
-			for (size_t i = 0; i < m_slotsCount; ++i)
-				m_slots[i] = HashSlot{};
-			for (size_t i = 0; i < m_valuesCount; ++i)
-				m_values[i].~T();
+			for (auto& slot: m_slots)
+				slot = HashSlot{};
+			for (auto& value: m_values)
+				value.~T();
 			m_valuesCount = 0;
 			m_deletedCount = 0;
 		}
@@ -541,7 +530,7 @@ namespace core
 
 		size_t capacity() const
 		{
-			return m_slotsCount;
+			return m_slots.count();
 		}
 
 		void reserve(size_t added_count)
@@ -583,21 +572,21 @@ namespace core
 		}
 
 		template<typename R>
-		const iterator lookup(const R& key) const
+		ConstIterator lookup(const R& key) const
 		{
 			auto res = findSlotForLookup(key);
-			if (res.index == m_slotsCount)
+			if (res.index == m_slots.count())
 				return nullptr;
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
-			return m_values + index;
+			return &m_values[index];
 		}
 
 		template<typename R>
 		bool remove(const R& key)
 		{
 			auto res = findSlotForLookup(key);
-			if (res.index == m_slotsCount)
+			if (res.index == m_slots.count())
 				return false;
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
@@ -610,7 +599,7 @@ namespace core
 				// fixup the index of the last element after swap
 				auto last_res = findSlotForLookup(m_values[m_valuesCount - 1]);
 				m_slots[last_res.index].setValueIndex(index);
-				::new (m_values + index) T(std::move_if_noexcept(m_values[m_valuesCount - 1]));
+				::new (&m_values[index]) T(std::move_if_noexcept(m_values[m_valuesCount - 1]));
 				m_values[m_valuesCount - 1].~T();
 			}
 
@@ -618,27 +607,27 @@ namespace core
 			++m_deletedCount;
 
 			// rehash because of size is too low
-			if (m_valuesCount < m_usedCountShrinkThreshold && m_slotsCount > 8)
+			if (m_valuesCount < m_usedCountShrinkThreshold && m_slots.count() > 8)
 			{
-				reserveExact(m_slotsCount >> 1);
+				reserveExact(m_slots.count() >> 1);
 				valuesShrinkToFit();
 			}
 			// rehash because of too many deleted values
 			else if (m_deletedCount > m_deletedCountThreshold)
 			{
-				reserveExact(m_slotsCount);
+				reserveExact(m_slots.count());
 			}
 			return true;
 		}
 
-		const iterator begin() const
+		ConstIterator begin() const
 		{
-			return m_values;
+			return m_values.sliceLeft(m_valuesCount).begin();
 		}
 
-		const iterator end() const
+		ConstIterator end() const
 		{
-			return m_values + m_valuesCount;
+			return m_values.sliceLeft(m_valuesCount).end();
 		}
 	};
 
@@ -653,15 +642,13 @@ namespace core
 	class Map
 	{
 		Allocator* m_allocator = nullptr;
-		HashSlot* m_slots = nullptr;
-		size_t m_slotsCount = 0;
+		Span<HashSlot> m_slots;
 		size_t m_deletedCount = 0;
 		size_t m_usedCountThreshold = 0;
 		size_t m_usedCountShrinkThreshold = 0;
 		size_t m_deletedCountThreshold = 0;
-		KeyValue<const TKey, TValue>* m_values = nullptr;
+		Span<KeyValue<const TKey, TValue>> m_values;
 		size_t m_valuesCount = 0;
-		size_t m_valuesCapacity = 0;
 
 		struct Search_Result
 		{
@@ -673,47 +660,43 @@ namespace core
 		{
 			for (size_t i = 0; i < m_valuesCount; ++i)
 				m_values[i].~KeyValue();
-			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(KeyValue<TKey, TValue>) * m_valuesCapacity});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(KeyValue<TKey, TValue>) * m_valuesCapacity});
+			m_allocator->releaseT(m_values);
+			m_allocator->freeT(m_values);
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->releaseT(m_slots);
+			m_allocator->freeT(m_slots);
 
-			m_slots = nullptr;
-			m_slotsCount = 0;
+			m_slots = Span<HashSlot>{};
 			m_deletedCount = 0;
 			m_usedCountThreshold = 0;
 			m_usedCountShrinkThreshold = 0;
 			m_deletedCountThreshold = 0;
-			m_values = nullptr;
+			m_values = Span<KeyValue<const TKey, TValue>>{};
 			m_valuesCount = 0;
-			m_valuesCapacity = 0;
 		}
 
 		void copyFrom(const Map& other)
 		{
 			m_allocator = other.m_allocator;
-			m_slotsCount = other.m_slotsCount;
 			m_deletedCount = other.m_deletedCount;
 			m_usedCountThreshold = other.m_usedCountThreshold;
 			m_usedCountShrinkThreshold = other.m_usedCountShrinkThreshold;
 			m_deletedCountThreshold = other.m_deletedCountThreshold;
 			m_valuesCount = other.m_valuesCount;
-			m_valuesCapacity = m_valuesCount;
 
-			m_values = (KeyValue<const TKey, TValue>*)m_allocator->alloc(sizeof(KeyValue<const TKey, TValue>) * m_valuesCount, alignof(KeyValue<const TKey, TValue>)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)m_values, sizeof(TValue) * m_valuesCount});
+			m_values = m_allocator->allocT<KeyValue<const TKey, TValue>>(m_valuesCount);
+			m_allocator->commitT(m_values);
 			for (size_t i = 0; i < m_valuesCount; ++i)
-				::new (m_values + i) KeyValue<const TKey, TValue>(other.m_values[i]);
+				::new (&m_values[i]) KeyValue<const TKey, TValue>(other.m_values[i]);
 
-			m_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * m_slotsCount, alignof(HashSlot)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
-			for (size_t i = 0; i < m_slotsCount; ++i)
-				::new (m_slots + i) HashSlot();
+			m_slots = m_allocator->allocT<HashSlot>(other.m_slots.count());
+			m_allocator->commitT(m_slots);
+			for (auto& slot: m_slots)
+				::new (&slot) HashSlot();
 
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
-				auto res = findSlotForInsert(m_slots, m_slotsCount, m_values, m_values[i].key);
+				auto res = findSlotForInsert(m_slots, m_values, m_values[i].key);
 				auto& slot = m_slots[res.index];
 				auto flags = slot.flags();
 				switch (flags)
@@ -738,33 +721,29 @@ namespace core
 		{
 			m_allocator = other.m_allocator;
 			m_slots = other.m_slots;
-			m_slotsCount = other.m_slotsCount;
 			m_deletedCount = other.m_deletedCount;
 			m_usedCountThreshold = other.m_usedCountThreshold;
 			m_usedCountShrinkThreshold = other.m_usedCountShrinkThreshold;
 			m_deletedCountThreshold = other.m_deletedCountThreshold;
 			m_values = other.m_values;
 			m_valuesCount = other.m_valuesCount;
-			m_valuesCapacity = other.m_valuesCapacity;
 
-			other.m_slots = nullptr;
-			other.m_slotsCount = 0;
+			other.m_slots = Span<HashSlot>{};
 			other.m_deletedCount = 0;
 			other.m_usedCountThreshold = 0;
 			other.m_usedCountShrinkThreshold = 0;
 			other.m_deletedCountThreshold = 0;
-			other.m_values = nullptr;
+			other.m_values = Span<KeyValue<const TKey, TValue>>{};
 			other.m_valuesCount = 0;
-			other.m_valuesCapacity = 0;
 		}
 
 		Search_Result
-		findSlotForInsert(const HashSlot* _slots, size_t _slots_count, const KeyValue<const TKey, TValue>* _values, const TKey& key)
+		findSlotForInsert(Span<const HashSlot> _slots, Span<const KeyValue<const TKey, TValue>> _values, const TKey& key)
 		{
 			Search_Result res{};
-			res.hash = THash{}(key, size_t(_slots));
+			res.hash = THash{}(key, size_t(_slots.data()));
 
-			auto cap = _slots_count;
+			auto cap = _slots.count();
 			if (cap == 0) return res;
 
 			auto index = res.hash & (cap - 1);
@@ -841,9 +820,9 @@ namespace core
 		Search_Result findSlotForLookup(const TKey& key) const
 		{
 			Search_Result res{};
-			res.hash = THash{}(key, size_t(m_slots));
+			res.hash = THash{}(key, size_t(m_slots.data()));
 
-			auto cap = m_slotsCount;
+			auto cap = m_slots.count();
 			if (cap == 0) return res;
 
 			auto index = res.hash & (cap - 1);
@@ -890,10 +869,10 @@ namespace core
 
 		void reserveExact(size_t new_count)
 		{
-			auto new_slots = (HashSlot*)m_allocator->alloc(sizeof(HashSlot) * new_count, alignof(HashSlot)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)new_slots, sizeof(HashSlot) * new_count});
-			for (size_t i = 0; i < new_count; ++i)
-				::new (new_slots + i) HashSlot();
+			auto new_slots = m_allocator->allocT<HashSlot>(new_count);
+			m_allocator->commitT(new_slots);
+			for (auto& slot: new_slots)
+				::new (&slot) HashSlot();
 
 			m_deletedCount = 0;
 			// if 12/16th of table is occupied, grow
@@ -908,7 +887,7 @@ namespace core
 			{
 				for (size_t i = 0; i < m_valuesCount; ++i)
 				{
-					auto res = findSlotForInsert(new_slots, new_count, m_values, m_values[i].key);
+					auto res = findSlotForInsert(new_slots, m_values, m_values[i].key);
 					auto& slot = new_slots[res.index];
 					auto flags = slot.flags();
 					switch (flags)
@@ -929,54 +908,52 @@ namespace core
 				}
 			}
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_slots, sizeof(HashSlot) * m_slotsCount});
+			m_allocator->releaseT(m_slots);
+			m_allocator->freeT(m_slots);
 			m_slots = new_slots;
-			m_slotsCount = new_count;
 		}
 
 		void maintainSpaceComplexity()
 		{
-			if (m_slotsCount == 0)
+			if (m_slots.count() == 0)
 			{
 				reserveExact(8);
 			}
 			else if (m_valuesCount + 1 > m_usedCountThreshold)
 			{
-				reserveExact(m_slotsCount * 2);
+				reserveExact(m_slots.count() * 2);
 			}
 		}
 
 		void valuesGrow(size_t new_capacity)
 		{
-			auto new_ptr = (KeyValue<const TKey, TValue>*)m_allocator->alloc(sizeof(KeyValue<const TKey, TValue>) * new_capacity, alignof(KeyValue<const TKey, TValue>)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(*m_values) * m_valuesCount});
+			auto new_values = m_allocator->allocT<KeyValue<const TKey, TValue>>(new_capacity);
+			m_allocator->commitT(new_values);
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<KeyValue<const TKey, TValue>>)
-					::new (new_ptr + i) KeyValue<const TKey, TValue>(std::move(m_values[i]));
+					::new (&new_values[i]) KeyValue<const TKey, TValue>(std::move(m_values[i]));
 				else
-					::new (new_ptr + i) KeyValue<const TKey, TValue>(m_values[i]);
+					::new (&new_values[i]) KeyValue<const TKey, TValue>(m_values[i]);
 				m_values[i].~KeyValue();
 			}
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_values, sizeof(*m_values) * m_valuesCapacity});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_values, sizeof(*m_values) * m_valuesCapacity});
+			m_allocator->releaseT(m_values);
+			m_allocator->freeT(m_values);
 
-			m_values = new_ptr;
-			m_valuesCapacity = new_capacity;
+			m_values = new_values;
 		}
 
 		void valuesEnsureSpaceExists(size_t i = 1)
 		{
-			if (m_valuesCount + i > m_valuesCapacity)
+			if (m_valuesCount + i > m_values.count())
 			{
-				size_t new_capacity = m_valuesCapacity * 2;
+				size_t new_capacity = m_values.count() * 2;
 				if (new_capacity == 0)
 					new_capacity = 8;
 
-				if (new_capacity < m_valuesCapacity + i)
-					new_capacity = m_valuesCapacity + i;
+				if (new_capacity < m_values.count() + i)
+					new_capacity = m_values.count() + i;
 
 				valuesGrow(new_capacity);
 			}
@@ -986,8 +963,8 @@ namespace core
 		void valuesPush(R&& key, U&& value)
 		{
 			valuesEnsureSpaceExists();
-			m_allocator->commit(Span<std::byte>{(std::byte*)(m_values + m_valuesCount), sizeof(KeyValue<const TKey, TValue>)});
-			::new (m_values + m_valuesCount) KeyValue<const TKey, TValue>{std::forward<R>(key), std::forward<U>(value)};
+			m_allocator->commitT(m_values.slice(m_valuesCount, m_valuesCount + 1));
+			::new (&m_values[m_valuesCount]) KeyValue<const TKey, TValue>{std::forward<R>(key), std::forward<U>(value)};
 			++m_valuesCount;
 		}
 
@@ -997,7 +974,8 @@ namespace core
 		}
 
 	public:
-		using iterator = KeyValue<const TKey, TValue>*;
+		using Iterator = KeyValue<const TKey, TValue>*;
+		using ConstIterator = KeyValue<const TKey, TValue> const*;
 
 		explicit Map(Allocator* a)
 			: m_allocator(a)
@@ -1037,7 +1015,7 @@ namespace core
 		{
 			maintainSpaceComplexity();
 
-			auto res = findSlotForInsert(m_slots, m_slotsCount, m_values, key);
+			auto res = findSlotForInsert(m_slots, m_values, key);
 
 			auto& slot = m_slots[res.index];
 			auto flags = slot.flags();
@@ -1073,10 +1051,10 @@ namespace core
 
 		void clear()
 		{
-			for (size_t i = 0; i < m_slotsCount; ++i)
-				m_slots[i] = HashSlot{};
-			for (size_t i = 0; i < m_valuesCount; ++i)
-				m_values[i].~KeyValue();
+			for (auto& slot: m_slots)
+				slot = HashSlot{};
+			for (auto& value: m_values)
+				value.~KeyValue();
 			m_valuesCount = 0;
 			m_deletedCount = 0;
 		}
@@ -1090,7 +1068,7 @@ namespace core
 
 		size_t capacity() const
 		{
-			return m_slotsCount;
+			return m_slots.count();
 		}
 
 		void reserve(size_t added_count)
@@ -1132,21 +1110,21 @@ namespace core
 		}
 
 		template<typename R>
-		const iterator lookup(const R& key) const
+		ConstIterator lookup(const R& key) const
 		{
 			auto res = findSlotForLookup(key);
-			if (res.index == m_slotsCount)
+			if (res.index == m_slots.count())
 				return end();
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
-			return m_values + index;
+			return &m_values[index];
 		}
 
 		template<typename R>
 		bool remove(const R& key)
 		{
 			auto res = findSlotForLookup(key);
-			if (res.index == m_slotsCount)
+			if (res.index == m_slots.count())
 				return false;
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
@@ -1159,7 +1137,7 @@ namespace core
 				// fixup the index of the last element after swap
 				auto last_res = findSlotForLookup(m_values[m_valuesCount - 1].key);
 				m_slots[last_res.index].setValueIndex(index);
-				::new (m_values + index) KeyValue<const TKey, TValue>(std::move(m_values[m_valuesCount - 1]));
+				::new (&m_values[index]) KeyValue<const TKey, TValue>(std::move(m_values[m_valuesCount - 1]));
 				m_values[m_valuesCount - 1].~KeyValue();
 			}
 
@@ -1167,37 +1145,37 @@ namespace core
 			++m_deletedCount;
 
 			// rehash because of size is too low
-			if (m_valuesCount < m_usedCountShrinkThreshold && m_slotsCount > 8)
+			if (m_valuesCount < m_usedCountShrinkThreshold && m_slots.count() > 8)
 			{
-				reserveExact(m_slotsCount >> 1);
+				reserveExact(m_slots.count() >> 1);
 				valuesShrinkToFit();
 			}
 			// rehash because of too many deleted values
 			else if (m_deletedCount > m_deletedCountThreshold)
 			{
-				reserveExact(m_slotsCount);
+				reserveExact(m_slots.count());
 			}
 			return true;
 		}
 
-		iterator begin()
+		Iterator begin()
 		{
-			return m_values;
+			return m_values.begin();
 		}
 
-		const iterator begin() const
+		ConstIterator begin() const
 		{
-			return m_values;
+			return m_values.begin();
 		}
 
-		iterator end()
+		Iterator end()
 		{
-			return m_values + m_valuesCount;
+			return m_values.sliceLeft(m_valuesCount).end();
 		}
 
-		const iterator end() const
+		ConstIterator end() const
 		{
-			return m_values + m_valuesCount;
+			return m_values.sliceLeft(m_valuesCount).end();
 		}
 	};
 }
