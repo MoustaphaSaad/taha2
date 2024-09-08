@@ -2,7 +2,7 @@
 
 namespace core
 {
-	constexpr inline size_t strlen(const char* start)
+	constexpr size_t strlen(const char* start)
 	{
 		auto end = start;
 		while (*end != '\0')
@@ -13,7 +13,7 @@ namespace core
 	template <typename F> struct DeferClosure
 	{
 		F f;
-		DeferClosure(F f): f(f) {}
+		explicit DeferClosure(F f): f(f) {}
 		~DeferClosure() { f(); }
 	};
 
