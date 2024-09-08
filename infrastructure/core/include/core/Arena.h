@@ -16,14 +16,14 @@ namespace core
 		{}
 
 		Arena(const Arena&) = delete;
-		Arena(Arena&& other)
+		Arena(Arena&& other) noexcept
 			: m_heap(other.m_heap)
 		{
 			other.m_heap = nullptr;
 		}
 
 		Arena& operator=(const Arena&) = delete;
-		Arena& operator=(Arena&& other)
+		Arena& operator=(Arena&& other) noexcept
 		{
 			if (m_heap)
 				mi_heap_destroy(m_heap);
