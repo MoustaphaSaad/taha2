@@ -6,6 +6,7 @@
 #include <cpptrace/cpptrace.hpp>
 
 #include <streambuf>
+#include <ostream>
 
 namespace core
 {
