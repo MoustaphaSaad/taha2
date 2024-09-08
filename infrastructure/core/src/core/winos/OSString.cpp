@@ -28,7 +28,7 @@ namespace core
 		// countNeeded includes null byte
 		str.resize(countNeeded - 1);
 
-		countNeeded = WideCharToMultiByte(CP_UTF8, NULL, (LPTSTR)m_buffer.data(), int(m_buffer.count() / sizeof(TCHAR)), str.m_ptr, int(str.m_count), NULL, NULL);
+		countNeeded = WideCharToMultiByte(CP_UTF8, NULL, (LPTSTR)m_buffer.data(), int(m_buffer.count() / sizeof(TCHAR)), str.data(), int(str.count()), NULL, NULL);
 		return str;
 	}
 }
