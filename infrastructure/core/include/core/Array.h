@@ -12,75 +12,70 @@ namespace core
 	template <typename T> class Array
 	{
 		Allocator* m_allocator = nullptr;
-		T* m_ptr = nullptr;
-		size_t m_capacity = 0;
+		Span<T> m_memory;
 		size_t m_count = 0;
 
 		void destroy()
 		{
-			if (m_ptr == nullptr)
+			if (m_memory.empty())
 				return;
 
 			for (size_t i = 0; i < m_count; ++i)
-				m_ptr[i].~T();
-			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, m_capacity * sizeof(T)});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, m_capacity * sizeof(T)});
+				m_memory[i].~T();
+			m_allocator->releaseT(m_memory);
+			m_allocator->freeT(m_memory);
 		}
 
 		void copyFrom(const Array& other)
 		{
 			m_allocator = other.m_allocator;
 			m_count = other.m_count;
-			m_capacity = m_count;
-			m_ptr = (T*)m_allocator->alloc(sizeof(T) * m_capacity, alignof(T)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
+			m_memory = m_allocator->allocT<T>(m_count);
+			m_allocator->commitT(m_memory);
 			for (size_t i = 0; i < m_count; ++i)
-				::new (m_ptr + i) T(other.m_ptr[i]);
+				::new (&m_memory[i]) T(other.m_memory[i]);
 		}
 
 		void moveFrom(Array&& other)
 		{
 			m_allocator = other.m_allocator;
-			m_ptr = other.m_ptr;
+			m_memory = other.m_memory;
 			m_count = other.m_count;
-			m_capacity = other.m_capacity;
 
 			other.m_allocator = nullptr;
-			other.m_ptr = nullptr;
+			other.m_memory = Span<T>{};
 			other.m_count = 0;
-			other.m_capacity = 0;
 		}
 
 		void grow(size_t new_capacity)
 		{
-			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * new_capacity, alignof(T)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(T) * m_count});
+			auto new_memory = m_allocator->allocT<T>(new_capacity);
+			m_allocator->commitT(new_memory.sliceLeft(m_count));
 			for (size_t i = 0; i < m_count; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
-					::new (new_ptr + i) T(std::move(m_ptr[i]));
+					::new (&new_memory[i]) T(std::move(m_memory[i]));
 				else
-					::new (new_ptr + i) T(m_ptr[i]);
-				m_ptr[i].~T();
+					::new (&new_memory[i]) T(m_memory[i]);
+				m_memory[i].~T();
 			}
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
+			m_allocator->releaseT(m_memory);
+			m_allocator->freeT(m_memory);
 
-			m_ptr = new_ptr;
-			m_capacity = new_capacity;
+			m_memory = new_memory;
 		}
 
 		void ensureSpaceExists(size_t i = 1)
 		{
-			if (m_count + i > m_capacity)
+			if (m_count + i > m_memory.count())
 			{
-				size_t new_capacity = m_capacity * 2;
+				size_t new_capacity = m_memory.count() * 2;
 				if (new_capacity == 0)
 					new_capacity = 8;
 
-				if (new_capacity < m_capacity + i)
-					new_capacity = m_capacity + i;
+				if (new_capacity < m_memory.count() + i)
+					new_capacity = m_memory.count() + i;
 
 				grow(new_capacity);
 			}
@@ -112,56 +107,56 @@ namespace core
 		T& operator[](size_t i)
 		{
 			coreAssert(i < m_count);
-			return m_ptr[i];
+			return m_memory[i];
 		}
 
 		const T& operator[](size_t i) const
 		{
 			coreAssert(i < m_count);
-			return m_ptr[i];
+			return m_memory[i];
 		}
 
 		Allocator* allocator() const { return m_allocator; }
 		size_t count() const { return m_count; }
-		size_t capacity() const { return m_capacity; }
+		size_t capacity() const { return m_memory.count(); }
 
 		void push(const T& v)
 		{
 			ensureSpaceExists();
-			m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), sizeof(T)});
-			::new (m_ptr + m_count) T(v);
+			m_allocator->commitT(m_memory.slice(m_count, m_count + 1));
+			::new (&m_memory[m_count]) T(v);
 			++m_count;
 		}
 
 		void push(T&& v)
 		{
 			ensureSpaceExists();
-			m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), sizeof(T)});
-			::new (m_ptr + m_count) T(std::move(v));
+			m_allocator->commitT(m_memory.slice(m_count, m_count + 1));
+			::new (&m_memory[m_count]) T(std::move(v));
 			++m_count;
 		}
 
 		template <typename... TArgs> void emplace(TArgs&&... args)
 		{
 			ensureSpaceExists();
-			m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), sizeof(T)});
-			::new (m_ptr + m_count) T(std::forward<TArgs>(args)...);
+			m_allocator->commitT(m_memory.slice(m_count, m_count + 1));
+			::new (&m_memory[m_count]) T(std::forward<TArgs>(args)...);
 			++m_count;
 		}
 
 		void pop()
 		{
 			coreAssert(m_count > 0);
-			m_ptr[m_count - 1].~T();
-			m_allocator->release(Span<std::byte>{(std::byte*)(m_ptr + m_count - 1), sizeof(T)});
+			m_memory[m_count - 1].~T();
+			m_allocator->releaseT(m_memory.slice(m_count - 1, m_count));
 			--m_count;
 		}
 
 		void clear()
 		{
 			for (size_t i = 0; i < m_count; ++i)
-				m_ptr[i].~T();
-			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_count});
+				m_memory[i].~T();
+			m_allocator->releaseT(m_memory.sliceLeft(m_count));
 			m_count = 0;
 		}
 
@@ -172,15 +167,15 @@ namespace core
 			if (new_count > m_count)
 			{
 				ensureSpaceExists(new_count - m_count);
-				m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), (new_count - m_count) * sizeof(T)});
+				m_allocator->commitT(m_memory.slice(m_count, new_count));
 				for (; m_count < new_count; ++m_count)
-					::new (m_ptr + m_count) T();
+					::new (&m_memory[m_count]) T();
 			}
 			else if (new_count < m_count)
 			{
 				for (size_t i = new_count; i < m_count; ++i)
-					m_ptr[i].~T();
-				m_allocator->release(Span<std::byte>{(std::byte*)(m_ptr + new_count), (m_count - new_count) * sizeof(T)});
+					m_memory[i].~T();
+				m_allocator->releaseT(m_memory.slice(new_count, m_count));
 				m_count = new_count;
 			}
 		}
@@ -190,51 +185,50 @@ namespace core
 			if (new_count > m_count)
 			{
 				ensureSpaceExists(new_count - m_count);
-				m_allocator->commit(Span<std::byte>{(std::byte*)(m_ptr + m_count), (new_count - m_count) * sizeof(T)});
+				m_allocator->commitT(m_memory.slice(m_count, new_count));
 				for (; m_count < new_count; ++m_count)
-					::new (m_ptr + m_count) T(value);
+					::new (&m_memory[m_count]) T(value);
 			}
 			else
 			{
 				for (size_t i = new_count; i < m_count; ++i)
-					m_ptr[i].~T();
-				m_allocator->release(Span<std::byte>{(std::byte*)(m_ptr + new_count), (m_count - new_count) * sizeof(T)});
+					m_memory[i].~T();
+				m_allocator->releaseT(m_memory.slice(new_count, m_count));
 				m_count = new_count;
 			}
 		}
 
 		void shrink_to_fit()
 		{
-			if (m_capacity == m_count)
+			if (m_memory.count() == m_count)
 				return;
 
-			auto new_ptr = (T*)m_allocator->alloc(sizeof(T) * m_count, alignof(T)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)new_ptr, sizeof(T) * m_count});
+			auto new_memory = m_allocator->allocT<T>(m_count);
+			m_allocator->commitT(new_memory);
 			for (size_t i = 0; i < m_count; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
-					::new (new_ptr + i) T(std::move(m_ptr[i]));
+					::new (&new_memory[i]) T(std::move(m_memory[i]));
 				else
-					::new (new_ptr + i) T(m_ptr[i]);
-				m_ptr[i].~T();
+					::new (&new_memory[i]) T(m_memory[i]);
+				m_memory[i].~T();
 			}
 
-			m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
-			m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, sizeof(T) * m_capacity});
+			m_allocator->releaseT(m_memory);
+			m_allocator->freeT(m_memory);
 
-			m_capacity = m_count;
-			m_ptr = new_ptr;
+			m_memory = new_memory;
 		}
 
-		T* data() { return m_ptr; }
-		const T* data() const { return m_ptr; }
+		T* data() { return m_memory.data(); }
+		const T* data() const { return m_memory.data(); }
 
-		T* begin() { return m_ptr; }
+		T* begin() { return m_memory.begin(); }
 
-		const T* begin() const { return m_ptr; }
+		const T* begin() const { return m_memory.begin(); }
 
-		T* end() { return m_ptr + m_count; }
+		T* end() { return m_memory.sliceLeft(m_count).end(); }
 
-		const T* end() const { return m_ptr + m_count; }
+		const T* end() const { return m_memory.sliceLeft(m_count).end(); }
 	};
 }

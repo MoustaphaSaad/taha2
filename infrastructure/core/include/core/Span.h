@@ -48,6 +48,8 @@ namespace core
 		size_t count() const { return m_count; }
 		size_t sizeInBytes() const { return m_count * sizeof(T); }
 
+		bool empty() const { return m_ptr == nullptr || m_count == 0; }
+
 		Span<T> slice(size_t start, size_t end) const
 		{
 			coreAssert(start <= end && end - start <= m_count);
