@@ -41,7 +41,7 @@ namespace core
 			copyFrom(other);
 		}
 
-		Buffer(Buffer&& other)
+		Buffer(Buffer&& other) noexcept
 		{
 			moveFrom(std::move(other));
 		}
@@ -55,7 +55,7 @@ namespace core
 			return *this;
 		}
 
-		Buffer& operator=(Buffer&& other)
+		Buffer& operator=(Buffer&& other) noexcept
 		{
 			destroy();
 			moveFrom(std::move(other));
@@ -86,7 +86,8 @@ namespace core
 		void push(std::byte b)
 		{
 			ensureSpaceExists(1);
-			m_memory[m_count++] = b;
+			m_memory[m_count] = b;
+			++m_count;
 		}
 
 		void push(StringView v)
