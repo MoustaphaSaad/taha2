@@ -30,8 +30,8 @@ namespace core
 			{
 				auto next = node->next;
 				node->~Node();
-				m_allocator->release(Span<std::byte>{(std::byte*)node, sizeof(Node)});
-				m_allocator->free(Span<std::byte>{(std::byte*)node, sizeof(Node)});
+				m_allocator->releaseSingleT(node);
+				m_allocator->freeSingleT(node);
 				node = next;
 			}
 		}
@@ -43,8 +43,8 @@ namespace core
 			auto node = other.m_head;
 			while (node)
 			{
-				auto new_node = (Node*)m_allocator->alloc(sizeof(Node), alignof(Node));
-				m_allocator->commit(new_node, sizeof(Node));
+				auto new_node = m_allocator->allocSingleT<Node>();
+				m_allocator->commitSingleT(new_node);
 				new (new_node) Node{ nullptr, nullptr, node->value };
 				if (m_tail)
 				{
@@ -110,8 +110,8 @@ namespace core
 		template<typename R>
 		void push_back(R&& value)
 		{
-			auto node = (Node*)m_allocator->alloc(sizeof(Node), alignof(Node)).data();
-			m_allocator->commit(Span<std::byte>{(std::byte*)node, sizeof(Node)});
+			auto node = m_allocator->allocSingleT<Node>();
+			m_allocator->commitSingleT(node);
 			new (node) Node{ nullptr, nullptr, std::forward<R>(value) };
 			if (m_tail)
 			{
@@ -130,8 +130,8 @@ namespace core
 		template<typename R>
 		void push_front(R&& value)
 		{
-			auto node = (Node*)m_allocator->alloc(sizeof(Node), alignof(Node));
-			m_allocator->commit(node, sizeof(Node));
+			auto node = m_allocator->allocSingleT<Node>();
+			m_allocator->commitSingleT(node);
 			new (node) Node{ nullptr, nullptr, std::forward<R>(value) };
 			if (m_head)
 			{
@@ -181,8 +181,8 @@ namespace core
 			else
 				m_head = nullptr;
 			node->~Node();
-			m_allocator->release(Span<std::byte>{(std::byte*)node, sizeof(Node)});
-			m_allocator->free(Span<std::byte>{(std::byte*)node, sizeof(Node)});
+			m_allocator->releaseSingleT(node);
+			m_allocator->freeSingleT(node);
 			--m_count;
 		}
 
@@ -196,8 +196,8 @@ namespace core
 			else
 				m_tail = nullptr;
 			node->~Node();
-			m_allocator->release(Span<std::byte>{(std::byte*)node, sizeof(Node)});
-			m_allocator->free(Span<std::byte>{(std::byte*)node, sizeof(Node)});
+			m_allocator->releaseSingleT(node);
+			m_allocator->freeSingleT(node);
 			--m_count;
 		}
 

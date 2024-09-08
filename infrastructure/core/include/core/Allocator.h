@@ -40,5 +40,29 @@ namespace core
 		{
 			free(s.asBytes());
 		}
+
+		template<typename T>
+		T* allocSingleT()
+		{
+			return allocT<T>(1).data();
+		}
+
+		template<typename T>
+		void commitSingleT(T* s)
+		{
+			commitT(Span<T>{s, 1});
+		}
+
+		template<typename T>
+		void releaseSingleT(T* s)
+		{
+			releaseT(Span<T>{s, 1});
+		}
+
+		template<typename T>
+		void freeSingleT(T* s)
+		{
+			freeT(Span<T>{s, 1});
+		}
 	};
 }
