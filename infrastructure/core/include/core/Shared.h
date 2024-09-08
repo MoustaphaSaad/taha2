@@ -18,8 +18,7 @@ namespace core
 	struct SharedControlBlock
 	{
 		Allocator* allocator = nullptr;
-		void* originalPtr = nullptr;
-		size_t originalSize = 0;
+		Span<std::byte> originalMemory;
 		std::atomic<int> strong = 0;
 		std::atomic<int> weak = 0;
 	};
@@ -68,8 +67,8 @@ namespace core
 				{
 					m_ptr->~T();
 					m_ptr = nullptr;
-					allocator->release(Span<std::byte>{(std::byte*)m_control->originalPtr, m_control->originalSize});
-					allocator->free(Span<std::byte>{(std::byte*)m_control->originalPtr, m_control->originalSize});
+					allocator->release(m_control->originalMemory);
+					allocator->free(m_control->originalMemory);
 				}
 
 				if (m_control->weak.fetch_sub(1) == 1)
@@ -489,17 +488,16 @@ namespace core
 	inline Shared<T>
 	shared_from(Allocator* allocator, TArgs&& ... args)
 	{
-		auto ptr = (T*)allocator->alloc(sizeof(T), alignof(T)).data();
-		allocator->commit(Span<std::byte>{(std::byte*)ptr, sizeof(*ptr)});
+		auto ptr = allocator->allocSingleT<T>();
+		allocator->commitSingleT(ptr);
 
-		auto control = (SharedControlBlock*)allocator->alloc(sizeof(SharedControlBlock), alignof(SharedControlBlock)).data();
-		allocator->commit(Span<std::byte>{(std::byte*)control, sizeof(*control)});
+		auto control = allocator->allocSingleT<SharedControlBlock>();
+		allocator->commitSingleT(control);
 
 		::new (ptr) T{std::forward<TArgs>(args)...};
 		::new (control) SharedControlBlock{};
 		control->allocator = allocator;
-		control->originalPtr = ptr;
-		control->originalSize = sizeof(*ptr);
+		control->originalMemory = Span<std::byte>{reinterpret_cast<std::byte*>(ptr), sizeof(*ptr)};
 
 		auto res = Shared<T>{ptr, control};
 

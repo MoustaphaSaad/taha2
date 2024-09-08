@@ -92,13 +92,12 @@ namespace core
 			buffer.push((std::byte)'\0');
 
 		m_allocator = buffer.m_allocator;
-		m_ptr = (char*)buffer.m_ptr;
-		m_capacity = buffer.m_capacity;
+		m_ptr = (char*)buffer.m_memory.data();
+		m_capacity = buffer.m_memory.count();
 		m_count = buffer.m_count - 1;
 
-		buffer.m_ptr = nullptr;
+		buffer.m_memory = Span<std::byte>{};
 		buffer.m_count = 0;
-		buffer.m_capacity = 0;
 	}
 
 	void String::resize(size_t new_count)

@@ -18,8 +18,8 @@ namespace core
 			if (m_ptr)
 			{
 				m_ptr->~T();
-				m_allocator->release(Span<std::byte>{(std::byte*)m_ptr, sizeof(T)});
-				m_allocator->free(Span<std::byte>{(std::byte*)m_ptr, sizeof(T)});
+				m_allocator->releaseSingleT(m_ptr);
+				m_allocator->freeSingleT(m_ptr);
 				m_ptr = nullptr;
 			}
 		}
@@ -111,8 +111,8 @@ namespace core
 	template<typename T, typename... TArgs>
 	inline Unique<T> unique_from(Allocator* allocator, TArgs&&... args)
 	{
-		auto ptr = (T*)allocator->alloc(sizeof(T), alignof(T)).data();
-		allocator->commit(Span<std::byte>{(std::byte*)ptr, sizeof(T)});
+		auto ptr = allocator->allocSingleT<T>();
+		allocator->commitSingleT(ptr);
 		::new (ptr) T(std::forward<TArgs>(args)...);
 		return Unique<T>{allocator, (T*)ptr};
 	}

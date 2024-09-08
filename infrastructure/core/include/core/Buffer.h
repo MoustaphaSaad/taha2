@@ -18,8 +18,7 @@ namespace core
 		friend class String;
 
 		Allocator* m_allocator = nullptr;
-		std::byte* m_ptr = nullptr;
-		size_t m_capacity = 0;
+		Span<std::byte> m_memory;
 		size_t m_count = 0;
 
 		CORE_EXPORT void destroy();
@@ -71,23 +70,23 @@ namespace core
 		std::byte& operator[](size_t i)
 		{
 			coreAssert(i < m_count);
-			return m_ptr[i];
+			return m_memory[i];
 		}
 
 		const std::byte& operator[](size_t i) const
 		{
 			coreAssert(i < m_count);
-			return m_ptr[i];
+			return m_memory[i];
 		}
 
-		explicit operator StringView() const { return StringView{(const char*)m_ptr, m_count}; }
-		explicit operator Span<const std::byte>() const { return Span<const std::byte>{m_ptr, m_count}; }
-		explicit operator Span<std::byte>() { return Span<std::byte>{m_ptr, m_count}; }
+		explicit operator StringView() const { return StringView{m_memory.sliceLeft(m_count)}; }
+		explicit operator Span<const std::byte>() const { return m_memory.sliceLeft(m_count); }
+		explicit operator Span<std::byte>() { return m_memory.sliceLeft(m_count); }
 
 		void push(std::byte b)
 		{
 			ensureSpaceExists(1);
-			m_ptr[m_count++] = b;
+			m_memory[m_count++] = b;
 		}
 
 		void push(StringView v)
@@ -112,9 +111,9 @@ namespace core
 		CORE_EXPORT void clear();
 
 		size_t count() const { return m_count; }
-		size_t capacity() const { return m_capacity; }
-		std::byte* data() { return m_ptr; }
-		const std::byte* data() const { return m_ptr; }
+		size_t capacity() const { return m_memory.count(); }
+		std::byte* data() { return m_memory.data(); }
+		const std::byte* data() const { return m_memory.data(); }
 		Allocator* allocator() const { return m_allocator; }
 	};
 }
