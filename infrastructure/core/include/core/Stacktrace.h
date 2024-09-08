@@ -2,7 +2,10 @@
 
 #include "core/Stream.h"
 #include "core/MemoryStream.h"
+
 #include <cpptrace/cpptrace.hpp>
+
+#include <streambuf>
 
 namespace core
 {
