@@ -38,8 +38,4 @@ TEST_CASE("basic core::FastLeak test")
 	REQUIRE(*ptr == 42);
 	allocator.release(core::Span<std::byte>{(std::byte*)ptr, sizeof(*ptr)});
 	allocator.free(core::Span<std::byte>{(std::byte*)ptr, sizeof(*ptr)});
-
-	*ptr = 23;
-	int* ptr2;
-	*ptr2 = *ptr;
 }
