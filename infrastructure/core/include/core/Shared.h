@@ -89,7 +89,7 @@ namespace core
 		}
 
 		template<typename U>
-		void moveFrom(Shared<U>&& other)
+		void moveFrom(Shared<U>& other)
 		{
 			m_control = other.m_control;
 			m_ptr = other.m_ptr;
@@ -125,16 +125,16 @@ namespace core
 			copyFrom(other);
 		}
 
-		Shared(Shared&& other)
+		Shared(Shared&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
-		Shared(Shared<U>&& other)
+		Shared(Shared<U>&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		Shared& operator=(std::nullptr_t)
@@ -145,19 +145,19 @@ namespace core
 			return *this;
 		}
 
-		Shared& operator=(Shared&& other)
+		Shared& operator=(Shared&& other) noexcept
 		{
 			unref();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
-		Shared& operator=(Shared<U>&& other)
+		Shared& operator=(Shared<U>&& other) noexcept
 		{
 			unref();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 
@@ -278,7 +278,7 @@ namespace core
 		}
 
 		template<typename U>
-		void moveFrom(Weak<U>&& other)
+		void moveFrom(Weak<U>& other)
 		{
 			control = other.control;
 			m_ptr = other.m_ptr;
@@ -320,16 +320,16 @@ namespace core
 			copyFrom(other);
 		}
 
-		Weak(Weak&& other)
+		Weak(Weak&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
-		Weak(Weak<U>&& other)
+		Weak(Weak<U>&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		Weak& operator=(std::nullptr_t)
@@ -356,19 +356,19 @@ namespace core
 			return *this;
 		}
 
-		Weak& operator=(Weak&& other)
+		Weak& operator=(Weak&& other) noexcept
 		{
 			unref();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
-		Weak& operator=(Weak<U>&& other)
+		Weak& operator=(Weak<U>&& other) noexcept
 		{
 			unref();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

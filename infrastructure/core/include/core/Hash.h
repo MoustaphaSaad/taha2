@@ -179,7 +179,7 @@ namespace core
 			}
 		}
 
-		void moveFrom(Set&& other)
+		void moveFrom(Set& other)
 		{
 			m_allocator = other.m_allocator;
 			m_slots = other.m_slots;
@@ -448,9 +448,9 @@ namespace core
 			copyFrom(other);
 		}
 
-		Set(Set&& other)
+		Set(Set&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		Set& operator=(const Set& other)
@@ -460,10 +460,10 @@ namespace core
 			return *this;
 		}
 
-		Set& operator=(Set&& other)
+		Set& operator=(Set&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 
@@ -717,7 +717,7 @@ namespace core
 			}
 		}
 
-		void moveFrom(Map&& other)
+		void moveFrom(Map& other)
 		{
 			m_allocator = other.m_allocator;
 			m_slots = other.m_slots;
@@ -986,9 +986,9 @@ namespace core
 			copyFrom(other);
 		}
 
-		Map(Map&& other)
+		Map(Map&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		Map& operator=(const Map& other)
@@ -998,10 +998,10 @@ namespace core
 			return *this;
 		}
 
-		Map& operator=(Map&& other)
+		Map& operator=(Map&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

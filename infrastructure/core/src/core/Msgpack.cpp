@@ -1114,7 +1114,7 @@ namespace core::msgpack
 		}
 	}
 
-	void Value::moveFrom(Value&& other)
+	void Value::moveFrom(Value& other)
 	{
 		m_kind = other.m_kind;
 		switch (m_kind)

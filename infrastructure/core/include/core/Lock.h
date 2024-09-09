@@ -33,7 +33,7 @@ namespace core
 				m_lockable->unlock();
 		}
 
-		void moveFrom(Lock&& other)
+		void moveFrom(Lock& other)
 		{
 			m_lockable = other.m_lockable;
 			m_locked = other.m_locked;
@@ -44,17 +44,17 @@ namespace core
 	public:
 		Lock(const Lock&) = delete;
 
-		Lock(Lock&& other)
+		Lock(Lock&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		Lock& operator=(const Lock&) = delete;
 
-		Lock& operator==(Lock&& other)
+		Lock& operator=(Lock&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

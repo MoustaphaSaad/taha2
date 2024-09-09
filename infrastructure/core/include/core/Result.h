@@ -79,7 +79,7 @@ namespace core
 			}
 		}
 
-		void moveFrom(Result&& other)
+		void moveFrom(Result& other)
 		{
 			m_state = other.m_state;
 			switch (m_state)
@@ -128,9 +128,9 @@ namespace core
 			copyFrom(value);
 		}
 
-		Result(Result&& value)
+		Result(Result&& value) noexcept
 		{
-			moveFrom(std::move(value));
+			moveFrom(value);
 		}
 
 		Result& operator=(const Result& other)
@@ -140,10 +140,10 @@ namespace core
 			return *this;
 		}
 
-		Result& operator=(Result&& other)
+		Result& operator=(Result&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

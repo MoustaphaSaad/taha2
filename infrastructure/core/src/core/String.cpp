@@ -26,7 +26,7 @@ namespace core
 		m_memory[m_count] = '\0';
 	}
 
-	void String::moveFrom(String&& other)
+	void String::moveFrom(String& other)
 	{
 		m_allocator = other.m_allocator;
 		m_memory = other.m_memory;

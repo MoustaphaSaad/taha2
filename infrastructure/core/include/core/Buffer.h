@@ -25,7 +25,7 @@ namespace core
 
 		CORE_EXPORT void copyFrom(const Buffer& other);
 
-		CORE_EXPORT void moveFrom(Buffer&& other);
+		CORE_EXPORT void moveFrom(Buffer& other);
 
 		void grow(size_t new_capacity);
 
@@ -43,7 +43,7 @@ namespace core
 
 		Buffer(Buffer&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		CORE_EXPORT explicit Buffer(String&& str);
@@ -58,7 +58,7 @@ namespace core
 		Buffer& operator=(Buffer&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

@@ -36,7 +36,7 @@ namespace core
 				::new (&m_memory[i]) T(other.m_memory[i]);
 		}
 
-		void moveFrom(Array&& other)
+		void moveFrom(Array& other)
 		{
 			m_allocator = other.m_allocator;
 			m_memory = other.m_memory;
@@ -86,7 +86,7 @@ namespace core
 
 		Array(const Array& other) { copyFrom(other); }
 
-		Array(Array&& other) { moveFrom(std::move(other)); }
+		Array(Array&& other) noexcept { moveFrom(other); }
 
 		Array& operator=(const Array& other)
 		{
@@ -95,10 +95,10 @@ namespace core
 			return *this;
 		}
 
-		Array& operator=(Array&& other)
+		Array& operator=(Array&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

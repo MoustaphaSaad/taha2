@@ -25,7 +25,7 @@ namespace core
 		}
 
 		template<typename U>
-		void moveFrom(Unique<U>&& other)
+		void moveFrom(Unique<U>& other)
 		{
 			m_allocator = other.allocator();
 			m_ptr = other.leak();
@@ -43,14 +43,14 @@ namespace core
 
 		Unique(const Unique&) = delete;
 
-		Unique(Unique&& other)
+		Unique(Unique&& other) noexcept
 			: m_allocator(other.allocator()),
 			  m_ptr(other.leak())
 		{}
 
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
-		Unique(Unique<U>&& other)
+		Unique(Unique<U>&& other) noexcept
 			: m_allocator(other.allocator()),
 			  m_ptr(other.leak())
 		{}
@@ -64,19 +64,19 @@ namespace core
 
 		Unique& operator=(const Unique&) = delete;
 
-		Unique& operator=(Unique&& other)
+		Unique& operator=(Unique&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 
 		template<typename U>
 		requires std::is_convertible_v<U*, T*>
-		Unique& operator=(Unique<U>&& other)
+		Unique& operator=(Unique<U>&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

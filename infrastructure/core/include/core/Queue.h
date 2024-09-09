@@ -61,7 +61,7 @@ namespace core
 			}
 		}
 
-		void moveFrom(Queue&& other)
+		void moveFrom(Queue& other)
 		{
 			m_allocator = other.m_allocator;
 			m_head = other.m_head;
@@ -83,9 +83,9 @@ namespace core
 			copyFrom(other);
 		}
 
-		Queue(Queue&& other)
+		Queue(Queue&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		Queue& operator=(const Queue& other)
@@ -95,10 +95,10 @@ namespace core
 			return *this;
 		}
 
-		Queue& operator=(Queue&& other)
+		Queue& operator=(Queue&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

@@ -30,7 +30,7 @@ namespace core
 
 		CORE_EXPORT void copyFrom(const String& other);
 
-		CORE_EXPORT void moveFrom(String&& other);
+		CORE_EXPORT void moveFrom(String& other);
 
 		void grow(size_t new_capacity);
 
@@ -48,9 +48,9 @@ namespace core
 			copyFrom(other);
 		}
 
-		String(String&& other)
+		String(String&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		explicit String(Buffer&& buffer);
@@ -62,10 +62,10 @@ namespace core
 			return *this;
 		}
 
-		String& operator=(String&& other)
+		String& operator=(String&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 

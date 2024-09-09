@@ -441,9 +441,9 @@ namespace core::msgpack
 			copyFrom(other);
 		}
 
-		Value (Value&& other)
+		Value (Value&& other) noexcept
 		{
-			moveFrom(std::move(other));
+			moveFrom(other);
 		}
 
 		Value& operator=(const Value& other)
@@ -453,10 +453,10 @@ namespace core::msgpack
 			return *this;
 		}
 
-		Value& operator=(Value&& other)
+		Value& operator=(Value&& other) noexcept
 		{
 			destroy();
-			moveFrom(std::move(other));
+			moveFrom(other);
 			return *this;
 		}
 
@@ -510,7 +510,7 @@ namespace core::msgpack
 	private:
 		CORE_EXPORT void destroy();
 		CORE_EXPORT void copyFrom(const Value& other);
-		CORE_EXPORT void moveFrom(Value&& other);
+		CORE_EXPORT void moveFrom(Value& other);
 
 		KIND m_kind = KIND_NULL;
 		union

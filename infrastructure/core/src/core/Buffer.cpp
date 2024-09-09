@@ -25,7 +25,7 @@ namespace core
 		::memcpy(m_memory.data(), other.m_memory.data(), m_memory.count());
 	}
 
-	void Buffer::moveFrom(core::Buffer&& other)
+	void Buffer::moveFrom(core::Buffer& other)
 	{
 		m_allocator = other.m_allocator;
 		m_memory = other.m_memory;
