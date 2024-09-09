@@ -74,7 +74,7 @@ namespace core
 			other.m_count = 0;
 		}
 	public:
-		Queue(Allocator* allocator)
+		explicit Queue(Allocator* allocator)
 			: m_allocator(allocator)
 		{}
 

@@ -11,8 +11,8 @@ namespace core
 		InitializeCriticalSectionAndSpinCount(&m_mutex->cs, 1 << 14);
 	}
 
-	Mutex::Mutex(Mutex&& other) = default;
-	Mutex& Mutex::operator=(Mutex&& other) = default;
+	Mutex::Mutex(Mutex&& other) noexcept = default;
+	Mutex& Mutex::operator=(Mutex&& other) noexcept = default;
 
 	Mutex::~Mutex()
 	{

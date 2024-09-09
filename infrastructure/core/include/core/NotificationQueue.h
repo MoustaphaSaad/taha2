@@ -24,7 +24,7 @@ namespace core
 		ConditionVariable m_condition;
 		bool m_done = false;
 	public:
-		NotificationQueue(Allocator* allocator)
+		explicit NotificationQueue(Allocator* allocator)
 			: m_queue(allocator),
 			  m_mutex(allocator),
 			  m_condition(allocator)

@@ -13,8 +13,8 @@ namespace core
 		coreAssert(res == 0);
 	}
 
-	Mutex::Mutex(Mutex&& other) = default;
-	Mutex& Mutex::operator=(Mutex&& other) = default;
+	Mutex::Mutex(Mutex&& other) noexcept = default;
+	Mutex& Mutex::operator=(Mutex&& other) noexcept = default;
 
 	Mutex::~Mutex()
 	{
