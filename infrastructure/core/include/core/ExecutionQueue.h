@@ -19,7 +19,7 @@ namespace core
 		Mutex m_mutex;
 		bool m_scheduled = false;
 
-		ExecutionQueue(Allocator* allocator)
+		explicit ExecutionQueue(Allocator* allocator)
 			: m_queue(allocator),
 			  m_mutex(allocator)
 		{}

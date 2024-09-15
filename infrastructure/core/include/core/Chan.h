@@ -616,7 +616,7 @@ namespace core
 		Allocator* m_allocator = nullptr;
 		Func<void()> m_callback;
 	public:
-		DefaultCase(Allocator* allocator)
+		explicit DefaultCase(Allocator* allocator)
 			: m_allocator(allocator)
 		{}
 
@@ -637,7 +637,7 @@ namespace core
 		bool m_isDefault = false;
 	public:
 		template<typename T, ChanDir dir>
-		SelectCaseDesc(ReadCase<T, dir>& c)
+		explicit SelectCaseDesc(ReadCase<T, dir>& c)
 			: m_case(&c)
 		{
 			m_tryEval = +[](void* ptr, SelectCond* cond, size_t index) {
@@ -679,7 +679,7 @@ namespace core
 		}
 
 		template<typename T, ChanDir dir>
-		SelectCaseDesc(WriteCase<T, dir>& c)
+		explicit SelectCaseDesc(WriteCase<T, dir>& c)
 			: m_case(&c)
 		{
 			m_tryEval = +[](void* ptr, SelectCond* cond, size_t index) {
@@ -704,7 +704,7 @@ namespace core
 			};
 		}
 
-		SelectCaseDesc(DefaultCase& c)
+		explicit SelectCaseDesc(DefaultCase& c)
 			: m_case(&c),
 			  m_isDefault(true)
 		{
@@ -742,9 +742,9 @@ namespace core
 	{
 	public:
 		template<typename ... TArgs>
-		Select(TArgs&& ... cases)
+		explicit Select(TArgs&& ... cases)
 		{
-			SelectCaseDesc descs[] = {cases...};
+			SelectCaseDesc descs[] = {SelectCaseDesc{cases}...};
 			auto descsCount = sizeof...(cases);
 			size_t defaultIndex = descsCount;
 			for (size_t i = 0; i < descsCount; ++i)
