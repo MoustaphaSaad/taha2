@@ -24,7 +24,7 @@ namespace core
 
 		void add(int count)
 		{
-			coreAssert(count > 0);
+			validate(count > 0);
 
 			auto lock = lockGuard(m_mutex);
 			m_count += count;
@@ -34,7 +34,7 @@ namespace core
 		{
 			auto lock = lockGuard(m_mutex);
 			m_count--;
-			coreAssert(m_count >= 0);
+			validate(m_count >= 0);
 			if (m_count == 0)
 			{
 				m_condition_variable.notify_all();
@@ -46,7 +46,7 @@ namespace core
 			auto lock = lockGuard(m_mutex);
 			while (m_count > 0)
 				m_condition_variable.wait(m_mutex);
-			coreAssert(m_count == 0);
+			validate(m_count == 0);
 		}
 	};
 }

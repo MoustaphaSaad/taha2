@@ -64,19 +64,19 @@ namespace core
 
 		size_t write(const void* buffer, size_t size) override
 		{
-			coreUnreachable();
+			unreachable();
 			return 0;
 		}
 
 		int64_t seek(int64_t offset, SEEK_MODE whence) override
 		{
-			coreUnreachable();
+			unreachable();
 			return 0;
 		}
 
 		int64_t tell() override
 		{
-			coreUnreachable();
+			unreachable();
 			return 0;
 		}
 	};

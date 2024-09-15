@@ -149,31 +149,31 @@ namespace core
 
 		T& back()
 		{
-			coreAssert(m_tail);
+			validate(m_tail);
 			return m_tail->value;
 		}
 
 		const T& back() const
 		{
-			coreAssert(m_tail);
+			validate(m_tail);
 			return m_tail->value;
 		}
 
 		T& front()
 		{
-			coreAssert(m_head);
+			validate(m_head);
 			return m_head->value;
 		}
 
 		const T& front() const
 		{
-			coreAssert(m_head);
+			validate(m_head);
 			return m_head->value;
 		}
 
 		void pop_back()
 		{
-			coreAssert(m_tail);
+			validate(m_tail);
 			auto node = m_tail;
 			m_tail = m_tail->prev;
 			if (m_tail)
@@ -188,7 +188,7 @@ namespace core
 
 		void pop_front()
 		{
-			coreAssert(m_head);
+			validate(m_head);
 			auto node = m_head;
 			m_head = m_head->next;
 			if (m_head)

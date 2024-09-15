@@ -123,7 +123,7 @@ namespace core
 		}
 		else
 		{
-			coreUnreachable();
+			unreachable();
 		}
 	}
 

@@ -17,7 +17,7 @@ namespace core
 			if (m_handle != INVALID_HANDLE_VALUE && m_closeHandle)
 			{
 				[[maybe_unused]] auto res = CloseHandle(m_handle);
-				coreAssert(SUCCEEDED(res));
+				validate(SUCCEEDED(res));
 				m_handle = INVALID_HANDLE_VALUE;
 			}
 		}
@@ -36,7 +36,7 @@ namespace core
 		{
 			DWORD dwNumberOfBytesRead = 0;
 			auto res = ReadFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesRead, nullptr);
-			coreAssert(SUCCEEDED(res));
+			validate(SUCCEEDED(res));
 			return dwNumberOfBytesRead;
 		}
 
@@ -63,14 +63,14 @@ namespace core
 					--nNumberOfCharsToWrite;
 				nNumberOfCharsToWrite /= sizeof(TCHAR);
 				auto res = WriteConsole(m_handle, osStr.data(), nNumberOfCharsToWrite, &nNumberOfCharsWritten, nullptr);
-				coreAssert(SUCCEEDED(res));
+				validate(SUCCEEDED(res));
 				return nNumberOfCharsWritten * sizeof(TCHAR);
 			}
 			else
 			{
 				DWORD dwNumberOfBytesWritten = 0;
 				auto res = WriteFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesWritten, nullptr);
-				coreAssert(SUCCEEDED(res));
+				validate(SUCCEEDED(res));
 				return dwNumberOfBytesWritten;
 			}
 		}
@@ -97,7 +97,7 @@ namespace core
 			liDistanceToMove.QuadPart = offset;
 			LARGE_INTEGER liNewFilePointer{};
 			auto res = SetFilePointerEx(m_handle, liDistanceToMove, &liNewFilePointer, dwMoveMethod);
-			coreAssert(SUCCEEDED(res));
+			validate(SUCCEEDED(res));
 			return liNewFilePointer.QuadPart;
 		}
 
@@ -107,7 +107,7 @@ namespace core
 			liDistanceToMove.QuadPart = 0;
 			LARGE_INTEGER liNewFilePointer{};
 			auto res = SetFilePointerEx(m_handle, liDistanceToMove, &liNewFilePointer, FILE_CURRENT);
-			coreAssert(SUCCEEDED(res));
+			validate(SUCCEEDED(res));
 			return liNewFilePointer.QuadPart;
 		}
 	};

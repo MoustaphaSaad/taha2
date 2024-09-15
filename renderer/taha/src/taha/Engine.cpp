@@ -32,14 +32,14 @@ namespace taha
 				break;
 			}
 			default:
-				coreUnreachable();
+				core::unreachable();
 				break;
 			}
 		#elif TAHA_OS_LINUX
 			switch (api)
 			{
 			case API_DX11:
-				coreUnreachableMsg("DirectX11 is not supported on linux platform");
+				core::unreachableMsg("DirectX11 is not supported on linux platform");
 				break;
 			case API_VULKAN:
 			{
@@ -50,7 +50,7 @@ namespace taha
 				break;
 			}
 			default:
-				coreUnreachable();
+				core::unreachable();
 				break;
 			}
 		#endif

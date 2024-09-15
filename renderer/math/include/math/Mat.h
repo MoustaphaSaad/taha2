@@ -27,13 +27,13 @@ namespace math
 
 		constexpr Vec4<T, W>& TAHA_XCALL operator[](size_t index)
 		{
-			coreAssert(index < 4);
+			core::validate(index < 4);
 			return columns[index];
 		}
 
 		constexpr const Vec4<T, W>& TAHA_XCALL operator[](size_t index) const
 		{
-			coreAssert(index < 4);
+			core::validate(index < 4);
 			return columns[index];
 		}
 	};
@@ -252,7 +252,7 @@ namespace math
 	constexpr Mat4<T, W, V> TAHA_XCALL inverse(const Mat4<T, V, W>& a)
 	{
 		auto det = determinant(a);
-		coreAssert(det != 0);
+		core::validate(det != 0);
 
 		Mat4<T, W, V> res;
 		// 1st col

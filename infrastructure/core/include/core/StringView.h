@@ -88,8 +88,7 @@ namespace core
 		StringView(const char* begin, size_t count): m_begin(begin), m_count(count) {}
 
 		StringView(const char* begin, const char* end): m_begin(begin), m_count(end - begin)
-		{
-			coreAssert(begin <= end);
+		{ validate(begin <= end);
 		}
 
 		StringView(const Span<const std::byte>& span): m_begin((const char*)span.data()), m_count(span.count()) {}
@@ -106,7 +105,7 @@ namespace core
 
 		const char& operator[](size_t i) const
 		{
-			coreAssert(i < m_count);
+			validate(i < m_count);
 			return m_begin[i];
 		}
 
@@ -140,7 +139,7 @@ namespace core
 		StringRunes runes() const { return StringRunes{m_begin, m_begin + m_count}; }
 		StringView slice(size_t start, size_t end) const
 		{
-			coreAssert(start <= end && end - start <= m_count);
+			validate(start <= end && end - start <= m_count);
 			return StringView{m_begin + start, end - start};
 		}
 

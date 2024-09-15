@@ -47,7 +47,7 @@ namespace core
 		bool signalFuncExecutionFinishedAndTryPop(Func<void()>& func)
 		{
 			auto lock = lockGuard(m_mutex);
-			coreAssert(m_scheduled == true);
+			validate(m_scheduled == true);
 			if (m_queue.count() > 0)
 			{
 				func = std::move(m_queue.front());

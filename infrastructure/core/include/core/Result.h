@@ -54,7 +54,7 @@ namespace core
 				((E*)m_storage)->~E();
 				break;
 			default:
-				coreUnreachable();
+				unreachable();
 				break;
 			}
 			m_state = STATE_EMPTY;
@@ -74,7 +74,7 @@ namespace core
 				::new (m_storage) E(*(E*)other.m_storage);
 				break;
 			default:
-				coreUnreachable();
+				unreachable();
 				break;
 			}
 		}
@@ -93,7 +93,7 @@ namespace core
 				::new (m_storage) E(std::move(*(E*)other.m_storage));
 				break;
 			default:
-				coreUnreachable();
+				unreachable();
 				break;
 			}
 			other.m_state = STATE_EMPTY;
@@ -158,35 +158,35 @@ namespace core
 
 		T& value()
 		{
-			coreAssert(m_state == STATE_VALUE);
+			validate(m_state == STATE_VALUE);
 			return *reinterpret_cast<T*>(m_storage);
 		}
 		const T& value() const
 		{
-			coreAssert(m_state == STATE_VALUE);
+			validate(m_state == STATE_VALUE);
 			return *reinterpret_cast<T*>(m_storage);
 		}
 
 		E& error()
 		{
-			coreAssert(m_state == STATE_ERROR);
+			validate(m_state == STATE_ERROR);
 			return *reinterpret_cast<E*>(m_storage);
 		}
 		const E& error() const
 		{
-			coreAssert(m_state == STATE_ERROR);
+			validate(m_state == STATE_ERROR);
 			return *reinterpret_cast<E*>(m_storage);
 		}
 
 		T releaseValue()
 		{
-			coreAssert(m_state == STATE_VALUE);
+			validate(m_state == STATE_VALUE);
 			m_state = STATE_EMPTY;
 			return std::move(*reinterpret_cast<T*>(m_storage));
 		}
 		E releaseError()
 		{
-			coreAssert(m_state == STATE_ERROR);
+			validate(m_state == STATE_ERROR);
 			m_state = STATE_EMPTY;
 			return std::move(*reinterpret_cast<E*>(m_storage));
 		}

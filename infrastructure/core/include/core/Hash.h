@@ -173,7 +173,7 @@ namespace core
 				case HASH_FLAGS::HASH_USED:
 				case HASH_FLAGS::HASH_DELETED:
 				default:
-					coreUnreachable();
+					unreachable();
 					break;
 				}
 			}
@@ -259,7 +259,7 @@ namespace core
 					break;
 				}
 				default:
-					coreUnreachable();
+					unreachable();
 					return {};
 				}
 
@@ -364,7 +364,7 @@ namespace core
 					case HASH_FLAGS::HASH_USED:
 					case HASH_FLAGS::HASH_DELETED:
 					default:
-						coreUnreachable();
+						unreachable();
 						break;
 					}
 				}
@@ -505,7 +505,7 @@ namespace core
 			}
 			default:
 			{
-				coreUnreachable();
+				unreachable();
 				return;
 			}
 			}
@@ -711,7 +711,7 @@ namespace core
 				case HASH_FLAGS::HASH_USED:
 				case HASH_FLAGS::HASH_DELETED:
 				default:
-					coreUnreachable();
+					unreachable();
 					break;
 				}
 			}
@@ -797,7 +797,7 @@ namespace core
 					break;
 				}
 				default:
-					coreUnreachable();
+					unreachable();
 					return {};
 				}
 
@@ -902,7 +902,7 @@ namespace core
 					case HASH_FLAGS::HASH_USED:
 					case HASH_FLAGS::HASH_DELETED:
 					default:
-						coreUnreachable();
+						unreachable();
 						break;
 					}
 				}
@@ -1043,7 +1043,7 @@ namespace core
 			}
 			default:
 			{
-				coreUnreachable();
+				unreachable();
 				return;
 			}
 			}

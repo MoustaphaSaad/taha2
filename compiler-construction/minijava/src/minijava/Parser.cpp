@@ -229,7 +229,7 @@ namespace minijava
 			}
 			else
 			{
-				coreUnreachable();
+				core::unreachable();
 			}
 		}
 

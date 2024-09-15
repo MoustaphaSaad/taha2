@@ -13,8 +13,8 @@ namespace core
 		{
 			WSADATA wsaData;
 			auto err = WSAStartup(MAKEWORD(2, 2), &wsaData);
-			coreAssert(err == 0);
-			coreAssert(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
+			validate(err == 0);
+			validate(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
 		}
 
 		~WinOSSocketInitializer()
@@ -45,7 +45,7 @@ namespace core
 			if (m_handle != INVALID_SOCKET)
 			{
 				[[maybe_unused]] auto res = ::closesocket(m_handle);
-				coreAssert(res == 0);
+				validate(res == 0);
 			}
 		}
 
@@ -172,7 +172,7 @@ namespace core
 			case AF_INET: return FAMILY_IPV4;
 			case AF_INET6: return FAMILY_IPV6;
 			default:
-				coreUnreachable();
+				unreachable();
 				return FAMILY(0);
 			}
 		}
@@ -184,7 +184,7 @@ namespace core
 			case SOCK_STREAM: return TYPE_TCP;
 			case SOCK_DGRAM: return TYPE_UDP;
 			default:
-				coreUnreachable();
+				unreachable();
 				return TYPE(0);
 			}
 		}
@@ -205,7 +205,7 @@ namespace core
 			auto res = strtoul(portName, &endPtr, 10);
 			if (errno == ERANGE || endPtr != portName + strlen(portName))
 				return 0;
-			coreAssert(res <= UINT16_MAX);
+			validate(res <= UINT16_MAX);
 			return uint16_t(res);
 		}
 
@@ -253,7 +253,7 @@ namespace core
 			osFamily = AF_INET6;
 			break;
 		default:
-			coreUnreachable();
+			unreachable();
 			break;
 		}
 
@@ -270,7 +270,7 @@ namespace core
 			osProtocol = IPPROTO_UDP;
 			break;
 		default:
-			coreUnreachable();
+			unreachable();
 			break;
 		}
 

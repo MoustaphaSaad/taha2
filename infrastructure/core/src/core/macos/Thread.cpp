@@ -34,16 +34,16 @@ namespace core
 
 		pthread_attr_t attr{};
 		[[maybe_unused]] auto res = pthread_attr_init(&attr);
-		coreAssert(res == 0);
+		validate(res == 0);
 		if (stackSize != 0)
 		{
 			res = pthread_attr_setstacksize(&attr, stackSize);
-			coreAssert(res == 0);
+			validate(res == 0);
 		}
 
 		m_thread = unique_from<IThread>(allocator);
 		res = pthread_create(&m_thread->handle, &attr, thread_start, threadFuncData.leak());
-		coreAssert(res == 0);
+		validate(res == 0);
 	}
 
 	Thread::Thread(Thread&& other) = default;
@@ -53,7 +53,7 @@ namespace core
 	void Thread::join()
 	{
 		[[maybe_unused]] auto res = pthread_join(m_thread->handle, nullptr);
-		coreAssert(res == 0);
+		validate(res == 0);
 	}
 
 	void Thread::detach()
@@ -61,7 +61,7 @@ namespace core
 		if (m_thread->detached == false)
 		{
 			[[maybe_unused]] auto res = pthread_detach(m_thread->handle);
-			coreAssert(res == 0);
+			validate(res == 0);
 		}
 		m_thread->detached = true;
 	}

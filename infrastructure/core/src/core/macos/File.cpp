@@ -17,7 +17,7 @@ namespace core
 			if (m_handle != -1 && m_closeHandle)
 			{
 				[[maybe_unused]] auto res = ::close(m_handle);
-				coreAssert(res == 0);
+				validate(res == 0);
 				m_handle = -1;
 			}
 		}

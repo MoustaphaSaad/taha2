@@ -154,8 +154,8 @@ namespace taha
 	{
 		// write rendering algorithm here
 		// for now we get the clear command at the beginning and clear the frame
-		coreAssert(commands.count() > 0);
-		coreAssert(commands[0]->kind() == Command::KIND_CLEAR);
+		core::validate(commands.count() > 0);
+		core::validate(commands[0]->kind() == Command::KIND_CLEAR);
 		auto clear = dynamic_cast<ClearCommand*>(commands[0].get());
 
 		auto dx11Frame = dynamic_cast<DX11Frame*>(frame);

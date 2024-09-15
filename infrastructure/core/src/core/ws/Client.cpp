@@ -135,7 +135,7 @@ namespace core::ws
 	{
 		if (Frame::isControlOpcode(opcode))
 		{
-			coreAssertMsg(payload.sizeInBytes() <= 125, "control frames are limited to 125 bytes");
+			validateMsg(payload.sizeInBytes() <= 125, "control frames are limited to 125 bytes");
 			// limit it to 125 bytes
 			if (payload.sizeInBytes() > 125)
 				payload = payload.sliceLeft(125);
@@ -302,7 +302,7 @@ namespace core::ws
 		case Message::KIND_BINARY:
 			return {};
 		default:
-			coreUnreachable();
+			unreachable();
 			return errf(m_allocator, "unknown message kind"_sv);
 		}
 	}

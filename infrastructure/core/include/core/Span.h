@@ -34,13 +34,13 @@ namespace core
 
 		T& operator[](size_t index)
 		{
-			coreAssert(index < m_count);
+			validate(index < m_count);
 			return m_ptr[index];
 		}
 
 		const T& operator[](size_t index) const
 		{
-			coreAssert(index < m_count);
+			validate(index < m_count);
 			return m_ptr[index];
 		}
 
@@ -54,7 +54,7 @@ namespace core
 
 		Span<T> slice(size_t start, size_t end) const
 		{
-			coreAssert(start <= end && end - start <= m_count);
+			validate(start <= end && end - start <= m_count);
 			return Span<T>(m_ptr + start, end - start);
 		}
 

@@ -77,7 +77,7 @@ namespace core
 			}
 
 			m_waitCond.wait(m_mutex);
-			coreAssert(m_event.isSignaled());
+			assert(m_event.isSignaled());
 			auto res = m_event;
 			m_event = Event{};
 			// close if we get real event
@@ -200,7 +200,7 @@ namespace core
 				if (m_closed.load())
 					return ChanErr::Closed;
 
-				coreAssert(m_buffer.count() < m_bufferSize);
+				assert(m_buffer.count() < m_bufferSize);
 				if constexpr (std::is_move_constructible_v<T>)
 					m_buffer.push_back(std::move(*ptr));
 				else
@@ -254,7 +254,7 @@ namespace core
 					m_readWaiting.fetch_sub(1);
 				}
 
-				coreAssert(m_buffer.count() > 0);
+				assert(m_buffer.count() > 0);
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
 					res = std::move(m_buffer.front());
@@ -328,7 +328,7 @@ namespace core
 					return ChanErr::Empty;
 				}
 
-				coreAssert(m_buffer.count() < m_bufferSize);
+				assert(m_buffer.count() < m_bufferSize);
 				if constexpr (std::is_move_constructible_v<T>)
 					m_buffer.push_back(std::move(*ptr));
 				else
@@ -385,7 +385,7 @@ namespace core
 					return ChanErr::Empty;
 				}
 
-				coreAssert(m_buffer.count() > 0);
+				assert(m_buffer.count() > 0);
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
 					res = std::move(m_buffer.front());
@@ -489,7 +489,7 @@ namespace core
 
 		ChanErr send(T* value)
 		{
-			coreAssert(value != nullptr);
+			assert(value != nullptr);
 			return internalSend(value);
 		}
 
@@ -500,7 +500,7 @@ namespace core
 
 		ChanErr trySend(T* value)
 		{
-			coreAssert(value != nullptr);
+			assert(value != nullptr);
 			return internalTrySend(&value, nullptr, 0);
 		}
 
@@ -752,7 +752,7 @@ namespace core
 				if (descs[i].isDefault())
 				{
 					// TODO: replace it with a panic
-					coreAssert(defaultIndex == descsCount);
+					assert(defaultIndex == descsCount);
 					defaultIndex = i;
 				}
 			}
@@ -791,7 +791,7 @@ namespace core
 				while (aliveDescsCount > 0)
 				{
 					auto event = cond.waitForEventAndClose();
-					coreAssert(event.isSignaled());
+					assert(event.isSignaled());
 					if (event.closed)
 					{
 						descs[event.index].removeCond(&cond);

@@ -120,7 +120,7 @@ namespace core
 		ensureSpaceExists(m_count + 5);
 
 		auto width = Rune::encode(r, m_memory.data() + m_count);
-		coreAssert(width > 0 && width <= 4);
+		validate(width > 0 && width <= 4);
 		m_count += width;
 		m_memory[m_count] = '\0';
 	}

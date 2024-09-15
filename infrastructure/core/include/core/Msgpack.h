@@ -67,7 +67,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			coreUnreachable();
+			unreachable();
 			return errf(writer.allocator(), "array is too long"_sv);
 		}
 
@@ -98,7 +98,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			coreUnreachable();
+			unreachable();
 			return errf(writer.allocator(), "array is too long"_sv);
 		}
 
@@ -129,7 +129,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			coreUnreachable();
+			unreachable();
 			return errf(writer.allocator(), "map is too long"_sv);
 		}
 
@@ -339,7 +339,7 @@ namespace core::msgpack
 		}
 		else
 		{
-			coreUnreachable();
+			unreachable();
 			return errf(writer.allocator(), "map is too long"_sv);
 		}
 
@@ -484,23 +484,36 @@ namespace core::msgpack
 		}
 
 		KIND kind() const { return m_kind; }
-		bool as_bool() const { coreAssert(m_kind == KIND_BOOL); return m_bool; }
-		int64_t as_int() const { coreAssert(m_kind == KIND_INT); return m_int; }
-		uint64_t as_uint() const { coreAssert(m_kind == KIND_UINT); return m_uint; }
-		float as_float() const { coreAssert(m_kind == KIND_FLOAT); return m_float; }
-		double as_double() const { coreAssert(m_kind == KIND_DOUBLE); return m_double; }
+		bool as_bool() const {
+			validate(m_kind == KIND_BOOL); return m_bool; }
+		int64_t as_int() const {
+			validate(m_kind == KIND_INT); return m_int; }
+		uint64_t as_uint() const {
+			validate(m_kind == KIND_UINT); return m_uint; }
+		float as_float() const {
+			validate(m_kind == KIND_FLOAT); return m_float; }
+		double as_double() const {
+			validate(m_kind == KIND_DOUBLE); return m_double; }
 
-		String& as_string() { coreAssert(m_kind == KIND_STRING); return *m_string; }
-		const String& as_string() const { coreAssert(m_kind == KIND_STRING); return *m_string; }
+		String& as_string() {
+			validate(m_kind == KIND_STRING); return *m_string; }
+		const String& as_string() const {
+			validate(m_kind == KIND_STRING); return *m_string; }
 
-		Buffer& as_bytes() { coreAssert(m_kind == KIND_BYTES); return *m_bytes; }
-		const Buffer& as_bytes() const { coreAssert(m_kind == KIND_BYTES); return *m_bytes; }
+		Buffer& as_bytes() {
+			validate(m_kind == KIND_BYTES); return *m_bytes; }
+		const Buffer& as_bytes() const {
+			validate(m_kind == KIND_BYTES); return *m_bytes; }
 
-		Array<Value>& as_array() { coreAssert(m_kind == KIND_ARRAY); return *m_array; }
-		const Array<Value>& as_array() const { coreAssert(m_kind == KIND_ARRAY); return *m_array; }
+		Array<Value>& as_array() {
+			validate(m_kind == KIND_ARRAY); return *m_array; }
+		const Array<Value>& as_array() const {
+			validate(m_kind == KIND_ARRAY); return *m_array; }
 
-		Map<String, Value>& as_map() { coreAssert(m_kind == KIND_MAP); return *m_map; }
-		const Map<String, Value>& as_map() const { coreAssert(m_kind == KIND_MAP); return *m_map; }
+		Map<String, Value>& as_map() {
+			validate(m_kind == KIND_MAP); return *m_map; }
+		const Map<String, Value>& as_map() const {
+			validate(m_kind == KIND_MAP); return *m_map; }
 
 		CORE_EXPORT String release_string();
 		CORE_EXPORT Buffer release_bytes();

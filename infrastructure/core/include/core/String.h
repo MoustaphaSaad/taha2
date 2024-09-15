@@ -82,13 +82,13 @@ namespace core
 
 		char& operator[](size_t i)
 		{
-			coreAssert(i < m_count);
+			validate(i < m_count);
 			return m_memory[i];
 		}
 
 		const char& operator[](size_t i) const
 		{
-			coreAssert(i < m_count);
+			validate(i < m_count);
 			return m_memory[i];
 		}
 

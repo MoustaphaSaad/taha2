@@ -36,7 +36,7 @@ namespace core
 
 	StringView::RabinKarpState StringView::hashRabinKarpReverse(StringView str)
 	{
-		coreAssert(str.m_count > 0);
+		validate(str.m_count > 0);
 
 		RabinKarpState res{0, 1};
 
@@ -185,7 +185,7 @@ namespace core
 
 	size_t StringView::find(Rune target, size_t start) const
 	{
-		coreAssert(start < m_count);
+		validate(start < m_count);
 		for (auto it = m_begin + start; it < m_begin + m_count; it = Rune::next(it))
 		{
 			auto c = Rune::decode(it);

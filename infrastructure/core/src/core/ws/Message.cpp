@@ -152,7 +152,7 @@ namespace core::ws
 					message.kind = Message::KIND_PONG;
 					break;
 				default:
-					coreUnreachable();
+					unreachable();
 					return errf(allocator, "invalid opcode"_sv);
 				}
 
@@ -177,7 +177,7 @@ namespace core::ws
 						m_fragmentedMessage.kind = Message::KIND_BINARY;
 						break;
 					default:
-						coreUnreachable();
+						unreachable();
 						return errf(allocator, "invalid opcode"_sv);
 					}
 				}
