@@ -220,6 +220,31 @@ namespace core
 			m_memory = new_memory;
 		}
 
+		template<typename TFunc>
+		void removeIf(TFunc&& func)
+		{
+			auto beginIt = begin();
+			auto endIt = end();
+			auto frontIt = beginIt;
+
+			for (auto it = beginIt; it != endIt; ++it)
+			{
+				if (func(*it) == false)
+				{
+					*frontIt = *it;
+					++frontIt;
+				}
+			}
+
+			auto removedCount = endIt - frontIt;
+			m_count -= removedCount;
+
+			for (auto it = frontIt; it != endIt; ++it)
+				it->~T();
+
+			m_allocator->releaseT(m_memory.slice(m_count, m_count + removedCount));
+		}
+
 		T* data() { return m_memory.data(); }
 		const T* data() const { return m_memory.data(); }
 

@@ -27,3 +27,21 @@ TEST_CASE("basic core::Array test")
 	numbers.reserve(100);
 	REQUIRE(numbers.capacity() >= 100);
 }
+
+TEST_CASE("test core::Array::removeIf")
+{
+	core::Mallocator allocator;
+	core::Array<int> numbers{&allocator};
+
+	for (int i = 0; i < 10; ++i)
+		numbers.push(i);
+	REQUIRE(numbers.count() == 10);
+
+	numbers.removeIf([](auto n) { return n % 2 == 0; });
+	REQUIRE(numbers.count() == 5);
+	REQUIRE(numbers[0] == 1);
+	REQUIRE(numbers[1] == 3);
+	REQUIRE(numbers[2] == 5);
+	REQUIRE(numbers[3] == 7);
+	REQUIRE(numbers[4] == 9);
+}
