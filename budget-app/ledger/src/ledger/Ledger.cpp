@@ -45,6 +45,19 @@ namespace ledger
 			s.stmt = res.releaseValue();
 		}
 
+		auto versionResult = ledger.queryVersion();
+		if (versionResult.isError()) return versionResult.releaseError();
+		auto version = versionResult.releaseValue();
+
+		if (version.appID == 0 && version.userVersion == 0)
+		{
+			// db file is newly created, initialize it
+		}
+		else if (version.appID == VERSION.appID)
+		{
+			// db file is initialized, check the version here and open it
+		}
+
 		return ledger;
 	}
 

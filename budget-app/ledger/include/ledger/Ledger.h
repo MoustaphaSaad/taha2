@@ -57,7 +57,19 @@ namespace ledger
 		{
 			int32_t appID;
 			int32_t userVersion;
+
+			bool operator==(Version v) const
+			{
+				return (
+					appID == v.appID &&
+					userVersion == v.userVersion
+				);
+			}
+
+			bool operator!=(Version v) const { return !operator==(v); }
 		};
+
+		constexpr static Version VERSION {.appID = 0x4C444752, .userVersion = 1};
 
 		LEDGER_EXPORT static core::Result<Ledger> open(core::StringView path, core::Allocator* allocator);
 
