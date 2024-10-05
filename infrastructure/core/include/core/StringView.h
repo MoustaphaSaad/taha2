@@ -118,7 +118,7 @@ namespace core
 			: m_begin(begin),
 			  m_count(end - begin)
 		{
-			validate(begin <= end);
+			assertTrue(begin <= end);
 		}
 
 		StringView(const Span<const std::byte>& span)
@@ -153,7 +153,7 @@ namespace core
 
 		const char& operator[](size_t i) const
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_begin[i];
 		}
 
@@ -225,7 +225,7 @@ namespace core
 		}
 		StringView slice(size_t start, size_t end) const
 		{
-			validate(start <= end && end - start <= m_count);
+			assertTrue(start <= end && end - start <= m_count);
 			return StringView{m_begin + start, end - start};
 		}
 

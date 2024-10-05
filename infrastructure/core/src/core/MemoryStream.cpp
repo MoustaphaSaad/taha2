@@ -5,8 +5,8 @@ namespace core
 {
 	size_t MemoryStream::read(void* buffer, size_t size)
 	{
-		validate(m_cursor >= 0);
-		validate((size_t)m_cursor <= m_buffer.count());
+		assertTrue(m_cursor >= 0);
+		assertTrue((size_t)m_cursor <= m_buffer.count());
 		auto remaining_size = m_buffer.count() - m_cursor;
 		auto read_size = size < remaining_size ? size : remaining_size;
 		::memcpy(buffer, m_buffer.data() + m_cursor, read_size);
@@ -16,7 +16,7 @@ namespace core
 
 	size_t MemoryStream::write(const void* buffer, size_t size)
 	{
-		validate(m_cursor >= 0);
+		assertTrue(m_cursor >= 0);
 		m_buffer.resize(m_cursor + size);
 		memcpy(m_buffer.data() + m_cursor, buffer, size);
 		m_cursor += (int64_t)size;

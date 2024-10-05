@@ -701,7 +701,7 @@ namespace core
 
 	StringView UrlQuery::get(KeyConstIterator it) const
 	{
-		validate(it != m_keyToIndex.end());
+		assertTrue(it != m_keyToIndex.end());
 		return m_keyValues[it->value].value;
 	}
 

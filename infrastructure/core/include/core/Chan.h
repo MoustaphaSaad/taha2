@@ -90,7 +90,7 @@ namespace core
 			}
 
 			m_waitCond.wait(m_mutex);
-			assert(m_event.isSignaled());
+			assertTrue(m_event.isSignaled());
 			auto res = m_event;
 			m_event = Event{};
 			// close if we get real event
@@ -222,7 +222,7 @@ namespace core
 					return ChanErr::Closed;
 				}
 
-				assert(m_buffer.count() < m_bufferSize);
+				assertTrue(m_buffer.count() < m_bufferSize);
 				if constexpr (std::is_move_constructible_v<T>)
 				{
 					m_buffer.push_back(std::move(*ptr));
@@ -284,7 +284,7 @@ namespace core
 					m_readWaiting.fetch_sub(1);
 				}
 
-				assert(m_buffer.count() > 0);
+				assertTrue(m_buffer.count() > 0);
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
 				{
@@ -372,7 +372,7 @@ namespace core
 					return ChanErr::Empty;
 				}
 
-				assert(m_buffer.count() < m_bufferSize);
+				assertTrue(m_buffer.count() < m_bufferSize);
 				if constexpr (std::is_move_constructible_v<T>)
 				{
 					m_buffer.push_back(std::move(*ptr));
@@ -433,7 +433,7 @@ namespace core
 					return ChanErr::Empty;
 				}
 
-				assert(m_buffer.count() > 0);
+				assertTrue(m_buffer.count() > 0);
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
 				{
@@ -562,7 +562,7 @@ namespace core
 
 		ChanErr send(T* value)
 		{
-			assert(value != nullptr);
+			assertTrue(value != nullptr);
 			return internalSend(value);
 		}
 
@@ -573,7 +573,7 @@ namespace core
 
 		ChanErr trySend(T* value)
 		{
-			assert(value != nullptr);
+			assertTrue(value != nullptr);
 			return internalTrySend(&value, nullptr, 0);
 		}
 
@@ -853,7 +853,7 @@ namespace core
 				if (descs[i].isDefault())
 				{
 					// TODO: replace it with a panic
-					assert(defaultIndex == descsCount);
+					assertTrue(defaultIndex == descsCount);
 					defaultIndex = i;
 				}
 			}
@@ -891,7 +891,7 @@ namespace core
 				while (aliveDescsCount > 0)
 				{
 					auto event = cond.waitForEventAndClose();
-					assert(event.isSignaled());
+					assertTrue(event.isSignaled());
 					if (event.closed)
 					{
 						descs[event.index].removeCond(&cond);

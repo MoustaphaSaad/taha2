@@ -1317,7 +1317,7 @@ namespace core::msgpack
 
 	String Value::release_string()
 	{
-		validate(m_kind == KIND_STRING);
+		assertTrue(m_kind == KIND_STRING);
 		auto allocator = m_string->allocator();
 		auto res = std::move(*m_string);
 		allocator->releaseSingleT(m_string);
@@ -1327,7 +1327,7 @@ namespace core::msgpack
 
 	Buffer Value::release_bytes()
 	{
-		validate(m_kind == KIND_BYTES);
+		assertTrue(m_kind == KIND_BYTES);
 		auto allocator = m_bytes->allocator();
 		auto res = std::move(*m_bytes);
 		allocator->releaseSingleT(m_bytes);
@@ -1337,7 +1337,7 @@ namespace core::msgpack
 
 	Array<Value> Value::release_array()
 	{
-		validate(m_kind == KIND_ARRAY);
+		assertTrue(m_kind == KIND_ARRAY);
 		auto allocator = m_array->allocator();
 		auto res = std::move(*m_array);
 		allocator->releaseSingleT(m_array);
@@ -1347,7 +1347,7 @@ namespace core::msgpack
 
 	Map<String, Value> Value::release_map()
 	{
-		validate(m_kind == KIND_MAP);
+		assertTrue(m_kind == KIND_MAP);
 		auto allocator = m_map->allocator();
 		auto res = std::move(*m_map);
 		allocator->releaseSingleT(m_map);

@@ -13,8 +13,8 @@ namespace core
 		{
 			WSADATA wsaData;
 			auto err = WSAStartup(MAKEWORD(2, 2), &wsaData);
-			validate(err == 0);
-			validate(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
+			assert(err == 0);
+			assert(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
 		}
 
 		~WinOSSocketInitializer()
@@ -46,7 +46,7 @@ namespace core
 			if (m_handle != INVALID_SOCKET)
 			{
 				[[maybe_unused]] auto res = ::closesocket(m_handle);
-				validate(res == 0);
+				assert(res == 0);
 			}
 		}
 
@@ -231,7 +231,7 @@ namespace core
 			{
 				return 0;
 			}
-			validate(res <= UINT16_MAX);
+			assert(res <= UINT16_MAX);
 			return uint16_t(res);
 		}
 

@@ -15,7 +15,7 @@ namespace core
 
 		b64 = BIO_push(b64, mem);
 		auto res = BIO_write(b64, bytes.data(), int(bytes.count()));
-		validate(res == bytes.count());
+		assertTrue(res == bytes.count());
 		BIO_flush(b64);
 
 		char* encodedString = nullptr;

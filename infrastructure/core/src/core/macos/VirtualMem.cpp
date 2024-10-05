@@ -17,13 +17,13 @@ namespace core
 	void VirtualMem::commit(Span<std::byte> bytes)
 	{
 		[[maybe_unused]] auto res = mprotect(bytes.data(), bytes.sizeInBytes(), PROT_READ | PROT_WRITE);
-		validate(res == 0);
+		assert(res == 0);
 	}
 
 	void VirtualMem::release(Span<std::byte> bytes)
 	{
 		[[maybe_unused]] auto res = mprotect(bytes.data(), bytes.sizeInBytes(), PROT_NONE);
-		validate(res == 0);
+		assert(res == 0);
 	}
 
 	void VirtualMem::free(Span<std::byte> bytes)

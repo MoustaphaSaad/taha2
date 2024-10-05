@@ -27,7 +27,7 @@ void handleClient(core::Socket* socket)
 		}
 
 		auto writeSize = socket->write(line, readSize);
-		assert(writeSize == readSize);
+		core::assertTrue(writeSize == readSize);
 	}
 }
 

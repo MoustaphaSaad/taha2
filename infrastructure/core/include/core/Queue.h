@@ -150,31 +150,31 @@ namespace core
 
 		T& back()
 		{
-			validate(m_tail);
+			assertTrue(m_tail);
 			return m_tail->value;
 		}
 
 		const T& back() const
 		{
-			validate(m_tail);
+			assertTrue(m_tail);
 			return m_tail->value;
 		}
 
 		T& front()
 		{
-			validate(m_head);
+			assertTrue(m_head);
 			return m_head->value;
 		}
 
 		const T& front() const
 		{
-			validate(m_head);
+			assertTrue(m_head);
 			return m_head->value;
 		}
 
 		void pop_back()
 		{
-			validate(m_tail);
+			assertTrue(m_tail);
 			auto node = m_tail;
 			m_tail = m_tail->prev;
 			if (m_tail)
@@ -193,7 +193,7 @@ namespace core
 
 		void pop_front()
 		{
-			validate(m_head);
+			assertTrue(m_head);
 			auto node = m_head;
 			m_head = m_head->next;
 			if (m_head)

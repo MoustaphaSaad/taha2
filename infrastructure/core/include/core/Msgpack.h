@@ -709,71 +709,71 @@ namespace core::msgpack
 		}
 		bool as_bool() const
 		{
-			validate(m_kind == KIND_BOOL);
+			assertTrue(m_kind == KIND_BOOL);
 			return m_bool;
 		}
 		int64_t as_int() const
 		{
-			validate(m_kind == KIND_INT);
+			assertTrue(m_kind == KIND_INT);
 			return m_int;
 		}
 		uint64_t as_uint() const
 		{
-			validate(m_kind == KIND_UINT);
+			assertTrue(m_kind == KIND_UINT);
 			return m_uint;
 		}
 		float as_float() const
 		{
-			validate(m_kind == KIND_FLOAT);
+			assertTrue(m_kind == KIND_FLOAT);
 			return m_float;
 		}
 		double as_double() const
 		{
-			validate(m_kind == KIND_DOUBLE);
+			assertTrue(m_kind == KIND_DOUBLE);
 			return m_double;
 		}
 
 		String& as_string()
 		{
-			validate(m_kind == KIND_STRING);
+			assertTrue(m_kind == KIND_STRING);
 			return *m_string;
 		}
 		const String& as_string() const
 		{
-			validate(m_kind == KIND_STRING);
+			assertTrue(m_kind == KIND_STRING);
 			return *m_string;
 		}
 
 		Buffer& as_bytes()
 		{
-			validate(m_kind == KIND_BYTES);
+			assertTrue(m_kind == KIND_BYTES);
 			return *m_bytes;
 		}
 		const Buffer& as_bytes() const
 		{
-			validate(m_kind == KIND_BYTES);
+			assertTrue(m_kind == KIND_BYTES);
 			return *m_bytes;
 		}
 
 		Array<Value>& as_array()
 		{
-			validate(m_kind == KIND_ARRAY);
+			assertTrue(m_kind == KIND_ARRAY);
 			return *m_array;
 		}
 		const Array<Value>& as_array() const
 		{
-			validate(m_kind == KIND_ARRAY);
+			assertTrue(m_kind == KIND_ARRAY);
 			return *m_array;
 		}
 
 		Map<String, Value>& as_map()
 		{
-			validate(m_kind == KIND_MAP);
+			assertTrue(m_kind == KIND_MAP);
 			return *m_map;
 		}
 		const Map<String, Value>& as_map() const
 		{
-			validate(m_kind == KIND_MAP);
+			assertTrue(m_kind == KIND_MAP);
 			return *m_map;
 		}
 

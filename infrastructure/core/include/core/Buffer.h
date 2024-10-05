@@ -69,13 +69,13 @@ namespace core
 
 		std::byte& operator[](size_t i)
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 
 		const std::byte& operator[](size_t i) const
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 

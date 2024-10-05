@@ -282,7 +282,7 @@ namespace taha
 				return format;
 			}
 		}
-		core::validate(formats.count() > 0);
+		core::assertTrue(formats.count() > 0);
 		return formats[0];
 	}
 

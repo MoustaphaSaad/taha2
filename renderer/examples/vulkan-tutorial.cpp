@@ -517,7 +517,7 @@ private:
 		{
 			auto familyProperties = listPhysicalDeviceFamilyProperties(device);
 
-			core::validate(familyProperties.count() < UINT32_MAX);
+			core::assertTrue(familyProperties.count() < UINT32_MAX);
 			uint32_t graphicsQueueFamily = UINT32_MAX;
 			uint32_t presentQueueFamily = UINT32_MAX;
 			for (size_t i = 0; i < familyProperties.count(); ++i)

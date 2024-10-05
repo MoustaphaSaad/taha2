@@ -163,7 +163,7 @@ namespace core::ws
 	{
 		if (Frame::isControlOpcode(opcode))
 		{
-			validateMsg(payload.sizeInBytes() <= 125, "control frames are limited to 125 bytes");
+			assertMsg(payload.sizeInBytes() <= 125, "control frames are limited to 125 bytes");
 			// limit it to 125 bytes
 			if (payload.sizeInBytes() > 125)
 			{

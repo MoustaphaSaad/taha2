@@ -179,35 +179,35 @@ namespace core
 
 		T& value()
 		{
-			validate(m_state == STATE_VALUE);
+			assertTrue(m_state == STATE_VALUE);
 			return *reinterpret_cast<T*>(m_storage);
 		}
 		const T& value() const
 		{
-			validate(m_state == STATE_VALUE);
+			assertTrue(m_state == STATE_VALUE);
 			return *reinterpret_cast<T*>(m_storage);
 		}
 
 		E& error()
 		{
-			validate(m_state == STATE_ERROR);
+			assertTrue(m_state == STATE_ERROR);
 			return *reinterpret_cast<E*>(m_storage);
 		}
 		const E& error() const
 		{
-			validate(m_state == STATE_ERROR);
+			assertTrue(m_state == STATE_ERROR);
 			return *reinterpret_cast<E*>(m_storage);
 		}
 
 		T releaseValue()
 		{
-			validate(m_state == STATE_VALUE);
+			assertTrue(m_state == STATE_VALUE);
 			m_state = STATE_EMPTY;
 			return std::move(*reinterpret_cast<T*>(m_storage));
 		}
 		E releaseError()
 		{
-			validate(m_state == STATE_ERROR);
+			assertTrue(m_state == STATE_ERROR);
 			m_state = STATE_EMPTY;
 			return std::move(*reinterpret_cast<E*>(m_storage));
 		}

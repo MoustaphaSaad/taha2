@@ -16,13 +16,13 @@ namespace math
 
 		constexpr T& operator[](size_t index)
 		{
-			core::validate(index < N);
+			core::assertTrue(index < N);
 			return elements[index];
 		}
 
 		constexpr const T& operator[](size_t index) const
 		{
-			core::validate(index < N);
+			core::assertTrue(index < N);
 			return elements[index];
 		}
 	};
@@ -57,13 +57,13 @@ namespace math
 
 		constexpr T& operator[](size_t index)
 		{
-			core::validate(index < 2);
+			core::assertTrue(index < 2);
 			return elements[index];
 		}
 
 		constexpr const T& operator[](size_t index) const
 		{
-			core::validate(index < 2);
+			core::assertTrue(index < 2);
 			return elements[index];
 		}
 	};
@@ -98,13 +98,13 @@ namespace math
 
 		constexpr T& operator[](size_t index)
 		{
-			core::validate(index < 3);
+			core::assertTrue(index < 3);
 			return elements[index];
 		}
 
 		constexpr const T& operator[](size_t index) const
 		{
-			core::validate(index < 3);
+			core::assertTrue(index < 3);
 			return elements[index];
 		}
 	};
@@ -139,13 +139,13 @@ namespace math
 
 		constexpr T& operator[](size_t index)
 		{
-			core::validate(index < 4);
+			core::assertTrue(index < 4);
 			return elements[index];
 		}
 
 		constexpr const T& operator[](size_t index) const
 		{
-			core::validate(index < 4);
+			core::assertTrue(index < 4);
 			return elements[index];
 		}
 	};

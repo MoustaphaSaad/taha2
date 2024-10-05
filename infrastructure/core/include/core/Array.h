@@ -132,13 +132,13 @@ namespace core
 
 		T& operator[](size_t i)
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 
 		const T& operator[](size_t i) const
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 
@@ -182,7 +182,7 @@ namespace core
 
 		void pop()
 		{
-			validate(m_count > 0);
+			assertTrue(m_count > 0);
 			m_memory[m_count - 1].~T();
 			m_allocator->releaseT(m_memory.slice(m_count - 1, m_count));
 			--m_count;

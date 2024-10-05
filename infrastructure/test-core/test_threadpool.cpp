@@ -49,7 +49,7 @@ TEST_CASE("core::ThreadPool ExecutionQueue")
 		{
 			queues[qi]->push(&pool, [&, qi, i = (int)i] {
 				auto val = count[qi].load();
-				assert(val == i);
+				core::assertTrue(val == i);
 				count[qi] = val + 1;
 			});
 		}

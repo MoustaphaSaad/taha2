@@ -15,7 +15,7 @@ namespace core
 	{
 		m_condition_variable = unique_from<IConditionVariable>(allocator);
 		[[maybe_unused]] auto res = pthread_cond_init(&m_condition_variable->cv, nullptr);
-		validate(res == 0);
+		assert(res == 0);
 	}
 
 	ConditionVariable::ConditionVariable(ConditionVariable&& other) noexcept = default;
@@ -26,7 +26,7 @@ namespace core
 		if (m_condition_variable)
 		{
 			[[maybe_unused]] auto res = pthread_cond_destroy(&m_condition_variable->cv);
-			validate(res == 0);
+			assert(res == 0);
 		}
 	}
 

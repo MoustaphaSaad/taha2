@@ -22,7 +22,7 @@ namespace core
 		return res;
 	}
 
-	void validateMsg(bool expr, const char* msg, std::source_location loc)
+	void assertMsg(bool expr, const char* msg, std::source_location loc)
 	{
 #ifdef TAHA_ENABLE_ASSERTS
 		if (expr)
