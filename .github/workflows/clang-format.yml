@@ -1,0 +1,17 @@
+name: clang-format
+
+on:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.ACCESS_TOKEN }}
+          submodules: 'true'
+
+      - name: check formatting
+        run: ./lint-clang-format.sh
