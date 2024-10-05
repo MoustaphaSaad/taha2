@@ -6,19 +6,23 @@ namespace core
 	inline uint8_t hex_to_uint8(char c)
 	{
 		if (c >= '0' && c <= '9')
+		{
 			return c - '0';
+		}
 		if (c >= 'a' && c <= 'f')
+		{
 			return 10 + c - 'a';
+		}
 		if (c >= 'A' && c <= 'F')
+		{
 			return 10 + c - 'A';
+		}
 		return 0;
 	}
 
 	inline char char_is_hex(char c)
 	{
-		return (c >= '0' && c <= '9') ||
-			   (c >= 'a' && c <= 'f') ||
-			   (c >= 'A' && c <= 'F');
+		return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 	}
 
 	inline uint8_t hex_to_uint8(char c1, char c2)
@@ -43,14 +47,20 @@ namespace core
 		UUID res{};
 
 		if (str.count() == 0)
+		{
 			return errf(allocator, "UUID string is empty"_sv);
+		}
 
 		size_t has_braces = 0;
 		if (str[0] == '{')
+		{
 			has_braces = 1;
+		}
 
 		if (has_braces > 0 && str[str.count() - 1] != '}')
+		{
 			return errf(allocator, "mismatched opening curly brace"_sv);
+		}
 
 		size_t index = 0;
 		bool first_digit = true;
@@ -58,10 +68,14 @@ namespace core
 		for (size_t i = has_braces; i < str.count() - has_braces; ++i)
 		{
 			if (str[i] == '-')
+			{
 				continue;
+			}
 
 			if (index >= 16 || char_is_hex(str[i]) == false)
+			{
 				return errf(allocator, "invalid uuid"_sv);
+			}
 
 			if (first_digit)
 			{
@@ -76,7 +90,9 @@ namespace core
 		}
 
 		if (index < 16)
+		{
 			return errf(allocator, "invalid uuid"_sv);
+		}
 
 		return res;
 	}

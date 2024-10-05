@@ -85,9 +85,18 @@ namespace minijava
 			  m_location(location)
 		{}
 
-		KIND kind() const { return m_kind; }
-		core::StringView text() const { return m_text; }
-		Location location() const { return m_location; }
+		KIND kind() const
+		{
+			return m_kind;
+		}
+		core::StringView text() const
+		{
+			return m_text;
+		}
+		Location location() const
+		{
+			return m_location;
+		}
 
 	private:
 		KIND m_kind = KIND_NONE;
@@ -98,16 +107,16 @@ namespace minijava
 
 namespace fmt
 {
-	template<>
+	template <>
 	struct formatter<minijava::Token::KIND>
 	{
-		template<typename ParseContext>
+		template <typename ParseContext>
 		constexpr auto parse(ParseContext& ctx)
 		{
 			return ctx.begin();
 		}
 
-		template<typename FormatContext>
+		template <typename FormatContext>
 		auto format(minijava::Token::KIND kind, FormatContext& ctx)
 		{
 			const char* name = "";

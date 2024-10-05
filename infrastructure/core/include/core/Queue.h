@@ -8,7 +8,7 @@
 
 namespace core
 {
-	template<typename T>
+	template <typename T>
 	class Queue
 	{
 		struct Node
@@ -45,7 +45,7 @@ namespace core
 			{
 				auto new_node = m_allocator->allocSingleT<Node>();
 				m_allocator->commitSingleT(new_node);
-				new (new_node) Node{ nullptr, nullptr, node->value };
+				new (new_node) Node{nullptr, nullptr, node->value};
 				if (m_tail)
 				{
 					m_tail->next = new_node;
@@ -73,6 +73,7 @@ namespace core
 			other.m_tail = nullptr;
 			other.m_count = 0;
 		}
+
 	public:
 		explicit Queue(Allocator* allocator)
 			: m_allocator(allocator)
@@ -107,12 +108,12 @@ namespace core
 			destroy();
 		}
 
-		template<typename R>
+		template <typename R>
 		void push_back(R&& value)
 		{
 			auto node = m_allocator->allocSingleT<Node>();
 			m_allocator->commitSingleT(node);
-			new (node) Node{ nullptr, nullptr, std::forward<R>(value) };
+			new (node) Node{nullptr, nullptr, std::forward<R>(value)};
 			if (m_tail)
 			{
 				m_tail->next = node;
@@ -127,12 +128,12 @@ namespace core
 			++m_count;
 		}
 
-		template<typename R>
+		template <typename R>
 		void push_front(R&& value)
 		{
 			auto node = m_allocator->allocSingleT<Node>();
 			m_allocator->commitSingleT(node);
-			new (node) Node{ nullptr, nullptr, std::forward<R>(value) };
+			new (node) Node{nullptr, nullptr, std::forward<R>(value)};
 			if (m_head)
 			{
 				m_head->prev = node;
@@ -177,9 +178,13 @@ namespace core
 			auto node = m_tail;
 			m_tail = m_tail->prev;
 			if (m_tail)
+			{
 				m_tail->next = nullptr;
+			}
 			else
+			{
 				m_head = nullptr;
+			}
 			node->~Node();
 			m_allocator->releaseSingleT(node);
 			m_allocator->freeSingleT(node);
@@ -192,16 +197,26 @@ namespace core
 			auto node = m_head;
 			m_head = m_head->next;
 			if (m_head)
+			{
 				m_head->prev = nullptr;
+			}
 			else
+			{
 				m_tail = nullptr;
+			}
 			node->~Node();
 			m_allocator->releaseSingleT(node);
 			m_allocator->freeSingleT(node);
 			--m_count;
 		}
 
-		size_t count() const { return m_count; }
-		Allocator* allocator() const { return m_allocator; }
+		size_t count() const
+		{
+			return m_count;
+		}
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
 	};
 }

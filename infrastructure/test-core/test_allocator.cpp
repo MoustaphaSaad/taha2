@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
+#include <core/FastLeak.h>
 #include <core/Mallocator.h>
 #include <core/VirtualMem.h>
-#include <core/FastLeak.h>
 
 TEST_CASE("basic core::Mallocator test")
 {

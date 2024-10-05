@@ -2,9 +2,9 @@
 #include "core/String.h"
 
 #include <fcntl.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <sys/file.h>
 
 namespace core
 {
@@ -30,7 +30,9 @@ namespace core
 	IPCMutex::~IPCMutex()
 	{
 		if (m_mutex)
+		{
 			::close(m_mutex->handle);
+		}
 	}
 
 	void IPCMutex::lock()

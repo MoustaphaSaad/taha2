@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include <core/Url.h>
 #include <core/Mallocator.h>
+#include <core/Url.h>
 
 TEST_CASE("basic core::Url::parse test")
 {
@@ -158,7 +158,9 @@ TEST_CASE("basic core::Url::parse test")
 		auto result = url.toString(&allocator);
 		REQUIRE(result.isError() == false);
 		auto str = result.releaseValue();
-		REQUIRE(str == "https://users.moustapha.xyz/account/login?scope=openid+profile&client_id=wallet&response_type=id_token&nonce=zhw87kq4u5drfiwkg&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2F&response_mode=form_post"_sv);
+		REQUIRE(
+			str ==
+			"https://users.moustapha.xyz/account/login?scope=openid+profile&client_id=wallet&response_type=id_token&nonce=zhw87kq4u5drfiwkg&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2F&response_mode=form_post"_sv);
 	}
 
 	SUBCASE("query element encoding")

@@ -1,14 +1,14 @@
 #pragma once
 
-#include "core/Mallocator.h"
 #include "core/Allocator.h"
-#include "core/Mutex.h"
-#include "core/Lock.h"
-#include "core/Queue.h"
 #include "core/ConditionVariable.h"
-#include "core/Shared.h"
 #include "core/Func.h"
 #include "core/Hash.h"
+#include "core/Lock.h"
+#include "core/Mallocator.h"
+#include "core/Mutex.h"
+#include "core/Queue.h"
+#include "core/Shared.h"
 
 #include <atomic>
 #include <random>
@@ -23,7 +23,10 @@ namespace core
 			size_t index = SIZE_MAX;
 			bool closed = false;
 
-			bool isSignaled() const { return index != SIZE_MAX; }
+			bool isSignaled() const
+			{
+				return index != SIZE_MAX;
+			}
 		};
 
 		explicit SelectCond(Allocator* allocator)
@@ -36,7 +39,9 @@ namespace core
 		{
 			auto lock = lockGuard(m_mutex);
 			if (m_event.isSignaled() || m_closed)
+			{
 				return false;
+			}
 			m_event = Event{.index = index};
 			m_waitCond.notify_one();
 			return true;
@@ -46,9 +51,13 @@ namespace core
 		{
 			auto lock = lockGuard(m_mutex);
 			while (m_event.isSignaled() && m_closed == false)
+			{
 				m_deliverCond.wait(m_mutex);
+			}
 			if (m_closed)
+			{
 				return false;
+			}
 			m_event = Event{.index = index};
 			m_waitCond.notify_one();
 			return true;
@@ -58,9 +67,13 @@ namespace core
 		{
 			auto lock = lockGuard(m_mutex);
 			while (m_event.isSignaled() && m_closed == false)
+			{
 				m_deliverCond.wait(m_mutex);
+			}
 			if (m_closed)
+			{
 				return false;
+			}
 			m_event = Event{.index = index, .closed = true};
 			m_waitCond.notify_one();
 			return true;
@@ -82,7 +95,9 @@ namespace core
 			m_event = Event{};
 			// close if we get real event
 			if (res.closed == false)
+			{
 				m_closed = true;
+			}
 
 			m_deliverCond.notify_all();
 
@@ -120,14 +135,13 @@ namespace core
 
 	class SelectCaseDesc;
 
-	template<typename T, ChanDir dir = ChanDir::Both>
+	template <typename T, ChanDir dir = ChanDir::Both>
 	class Chan
 	{
 		friend class SelectCaseDesc;
 
-		template<typename TPtr, typename... TArgs>
-		friend inline Shared<TPtr>
-		shared_from(Allocator* allocator, TArgs&&... args);
+		template <typename TPtr, typename... TArgs>
+		friend inline Shared<TPtr> shared_from(Allocator* allocator, TArgs&&... args);
 
 		Allocator* m_allocator = nullptr;
 		std::atomic<bool> m_closed = false;
@@ -159,7 +173,9 @@ namespace core
 		void signalSelectAndRemove(Map<SelectCond*, size_t>& selects)
 		{
 			if (selects.count() == 0)
+			{
 				return;
+			}
 
 			std::random_device device;
 			std::uniform_int_distribution<size_t> dist(0, selects.count() - 1);
@@ -179,9 +195,13 @@ namespace core
 				auto it = selects.begin();
 				auto index = offsetIndex % selects.count();
 				if (it[index].key->signalReady(it[index].value) == false)
+				{
 					selects.remove(it[offsetIndex].key);
+				}
 				else
+				{
 					break;
+				}
 			}
 		}
 
@@ -198,13 +218,19 @@ namespace core
 				}
 
 				if (m_closed.load())
+				{
 					return ChanErr::Closed;
+				}
 
 				assert(m_buffer.count() < m_bufferSize);
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					m_buffer.push_back(std::move(*ptr));
+				}
 				else
+				{
 					m_buffer.push_back(*ptr);
+				}
 				if (m_readWaiting.load() > 0)
 				{
 					m_readCond.notify_one();
@@ -222,7 +248,9 @@ namespace core
 				auto lockMutex = lockGuard(m_mutex);
 
 				if (m_closed.load())
+				{
 					return ChanErr::Closed;
+				}
 
 				m_unbufferedSlot = ptr;
 				m_writeWaiting.fetch_add(1);
@@ -247,7 +275,9 @@ namespace core
 				while (m_buffer.count() == 0)
 				{
 					if (m_closed.load())
+					{
 						return ChanErr::Closed;
+					}
 
 					m_readWaiting.fetch_add(1);
 					m_readCond.wait(m_mutex);
@@ -257,9 +287,13 @@ namespace core
 				assert(m_buffer.count() > 0);
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					res = std::move(m_buffer.front());
+				}
 				else
+				{
 					res = m_buffer.front();
+				}
 				m_buffer.pop_front();
 
 				if (m_writeWaiting.load() > 0)
@@ -285,13 +319,19 @@ namespace core
 				}
 
 				if (m_closed.load())
+				{
 					return ChanErr::Closed;
+				}
 
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					res = std::move(*m_unbufferedSlot);
+				}
 				else
+				{
 					res = *m_unbufferedSlot;
+				}
 				m_unbufferedSlot = nullptr;
 				m_writeWaiting.fetch_sub(1);
 				m_writeCond.notify_one();
@@ -306,14 +346,18 @@ namespace core
 		void internalInsertReadSelectCond(SelectCond* cond, size_t index)
 		{
 			if (cond == nullptr)
+			{
 				return;
+			}
 			m_readSelects.insert(cond, index);
 		}
 
 		void internalInsertWriteSelectCond(SelectCond* cond, size_t index)
 		{
 			if (cond == nullptr)
+			{
 				return;
+			}
 			m_writeSelects.insert(cond, index);
 		}
 
@@ -330,9 +374,13 @@ namespace core
 
 				assert(m_buffer.count() < m_bufferSize);
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					m_buffer.push_back(std::move(*ptr));
+				}
 				else
+				{
 					m_buffer.push_back(*ptr);
+				}
 				if (m_readWaiting.load() > 0)
 				{
 					m_readCond.notify_one();
@@ -388,9 +436,13 @@ namespace core
 				assert(m_buffer.count() > 0);
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					res = std::move(m_buffer.front());
+				}
 				else
+				{
 					res = m_buffer.front();
+				}
 				m_buffer.pop_front();
 
 				if (m_writeWaiting.load() > 0)
@@ -421,9 +473,13 @@ namespace core
 
 				auto res = Result<T, ChanErr>::createEmpty();
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					res = std::move(*m_unbufferedSlot);
+				}
 				else
+				{
 					res = *m_unbufferedSlot;
+				}
 				m_unbufferedSlot = nullptr;
 				m_writeWaiting.fetch_sub(1);
 				m_writeCond.notify_one();
@@ -439,21 +495,29 @@ namespace core
 		{
 			auto lockMutex = lockGuard(m_mutex);
 			if (m_closed.load())
+			{
 				return false;
+			}
 			m_closed.store(true);
 			m_readCond.notify_all();
 			m_writeCond.notify_all();
 			for (auto& [cond, index]: m_readSelects)
+			{
 				cond->signalClose(index);
+			}
 			for (auto& [cond, index]: m_writeSelects)
+			{
 				cond->signalClose(index);
+			}
 			return true;
 		}
 
 		void internalRemoveSelectCond(SelectCond* cond)
 		{
 			if (cond == nullptr)
+			{
 				return;
+			}
 			auto lock = lockGuard(m_mutex);
 			m_readSelects.remove(cond);
 			m_writeSelects.remove(cond);
@@ -467,9 +531,18 @@ namespace core
 			return res;
 		}
 
-		bool isBuffered() const { return m_bufferSize > 0; }
-		size_t capacity() const { return m_bufferSize; }
-		Allocator* allocator() const { return m_allocator; }
+		bool isBuffered() const
+		{
+			return m_bufferSize > 0;
+		}
+		size_t capacity() const
+		{
+			return m_bufferSize;
+		}
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
 
 		size_t count()
 		{
@@ -518,6 +591,7 @@ namespace core
 		{
 			Chan<T, dir>* m_chan;
 			Result<T, ChanErr> m_recvRes;
+
 		public:
 			ChanIterator(Chan<T, dir>& chan, Result<T, ChanErr>&& res)
 				: m_chan(&chan),
@@ -547,10 +621,22 @@ namespace core
 				return !operator==(other);
 			}
 
-			T& operator*() { return m_recvRes.value(); }
-			const T& operator*() const { return m_recvRes.value(); }
-			T* operator->() { return &m_recvRes.value(); }
-			const T* operator->() const { return &m_recvRes.value(); }
+			T& operator*()
+			{
+				return m_recvRes.value();
+			}
+			const T& operator*() const
+			{
+				return m_recvRes.value();
+			}
+			T* operator->()
+			{
+				return &m_recvRes.value();
+			}
+			const T* operator->() const
+			{
+				return &m_recvRes.value();
+			}
 		};
 
 		ChanIterator begin()
@@ -566,20 +652,21 @@ namespace core
 
 	class SelectCaseDesc;
 
-	template<typename T, ChanDir dir>
+	template <typename T, ChanDir dir>
 	class ReadCase
 	{
 		friend class SelectCaseDesc;
 		Allocator* m_allocator = nullptr;
 		Chan<T, dir>* m_chan = nullptr;
 		Func<void(T&&)> m_callback;
+
 	public:
 		ReadCase(Allocator* allocator, Chan<T, dir>& chan)
 			: m_allocator(allocator),
 			  m_chan(&chan)
 		{}
 
-		template<typename TFunc>
+		template <typename TFunc>
 		ReadCase& operator=(TFunc&& func)
 		{
 			m_callback = Func<void(T&&)>{m_allocator, std::forward<TFunc>(func)};
@@ -587,7 +674,7 @@ namespace core
 		}
 	};
 
-	template<typename T, ChanDir dir>
+	template <typename T, ChanDir dir>
 	class WriteCase
 	{
 		friend class SelectCaseDesc;
@@ -595,6 +682,7 @@ namespace core
 		Chan<T, dir>* m_chan = nullptr;
 		T* m_value = nullptr;
 		Func<void()> m_callback;
+
 	public:
 		WriteCase(Allocator* allocator, Chan<T, dir>& chan, T& value)
 			: m_allocator(allocator),
@@ -602,7 +690,7 @@ namespace core
 			  m_value(&value)
 		{}
 
-		template<typename TFunc>
+		template <typename TFunc>
 		WriteCase& operator=(TFunc&& func)
 		{
 			m_callback = Func<void()>{m_allocator, std::forward<TFunc>(func)};
@@ -615,12 +703,13 @@ namespace core
 		friend class SelectCaseDesc;
 		Allocator* m_allocator = nullptr;
 		Func<void()> m_callback;
+
 	public:
 		explicit DefaultCase(Allocator* allocator)
 			: m_allocator(allocator)
 		{}
 
-		template<typename TFunc>
+		template <typename TFunc>
 		DefaultCase& operator=(TFunc&& func)
 		{
 			m_callback = Func<void()>{m_allocator, std::forward<TFunc>(func)};
@@ -635,8 +724,9 @@ namespace core
 		ChanErr (*m_eval)(void* ptr) = nullptr;
 		void (*m_removeSelectCond)(void* ptr, SelectCond* cond) = nullptr;
 		bool m_isDefault = false;
+
 	public:
-		template<typename T, ChanDir dir>
+		template <typename T, ChanDir dir>
 		explicit SelectCaseDesc(ReadCase<T, dir>& c)
 			: m_case(&c)
 		{
@@ -646,7 +736,9 @@ namespace core
 				if (res.isError())
 				{
 					if (res.error() == ChanErr::Closed)
+					{
 						return res.releaseError();
+					}
 				}
 				else if (res.isValue())
 				{
@@ -662,7 +754,9 @@ namespace core
 				if (res.isError())
 				{
 					if (res.error() == ChanErr::Closed)
+					{
 						return res.releaseError();
+					}
 				}
 				else if (res.isValue())
 				{
@@ -678,7 +772,7 @@ namespace core
 			};
 		}
 
-		template<typename T, ChanDir dir>
+		template <typename T, ChanDir dir>
 		explicit SelectCaseDesc(WriteCase<T, dir>& c)
 			: m_case(&c)
 		{
@@ -686,7 +780,9 @@ namespace core
 				auto c = (WriteCase<T, dir>*)ptr;
 				auto err = c->m_chan->internalTrySend(c->m_value, cond, index);
 				if (err == ChanErr::Ok)
+				{
 					c->m_callback();
+				}
 				return err;
 			};
 
@@ -694,7 +790,9 @@ namespace core
 				auto c = (WriteCase<T, dir>*)ptr;
 				auto err = c->m_chan->send(c->m_value);
 				if (err == ChanErr::Ok)
+				{
 					c->m_callback();
+				}
 				return err;
 			};
 
@@ -723,7 +821,10 @@ namespace core
 			m_removeSelectCond = +[](void*, SelectCond*) {};
 		}
 
-		bool isDefault() const { return m_isDefault; }
+		bool isDefault() const
+		{
+			return m_isDefault;
+		}
 		ChanErr tryEval(SelectCond* cond, size_t index)
 		{
 			return m_tryEval(m_case, cond, index);
@@ -741,8 +842,8 @@ namespace core
 	class Select
 	{
 	public:
-		template<typename ... TArgs>
-		explicit Select(TArgs&& ... cases)
+		template <typename... TArgs>
+		explicit Select(TArgs&&... cases)
 		{
 			SelectCaseDesc descs[] = {SelectCaseDesc{cases}...};
 			auto descsCount = sizeof...(cases);
@@ -787,7 +888,6 @@ namespace core
 					}
 				}
 
-
 				while (aliveDescsCount > 0)
 				{
 					auto event = cond.waitForEventAndClose();
@@ -803,7 +903,9 @@ namespace core
 						if (err == ChanErr::Ok)
 						{
 							for (size_t i = 0; i < descsCount; ++i)
+							{
 								descs[i].removeCond(&cond);
+							}
 							return;
 						}
 						else if (err == ChanErr::Closed)
@@ -823,10 +925,14 @@ namespace core
 				{
 					auto index = (i + offsetIndex) % descsCount;
 					if (index == defaultIndex)
+					{
 						continue;
+					}
 					auto err = descs[index].tryEval(nullptr, 0);
 					if (err == ChanErr::Ok)
+					{
 						return;
+					}
 				}
 				descs[defaultIndex].eval();
 				return;

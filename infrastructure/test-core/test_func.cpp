@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include <core/Mallocator.h>
 #include <core/Func.h>
+#include <core/Mallocator.h>
 
 TEST_CASE("core::Func basics")
 {

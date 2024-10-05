@@ -29,6 +29,7 @@ namespace minijava
 		core::Unique<BlockStmt> parseBlockStmt();
 		core::Unique<IfStmt> parseIfStmt();
 		core::Unique<MainClass> parseMainClass();
+
 	public:
 		explicit Parser(Unit* unit, core::Allocator* allocator);
 

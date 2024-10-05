@@ -1,7 +1,7 @@
 #include "core/FastLeak.h"
 
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 
 namespace core
 {
@@ -9,19 +9,16 @@ namespace core
 	{
 		if (atomic_count > 0)
 		{
-			::fprintf(
-				stderr,
-				"Leaks count: %zu, Leaks size(bytes): %zu\n",
-				atomic_count.load(),
-				atomic_size.load()
-			);
+			::fprintf(stderr, "Leaks count: %zu, Leaks size(bytes): %zu\n", atomic_count.load(), atomic_size.load());
 		}
 	}
 
 	Span<std::byte> FastLeak::alloc(size_t size, size_t)
 	{
 		if (size == 0)
+		{
 			return Span<std::byte>{};
+		}
 
 		atomic_count.fetch_add(1);
 		atomic_size.fetch_add(size);
@@ -43,7 +40,9 @@ namespace core
 	void FastLeak::free(Span<std::byte> bytes)
 	{
 		if (bytes.sizeInBytes() == 0)
+		{
 			return;
+		}
 
 		atomic_count.fetch_sub(1);
 		atomic_size.fetch_sub(bytes.sizeInBytes());

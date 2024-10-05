@@ -2,21 +2,21 @@
 
 namespace core
 {
-	template<typename T>
+	template <typename T>
 	class Lock;
 
-	template<typename T>
+	template <typename T>
 	inline Lock<T> lockGuard(T& lockable);
 
-	template<typename T>
+	template <typename T>
 	inline Lock<T> tryLockGuard(T& lockable);
 
-	template<typename T>
+	template <typename T>
 	class Lock
 	{
-		template<typename U>
+		template <typename U>
 		friend inline Lock<U> lockGuard(U& lockable);
-		template<typename U>
+		template <typename U>
 		friend inline Lock<U> tryLockGuard(U& lockable);
 
 		T* m_lockable = nullptr;
@@ -30,7 +30,9 @@ namespace core
 		void destroy()
 		{
 			if (m_lockable && m_locked)
+			{
 				m_lockable->unlock();
+			}
 		}
 
 		void moveFrom(Lock& other)
@@ -41,6 +43,7 @@ namespace core
 			other.m_lockable = nullptr;
 			other.m_locked = false;
 		}
+
 	public:
 		Lock(const Lock&) = delete;
 
@@ -63,21 +66,26 @@ namespace core
 			destroy();
 		}
 
-		bool isLocked() const { return m_locked; }
+		bool isLocked() const
+		{
+			return m_locked;
+		}
 	};
 
-	template<typename T>
+	template <typename T>
 	inline Lock<T> lockGuard(T& lockable)
 	{
 		lockable.lock();
 		return Lock<T>{lockable, true};
 	}
 
-	template<typename T>
+	template <typename T>
 	inline Lock<T> tryLockGuard(T& lockable)
 	{
 		if (lockable.tryLock())
+		{
 			return Lock{lockable, true};
+		}
 		return Lock<T>{lockable, false};
 	}
 }

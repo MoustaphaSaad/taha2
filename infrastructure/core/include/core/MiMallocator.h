@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/Exports.h"
 #include "core/Allocator.h"
+#include "core/Exports.h"
 
 namespace core
 {

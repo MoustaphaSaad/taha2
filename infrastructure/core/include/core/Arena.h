@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/Exports.h"
 #include "core/Allocator.h"
+#include "core/Exports.h"
 
 #include <mimalloc.h>
 
@@ -10,6 +10,7 @@ namespace core
 	class Arena: public Allocator
 	{
 		mi_heap_t* m_heap = nullptr;
+
 	public:
 		Arena()
 			: m_heap(mi_heap_new())
@@ -26,7 +27,9 @@ namespace core
 		Arena& operator=(Arena&& other) noexcept
 		{
 			if (m_heap)
+			{
 				mi_heap_destroy(m_heap);
+			}
 			m_heap = other.m_heap;
 			other.m_heap = nullptr;
 			return *this;
@@ -35,7 +38,9 @@ namespace core
 		~Arena() override
 		{
 			if (m_heap)
+			{
 				mi_heap_destroy(m_heap);
+			}
 			m_heap = nullptr;
 		}
 

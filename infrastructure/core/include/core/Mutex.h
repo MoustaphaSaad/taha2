@@ -11,6 +11,7 @@ namespace core
 		friend class ConditionVariable;
 		struct IMutex;
 		Unique<IMutex> m_mutex;
+
 	public:
 		CORE_EXPORT explicit Mutex(Allocator* allocator);
 		CORE_EXPORT Mutex(Mutex&& other) noexcept;

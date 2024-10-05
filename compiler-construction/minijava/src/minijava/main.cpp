@@ -1,18 +1,18 @@
-#include <core/FastLeak.h>
-#include <core/Log.h>
-#include <core/Result.h>
 #include <core/Array.h>
-#include <core/StringView.h>
+#include <core/FastLeak.h>
 #include <core/File.h>
 #include <core/Hash.h>
+#include <core/Log.h>
 #include <core/MemoryStream.h>
+#include <core/Result.h>
+#include <core/StringView.h>
 
 #include <fmt/color.h>
 
-#include "minijava/Unit.h"
-#include "minijava/Scanner.h"
-#include "minijava/Parser.h"
 #include "minijava/ASTPrinter.h"
+#include "minijava/Parser.h"
+#include "minijava/Scanner.h"
+#include "minijava/Unit.h"
 
 constexpr auto HELP = R"""(MiniJava compiler usage:
 minijava COMMAND [OPTIONS] [files...]
@@ -32,16 +32,22 @@ class Args
 	core::Array<core::StringView> m_files;
 	core::Map<core::StringView, core::StringView> m_options;
 
-	Args(core::StringView command, core::Array<core::StringView> files, core::Map<core::StringView, core::StringView> options)
+	Args(
+		core::StringView command,
+		core::Array<core::StringView> files,
+		core::Map<core::StringView, core::StringView> options)
 		: m_command(command),
 		  m_files(std::move(files)),
 		  m_options(std::move(options))
 	{}
+
 public:
 	static core::Result<Args> parse(int argc, char* argv[], core::Allocator* allocator)
 	{
 		if (argc <= 1)
+		{
 			return core::errf(allocator, "no command specified"_sv);
+		}
 
 		auto command = core::StringView{argv[1]};
 		core::Array<core::StringView> files{allocator};
@@ -53,9 +59,13 @@ public:
 			{
 				core::StringView arg{argv[i]};
 				if (arg == "--test"_sv || arg == "-t"_sv)
+				{
 					options.insert(arg, ""_sv);
+				}
 				else
+				{
 					files.push(arg);
+				}
 			}
 		}
 		else if (command == "parse-expr"_sv)
@@ -64,19 +74,35 @@ public:
 			{
 				core::StringView arg{argv[i]};
 				if (arg == "--test"_sv || arg == "-t"_sv)
+				{
 					options.insert(arg, ""_sv);
+				}
 				else
+				{
 					files.push(arg);
+				}
 			}
 		}
 
 		return Args{command, std::move(files), std::move(options)};
 	}
 
-	core::StringView command() const { return m_command; }
-	const core::Array<core::StringView>& files() const { return m_files; }
-	bool hasOption(core::StringView opt) const { return m_options.lookup(opt) != m_options.end(); }
-	core::StringView getOption(core::StringView opt) const { return m_options.lookup(opt)->value; }
+	core::StringView command() const
+	{
+		return m_command;
+	}
+	const core::Array<core::StringView>& files() const
+	{
+		return m_files;
+	}
+	bool hasOption(core::StringView opt) const
+	{
+		return m_options.lookup(opt) != m_options.end();
+	}
+	core::StringView getOption(core::StringView opt) const
+	{
+		return m_options.lookup(opt)->value;
+	}
 };
 
 int main(int argc, char* argv[])
@@ -124,9 +150,13 @@ int main(int argc, char* argv[])
 				core::MemoryStream outputStream{&allocator};
 
 				if (unit->scan() == false)
+				{
 					unit->dumpErrors(&outputStream);
+				}
 				else
+				{
 					unit->dumpTokens(&outputStream);
+				}
 				auto output = outputStream.releaseString();
 				output.replace("\r\n"_sv, "\n"_sv);
 				if (core::StringView{output}.trim() != core::StringView{expectedOutput}.trim())
@@ -136,16 +166,21 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					core::strf(core::File::STDOUT, "[{}]: {}"_sv, fmt::styled("PASS", fmt::fg(fmt::color::green)), file);
+					core::strf(
+						core::File::STDOUT, "[{}]: {}"_sv, fmt::styled("PASS", fmt::fg(fmt::color::green)), file);
 					return EXIT_SUCCESS;
 				}
 			}
 			else
 			{
 				if (unit->scan() == false)
+				{
 					unit->dumpErrors(core::File::STDOUT);
+				}
 				else
+				{
 					unit->dumpTokens(core::File::STDOUT);
+				}
 			}
 		}
 
@@ -198,7 +233,8 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					core::strf(core::File::STDOUT, "[{}]: {}"_sv, fmt::styled("PASS", fmt::fg(fmt::color::green)), file);
+					core::strf(
+						core::File::STDOUT, "[{}]: {}"_sv, fmt::styled("PASS", fmt::fg(fmt::color::green)), file);
 					return EXIT_SUCCESS;
 				}
 			}

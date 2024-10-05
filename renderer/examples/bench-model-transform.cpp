@@ -1,5 +1,5 @@
-#include <math/Vec.h>
 #include <math/Mat.h>
+#include <math/Vec.h>
 
 #define ANKERL_NANOBENCH_IMPLEMENT 1
 #include <nanobench.h>

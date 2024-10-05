@@ -1,9 +1,9 @@
 #pragma once
 
-#include <core/String.h>
 #include <core/Array.h>
-#include <core/Unique.h>
 #include <core/Result.h>
+#include <core/String.h>
+#include <core/Unique.h>
 
 namespace sabre
 {

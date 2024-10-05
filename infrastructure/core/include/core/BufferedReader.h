@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/Stream.h"
 #include "core/Buffer.h"
+#include "core/Stream.h"
 
 namespace core
 {
@@ -10,6 +10,7 @@ namespace core
 		Stream* m_source = nullptr;
 		Buffer m_buffer;
 		size_t m_readCursor = 0;
+
 	public:
 		BufferedReader(Stream* source, Allocator* allocator)
 			: m_source(source),
@@ -31,7 +32,9 @@ namespace core
 			availableSize = m_buffer.count() - m_readCursor;
 			auto resSize = size;
 			if (resSize > availableSize)
+			{
 				resSize = availableSize;
+			}
 			return Span<const std::byte>{m_buffer}.slice(m_readCursor, resSize);
 		}
 

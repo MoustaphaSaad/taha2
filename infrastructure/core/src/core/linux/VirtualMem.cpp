@@ -9,7 +9,7 @@ namespace core
 {
 	Span<std::byte> VirtualMem::alloc(size_t size, size_t)
 	{
-		auto res = (std::byte*)mmap(nullptr, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+		auto res = (std::byte*)mmap(nullptr, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		TracyAllocS(res, size, 10);
 		return Span<std::byte>{res, size};
 	}

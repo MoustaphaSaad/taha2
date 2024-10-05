@@ -21,6 +21,7 @@ namespace core
 				m_handle = -1;
 			}
 		}
+
 	public:
 		LinuxFile(int handle, bool close_handle = true)
 			: m_handle(handle),
@@ -36,7 +37,9 @@ namespace core
 		{
 			auto res = ::read(m_handle, buffer, size);
 			if (res == -1)
+			{
 				return SIZE_MAX;
+			}
 			return res;
 		}
 
@@ -44,7 +47,9 @@ namespace core
 		{
 			auto res = ::write(m_handle, buffer, size);
 			if (res == -1)
+			{
 				return SIZE_MAX;
+			}
 			return res;
 		}
 
@@ -83,12 +88,13 @@ namespace core
 	File* File::STDERR = &core::STDERR;
 	File* File::STDIN = &core::STDIN;
 
-	Unique<File> File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
+	Unique<File>
+	File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
 	{
 		int flags = 0;
 
 		// translate the io mode
-		switch(io_mode)
+		switch (io_mode)
 		{
 		case File::IO_MODE_READ:
 			flags |= O_RDONLY;
@@ -105,7 +111,7 @@ namespace core
 		}
 
 		// translate the open mode
-		switch(open_mode)
+		switch (open_mode)
 		{
 		case OPEN_MODE_CREATE_ONLY:
 			flags |= O_CREAT;
@@ -118,7 +124,7 @@ namespace core
 			break;
 
 		case OPEN_MODE_OPEN_ONLY:
-			//do nothing
+			// do nothing
 			break;
 
 		case OPEN_MODE_OPEN_OVERWRITE:
@@ -142,8 +148,10 @@ namespace core
 		switch (share_mode)
 		{
 		case SHARE_MODE_NONE:
-			if(flags & O_CREAT)
+			if (flags & O_CREAT)
+			{
 				flags |= O_EXCL;
+			}
 			break;
 
 		default:
@@ -152,7 +160,9 @@ namespace core
 
 		auto handle = ::open(name.data(), flags, S_IRWXU);
 		if (handle == -1)
+		{
 			return nullptr;
+		}
 
 		return core::unique_from<LinuxFile>(allocator, handle);
 	}

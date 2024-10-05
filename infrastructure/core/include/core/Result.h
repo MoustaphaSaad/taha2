@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/Assert.h"
 #include "core/String.h"
 #include "core/StringView.h"
-#include "core/Assert.h"
 
 #include <utility>
 
@@ -14,19 +14,28 @@ namespace core
 	class [[nodiscard]] HumanError
 	{
 		String m_message;
+
 	public:
 		HumanError()
 			: m_message(nullptr)
 		{}
 
-		explicit HumanError(String message) : m_message(std::move(message)) {}
+		explicit HumanError(String message)
+			: m_message(std::move(message))
+		{}
 
-		StringView message() const { return m_message; }
+		StringView message() const
+		{
+			return m_message;
+		}
 
-		operator bool() const { return m_message.count() > 0; }
+		operator bool() const
+		{
+			return m_message.count() > 0;
+		}
 	};
 
-	template<typename T, typename E = HumanError>
+	template <typename T, typename E = HumanError>
 	class Result
 	{
 		enum STATE
@@ -43,7 +52,7 @@ namespace core
 
 		void destroy()
 		{
-			switch(m_state)
+			switch (m_state)
 			{
 			case STATE_EMPTY:
 				break;
@@ -100,11 +109,14 @@ namespace core
 		}
 
 		Result() = default;
+
 	public:
+		static Result createEmpty()
+		{
+			return Result{};
+		}
 
-		static Result createEmpty() { return Result{}; }
-
-		template<typename U>
+		template <typename U>
 		Result(U&& value)
 		{
 			::new (m_storage) T(std::forward<U>(value));
@@ -152,9 +164,18 @@ namespace core
 			destroy();
 		}
 
-		bool isError() const { return m_state == STATE_ERROR; }
-		bool isValue() const { return m_state == STATE_VALUE; }
-		bool isEmpty() const { return m_state == STATE_EMPTY; }
+		bool isError() const
+		{
+			return m_state == STATE_ERROR;
+		}
+		bool isValue() const
+		{
+			return m_state == STATE_VALUE;
+		}
+		bool isEmpty() const
+		{
+			return m_state == STATE_EMPTY;
+		}
 
 		T& value()
 		{
@@ -192,8 +213,8 @@ namespace core
 		}
 	};
 
-	template<typename ... Args>
-	inline HumanError errf(Allocator* allocator, StringView format, Args&& ... args)
+	template <typename... Args>
+	inline HumanError errf(Allocator* allocator, StringView format, Args&&... args)
 	{
 		return HumanError{strf(allocator, format, std::forward<Args>(args)...)};
 	}
@@ -201,16 +222,16 @@ namespace core
 
 namespace fmt
 {
-	template<>
+	template <>
 	struct formatter<core::HumanError>
 	{
-		template<typename ParseContext>
+		template <typename ParseContext>
 		constexpr auto parse(ParseContext& ctx)
 		{
 			return ctx.begin();
 		}
 
-		template<typename FormatContext>
+		template <typename FormatContext>
 		auto format(const core::HumanError& err, FormatContext& ctx)
 		{
 			return format_to(ctx.out(), fmt::runtime("{}"), err.message());

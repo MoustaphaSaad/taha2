@@ -2,12 +2,12 @@
 
 #include "taha/Exports.h"
 #include "taha/Frame.h"
-#include "taha/Renderer.h"
 #include "taha/NativeWindowDesc.h"
+#include "taha/Renderer.h"
 
+#include <core/Log.h>
 #include <core/Result.h>
 #include <core/Unique.h>
-#include <core/Log.h>
 
 namespace taha
 {
@@ -29,6 +29,5 @@ namespace taha
 		TAHA_EXPORT static core::Result<Engine> create(API api, core::Log* log, core::Allocator* allocator);
 
 		TAHA_EXPORT core::Unique<Frame> createFrameForWindow(NativeWindowDesc desc);
-
 	};
 }

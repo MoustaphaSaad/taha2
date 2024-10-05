@@ -32,7 +32,10 @@ namespace taha
 		VkQueue m_presentQueue = VK_NULL_HANDLE;
 		VkSurfaceKHR m_dummySurface = VK_NULL_HANDLE;
 
-		VkRenderer(core::Log* log, core::Allocator* allocator): m_allocator(allocator), m_log(log) {}
+		VkRenderer(core::Log* log, core::Allocator* allocator)
+			: m_allocator(allocator),
+			  m_log(log)
+		{}
 
 		TAHA_EXPORT static VkBool32 VKAPI_CALL debugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT severity,

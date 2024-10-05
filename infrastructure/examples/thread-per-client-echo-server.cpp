@@ -1,8 +1,8 @@
+#include "core/Array.h"
 #include "core/Log.h"
 #include "core/Mallocator.h"
 #include "core/Socket.h"
 #include "core/Thread.h"
-#include "core/Array.h"
 #include <signal.h>
 
 core::Socket* LISTEN_SOCKET = nullptr;
@@ -22,7 +22,9 @@ void handleClient(core::Socket* socket)
 	{
 		auto readSize = socket->read(line, sizeof(line));
 		if (readSize == 0)
+		{
 			return;
+		}
 
 		auto writeSize = socket->write(line, readSize);
 		assert(writeSize == readSize);
@@ -60,16 +62,20 @@ int main()
 
 	while (auto clientSocket = listenSocket->accept())
 	{
-		core::Thread thread{&mallocator, [socket = clientSocket.get()]{ handleClient(socket); }};
+		core::Thread thread{&mallocator, [socket = clientSocket.get()] { handleClient(socket); }};
 		sockets.push(std::move(clientSocket));
 		threads.push(std::move(thread));
 	}
 
 	for (auto& socket: sockets)
+	{
 		socket->shutdown(core::Socket::SHUTDOWN_RD);
+	}
 
 	for (auto& thread: threads)
+	{
 		thread.join();
+	}
 
 	return 0;
 }

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/Buffer.h"
 #include "core/Exports.h"
 #include "core/Stream.h"
-#include "core/Buffer.h"
 #include "core/String.h"
 
 namespace core
@@ -11,6 +11,7 @@ namespace core
 	{
 		Buffer m_buffer;
 		int64_t m_cursor = 0;
+
 	public:
 		explicit MemoryStream(Allocator* allocator)
 			: m_buffer(allocator)

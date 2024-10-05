@@ -18,8 +18,7 @@ namespace core
 
 	Thread::Thread(Allocator* allocator, Func<void()> func, size_t stackSize)
 	{
-		auto thread_start = +[](void* userData) -> DWORD
-		{
+		auto thread_start = +[](void* userData) -> DWORD {
 			auto funcData = (ThreadFuncData*)userData;
 			Unique threadFuncData{funcData->allocator, funcData};
 			threadFuncData->func();

@@ -1,9 +1,9 @@
 #include <doctest/doctest.h>
 
-#include <core/Stacktrace.h>
-#include <core/Mallocator.h>
-#include <core/Log.h>
 #include <core/File.h>
+#include <core/Log.h>
+#include <core/Mallocator.h>
+#include <core/Stacktrace.h>
 
 core::Rawtrace stacktraceBar()
 {

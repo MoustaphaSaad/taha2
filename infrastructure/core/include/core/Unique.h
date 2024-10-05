@@ -2,12 +2,12 @@
 
 #include "core/Allocator.h"
 
-#include <utility>
 #include <new>
+#include <utility>
 
 namespace core
 {
-	template<typename T>
+	template <typename T>
 	class Unique
 	{
 		Allocator* m_allocator = nullptr;
@@ -24,7 +24,7 @@ namespace core
 			}
 		}
 
-		template<typename U>
+		template <typename U>
 		void moveFrom(Unique<U>& other)
 		{
 			m_allocator = other.allocator();
@@ -39,7 +39,7 @@ namespace core
 			  m_ptr(p)
 		{}
 
-		Unique(std::nullptr_t){}
+		Unique(std::nullptr_t) {}
 
 		Unique(const Unique&) = delete;
 
@@ -48,8 +48,8 @@ namespace core
 			  m_ptr(other.leak())
 		{}
 
-		template<typename U>
-		requires std::is_convertible_v<U*, T*>
+		template <typename U>
+			requires std::is_convertible_v<U*, T*>
 		Unique(Unique<U>&& other) noexcept
 			: m_allocator(other.allocator()),
 			  m_ptr(other.leak())
@@ -71,8 +71,8 @@ namespace core
 			return *this;
 		}
 
-		template<typename U>
-		requires std::is_convertible_v<U*, T*>
+		template <typename U>
+			requires std::is_convertible_v<U*, T*>
 		Unique& operator=(Unique<U>&& other) noexcept
 		{
 			destroy();
@@ -85,18 +85,42 @@ namespace core
 			destroy();
 		}
 
-		T& operator*() const { return *m_ptr; }
-		T* operator->() const { return m_ptr; }
+		T& operator*() const
+		{
+			return *m_ptr;
+		}
+		T* operator->() const
+		{
+			return m_ptr;
+		}
 
-		operator bool() const { return m_ptr != nullptr; }
-		bool operator==(std::nullptr_t) const { return m_ptr == nullptr; }
-		bool operator!=(std::nullptr_t) const { return m_ptr != nullptr; }
-		template<typename R>
-		bool operator==(const Unique<R>& other) const { return m_ptr == other.m_ptr; }
-		template<typename R>
-		bool operator!=(const Unique<R>& other) const { return m_ptr != other.m_ptr; }
+		operator bool() const
+		{
+			return m_ptr != nullptr;
+		}
+		bool operator==(std::nullptr_t) const
+		{
+			return m_ptr == nullptr;
+		}
+		bool operator!=(std::nullptr_t) const
+		{
+			return m_ptr != nullptr;
+		}
+		template <typename R>
+		bool operator==(const Unique<R>& other) const
+		{
+			return m_ptr == other.m_ptr;
+		}
+		template <typename R>
+		bool operator!=(const Unique<R>& other) const
+		{
+			return m_ptr != other.m_ptr;
+		}
 
-		T* get() const { return m_ptr; }
+		T* get() const
+		{
+			return m_ptr;
+		}
 
 		[[nodiscard]] T* leak()
 		{
@@ -105,10 +129,13 @@ namespace core
 			return p;
 		}
 
-		Allocator* allocator() const { return m_allocator; }
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
 	};
 
-	template<typename T, typename... TArgs>
+	template <typename T, typename... TArgs>
 	inline Unique<T> unique_from(Allocator* allocator, TArgs&&... args)
 	{
 		auto ptr = allocator->allocSingleT<T>();
@@ -117,7 +144,7 @@ namespace core
 		return Unique<T>{allocator, (T*)ptr};
 	}
 
-	template<typename T, typename R>
+	template <typename T, typename R>
 	inline Unique<T> unique_static_cast(Unique<R> other)
 	{
 		return Unique<T>{other.allocator(), static_cast<T*>(other.leak())};

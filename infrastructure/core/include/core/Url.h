@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/Exports.h"
-#include "core/String.h"
 #include "core/Array.h"
+#include "core/Exports.h"
 #include "core/Hash.h"
 #include "core/Result.h"
+#include "core/String.h"
 
 namespace core
 {
@@ -16,8 +16,8 @@ namespace core
 			String key, value;
 
 			KeyValue(String key, String value)
-				: key(std::move(key))
-				, value(std::move(value))
+				: key(std::move(key)),
+				  value(std::move(value))
 			{}
 		};
 
@@ -38,8 +38,14 @@ namespace core
 		CORE_EXPORT KeyConstIterator find(StringView key) const;
 		CORE_EXPORT StringView get(KeyConstIterator) const;
 
-		size_t count() const { return m_keyValues.count(); }
-		const KeyValue& operator[](size_t index) const { return m_keyValues[index]; }
+		size_t count() const
+		{
+			return m_keyValues.count();
+		}
+		const KeyValue& operator[](size_t index) const
+		{
+			return m_keyValues[index];
+		}
 	};
 
 	class Url
@@ -52,6 +58,7 @@ namespace core
 		UrlQuery m_query;
 		String m_fragment;
 		int m_ipVersion = 0;
+
 	public:
 		CORE_EXPORT static String encodeQueryElement(StringView str, Allocator* allocator);
 		CORE_EXPORT static Result<Url> parse(StringView url, Allocator* allocator);
@@ -66,15 +73,42 @@ namespace core
 			  m_fragment(allocator)
 		{}
 
-		StringView scheme() const { return m_scheme; }
-		StringView user() const { return m_user; }
-		StringView host() const { return m_host; }
-		StringView port() const { return m_port; }
-		StringView path() const { return m_path; }
-		const UrlQuery& query() const { return m_query; }
-		UrlQuery& query() { return m_query; }
-		StringView fragment() const { return m_fragment; }
-		int ipVersion() const { return m_ipVersion; }
+		StringView scheme() const
+		{
+			return m_scheme;
+		}
+		StringView user() const
+		{
+			return m_user;
+		}
+		StringView host() const
+		{
+			return m_host;
+		}
+		StringView port() const
+		{
+			return m_port;
+		}
+		StringView path() const
+		{
+			return m_path;
+		}
+		const UrlQuery& query() const
+		{
+			return m_query;
+		}
+		UrlQuery& query()
+		{
+			return m_query;
+		}
+		StringView fragment() const
+		{
+			return m_fragment;
+		}
+		int ipVersion() const
+		{
+			return m_ipVersion;
+		}
 
 		CORE_EXPORT Result<String> toString(Allocator* allocator) const;
 		CORE_EXPORT Result<String> pathWithQueryAndFragment(Allocator* allocator) const;

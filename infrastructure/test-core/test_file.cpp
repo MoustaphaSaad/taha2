@@ -7,7 +7,8 @@ TEST_CASE("core::File roundtrip")
 {
 	core::Mallocator allocator;
 
-	auto file = core::File::open(&allocator, "test.txt"_sv, core::File::IO_MODE_READ_WRITE, core::File::OPEN_MODE_CREATE_OVERWRITE);
+	auto file = core::File::open(
+		&allocator, "test.txt"_sv, core::File::IO_MODE_READ_WRITE, core::File::OPEN_MODE_CREATE_OVERWRITE);
 	REQUIRE(file != nullptr);
 
 	auto str = "Hello يا عالم 🌎!"_sv;

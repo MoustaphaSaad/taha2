@@ -10,12 +10,16 @@ namespace core
 	{
 		static void join(String& result) {}
 
-		template<typename ... TArgs>
-		static void join(String& result, StringView first, TArgs&& ... args)
+		template <typename... TArgs>
+		static void join(String& result, StringView first, TArgs&&... args)
 		{
 			if (result.count() > 0)
+			{
 				if (!(result.endsWith("/"_sv) || result.endsWith("\\"_sv)))
+				{
 					result.push(Rune{'/'});
+				}
+			}
 			result.push(first);
 			join(result, std::forward<TArgs>(args)...);
 		}
@@ -25,8 +29,8 @@ namespace core
 		CORE_EXPORT static Result<String> workingDir(Allocator* allocator);
 		CORE_EXPORT static Result<String> tmpDir(Allocator* allocator);
 
-		template<typename ... TArgs>
-		static String join(Allocator* allocator, TArgs&& ... args)
+		template <typename... TArgs>
+		static String join(Allocator* allocator, TArgs&&... args)
 		{
 			String result{allocator};
 			join(result, std::forward<TArgs>(args)...);
@@ -62,7 +66,9 @@ namespace core
 				prev = c;
 			}
 			if ((prev == '\\' || prev == '/') && result.count() > 0)
+			{
 				result.resize(result.count() - 1);
+			}
 			return result;
 		}
 	};

@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include <math/Vec.h>
 #include <math/Mat.h>
+#include <math/Vec.h>
 
 TEST_CASE("vector initialization")
 {

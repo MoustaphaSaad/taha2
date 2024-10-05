@@ -5,7 +5,7 @@
 
 namespace core
 {
-	String Base64::encode(Span<std::byte> bytes, core::Allocator *allocator)
+	String Base64::encode(Span<std::byte> bytes, core::Allocator* allocator)
 	{
 		auto b64 = BIO_new(BIO_f_base64());
 		// ignore newlines
@@ -27,7 +27,7 @@ namespace core
 		return result;
 	}
 
-	Buffer Base64::decode(core::StringView str, core::Allocator *allocator)
+	Buffer Base64::decode(core::StringView str, core::Allocator* allocator)
 	{
 		auto b64 = BIO_new(BIO_f_base64());
 		// ignore newlines

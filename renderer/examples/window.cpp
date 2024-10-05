@@ -1,6 +1,6 @@
+#include <GLFW/glfw3.h>
 #include <core/FastLeak.h>
 #include <core/Log.h>
-#include <GLFW/glfw3.h>
 
 int main()
 {

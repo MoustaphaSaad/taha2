@@ -11,21 +11,28 @@ namespace core
 	{
 		m_queue.reserve(threads_count);
 		for (size_t i = 0; i < threads_count; ++i)
+		{
 			m_queue.push(NotificationQueue{allocator});
+		}
 
 		m_threads.reserve(threads_count);
 		for (size_t i = 0; i < threads_count; ++i)
 		{
-			Thread thread(allocator, [this, n = i]()
-			{
+			Thread thread(allocator, [this, n = i]() {
 				while (true)
 				{
 					NotificationQueueEntry entry;
 					for (size_t i = 0; i < m_threads_count; ++i)
+					{
 						if (m_queue[(i + n) % m_threads_count].tryPop(entry))
+						{
 							break;
+						}
+					}
 					if (!entry.func && !m_queue[n].pop(entry))
+					{
 						break;
+					}
 					entry.func();
 					if (auto executionQueue = entry.executionQueue.lock())
 					{
@@ -44,9 +51,13 @@ namespace core
 
 	ThreadPool::~ThreadPool()
 	{
-		for (auto& queue : m_queue)
+		for (auto& queue: m_queue)
+		{
 			queue.done();
-		for (auto& thread : m_threads)
+		}
+		for (auto& thread: m_threads)
+		{
 			thread.join();
+		}
 	}
 }

@@ -1,22 +1,27 @@
 #include "core/ws/Client.h"
-#include "core/ws/Handshake.h"
-#include "core/Url.h"
-#include "core/Rand.h"
 #include "core/Base64.h"
-#include "core/MemoryStream.h"
-#include "core/SHA1.h"
 #include "core/Lock.h"
+#include "core/MemoryStream.h"
+#include "core/Rand.h"
+#include "core/SHA1.h"
+#include "core/Url.h"
+#include "core/ws/Handshake.h"
 
 namespace core::ws
 {
 	HumanError Client::write(Span<const std::byte> bytes)
 	{
 		if (bytes.sizeInBytes() == 0)
+		{
 			return {};
+		}
 
 		auto writtenSize = m_socket->write(bytes.data(), bytes.sizeInBytes());
 		if (writtenSize != bytes.sizeInBytes())
-			return errf(m_allocator, "failed to write into socket, wrote {}/{} bytes"_sv, writtenSize, bytes.sizeInBytes());
+		{
+			return errf(
+				m_allocator, "failed to write into socket, wrote {}/{} bytes"_sv, writtenSize, bytes.sizeInBytes());
+		}
 		return {};
 	}
 
@@ -24,7 +29,9 @@ namespace core::ws
 	{
 		auto readSize = m_bufferedReader.read(bytes.data(), bytes.count());
 		if (readSize != bytes.sizeInBytes())
+		{
 			return errf(m_allocator, "failed to read from socket, read {}/{} bytes"_sv, readSize, bytes.count());
+		}
 		return {};
 	}
 
@@ -32,7 +39,9 @@ namespace core::ws
 	{
 		auto pathResult = url.pathWithQueryAndFragment(m_allocator);
 		if (pathResult.isError())
+		{
 			return pathResult.releaseError();
+		}
 		auto path = pathResult.releaseValue();
 
 		MemoryStream request{m_allocator};
@@ -53,10 +62,14 @@ namespace core::ws
 	{
 		StringView http;
 		while (http.find("\r\n\r\n"_sv) == SIZE_MAX && http.count() < maxSize)
+		{
 			http = m_bufferedReader.peek(http.count() + 1024);
+		}
 
 		if (http.count() > maxSize)
+		{
 			return errf(m_allocator, "http size is too large, >{}"_sv, maxSize);
+		}
 
 		auto httpEnd = http.find("\r\n\r\n"_sv);
 		String httpString{m_allocator};
@@ -64,7 +77,9 @@ namespace core::ws
 		httpString.resize(httpEnd + 4);
 		auto err = read(StringView{httpString});
 		if (err)
+		{
 			return errf(m_allocator, "failed to read http request or response, {}"_sv, err);
+		}
 		return httpString;
 	}
 
@@ -74,22 +89,30 @@ namespace core::ws
 		Span<std::byte> key{rawKey, sizeof(rawKey)};
 		auto ok = Rand::cryptoRand(key);
 		if (ok == false)
+		{
 			return errf(m_allocator, "failed to generate random key"_sv);
+		}
 
 		auto base64Key = Base64::encode(key, m_allocator);
 		auto err = sendHandshake(url, base64Key);
 		if (err)
+		{
 			return err;
+		}
 
 		// read response
 		auto httpResponseResult = readHTTP(m_maxHandshakeSize);
 		if (httpResponseResult.isError())
+		{
 			return httpResponseResult.releaseError();
+		}
 		auto httpResponse = httpResponseResult.releaseValue();
 
 		auto handshakeResult = Handshake::parseResponse(httpResponse, m_allocator);
 		if (handshakeResult.isError())
+		{
 			return handshakeResult.releaseError();
+		}
 		auto handshake = handshakeResult.releaseValue();
 
 		SHA1Hasher hasher;
@@ -97,7 +120,9 @@ namespace core::ws
 		hasher.hash("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"_sv);
 		auto expectedBase64 = Base64::encode(hasher.final().asBytes(), m_allocator);
 		if (expectedBase64 != handshake.key())
+		{
 			return errf(m_allocator, "invalid websocket accept header"_sv);
+		}
 		return {};
 	}
 
@@ -105,23 +130,26 @@ namespace core::ws
 	{
 		auto httpRequestResult = readHTTP(m_maxHandshakeSize);
 		if (httpRequestResult.isError())
+		{
 			return httpRequestResult.releaseError();
+		}
 		auto httpRequest = httpRequestResult.releaseValue();
 
 		auto handshakeResult = Handshake::parse(httpRequest, m_allocator);
 		if (handshakeResult.isError())
 		{
-			constexpr static auto REPLY = R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)";
+			constexpr static auto REPLY =
+				R"(HTTP/1.1 400 Invalid\r\nerror: failed to parse handshake\r\ncontent-length: 0\r\n\r\n)";
 			(void)write(StringView{REPLY});
 			return handshakeResult.releaseError();
 		}
 		auto handshake = handshakeResult.releaseValue();
 
 		constexpr static const char* REPLY = "HTTP/1.1 101 Switching Protocols\r\n"
-			"Upgrade: websocket\r\n"
-			"Connection: Upgrade\r\n"
-			"Sec-WebSocket-Accept: {}\r\n"
-			"\r\n";
+											 "Upgrade: websocket\r\n"
+											 "Connection: Upgrade\r\n"
+											 "Sec-WebSocket-Accept: {}\r\n"
+											 "\r\n";
 
 		SHA1Hasher hasher;
 		hasher.hash(handshake.key());
@@ -138,7 +166,9 @@ namespace core::ws
 			validateMsg(payload.sizeInBytes() <= 125, "control frames are limited to 125 bytes");
 			// limit it to 125 bytes
 			if (payload.sizeInBytes() > 125)
+			{
 				payload = payload.sliceLeft(125);
+			}
 		}
 
 		std::byte rawMask[4] = {};
@@ -147,7 +177,9 @@ namespace core::ws
 		{
 			auto ok = Rand::cryptoRand(mask);
 			if (ok == false)
+			{
 				return errf(m_allocator, "failed to generate mask"_sv);
+			}
 		}
 
 		std::byte buf[14] = {};
@@ -188,14 +220,18 @@ namespace core::ws
 
 		// write header
 		if (auto err = write(Span<const std::byte>{buf, buf_size}); err)
+		{
 			return err;
+		}
 
 		if (m_shouldMask)
 		{
 			Buffer maskedPayload{m_allocator};
 			maskedPayload.push(payload);
 			for (size_t i = 0; i < maskedPayload.count(); ++i)
+			{
 				maskedPayload[i] ^= mask[i & 3];
+			}
 			return write(Span<const std::byte>{maskedPayload});
 		}
 		else
@@ -215,34 +251,46 @@ namespace core::ws
 		return writeFrame(Frame::OPCODE_CLOSE, Span<const std::byte>{buf, payloadSize});
 	}
 
-	Result<Client> Client::connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator)
+	Result<Client>
+	Client::connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator)
 	{
 		auto parsedUrlResult = Url::parse(url, allocator);
 		if (parsedUrlResult.isError())
+		{
 			return parsedUrlResult.releaseError();
+		}
 		auto parsedUrl = parsedUrlResult.releaseValue();
 
 		auto socket = Socket::open(allocator, Socket::FAMILY_IPV4, Socket::TYPE_TCP);
 		if (socket == nullptr)
+		{
 			return core::errf(allocator, "failed to open a socket"_sv);
+		}
 
 		auto ok = socket->connect(parsedUrl.host(), parsedUrl.port());
 		if (ok == false)
+		{
 			return core::errf(allocator, "failed to connect to '{}'"_sv, url);
+		}
 
 		Client client{std::move(socket), maxHandshakeSize, maxMessageSize, log, allocator};
 		if (auto err = client.handshake(parsedUrl); err)
+		{
 			return err;
+		}
 
 		client.m_shouldMask = true;
 		return client;
 	}
 
-	Result<Client> Client::acceptFromServer(Unique<Socket> socket, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator)
+	Result<Client> Client::acceptFromServer(
+		Unique<Socket> socket, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator)
 	{
 		Client client{std::move(socket), maxHandshakeSize, maxMessageSize, log, allocator};
 		if (auto err = client.serverHandshake(); err)
+		{
 			return err;
+		}
 		return client;
 	}
 
@@ -274,22 +322,33 @@ namespace core::ws
 		case Message::KIND_CLOSE:
 		{
 			if (message.payload.count() == 0)
+			{
 				return writeClose(1000, ""_sv);
+			}
 
 			// error protocol close payload should have at least 2 byte
 			if (message.payload.count() == 1)
+			{
 				return writeClose(1002, "close payload should have at least 2 byte"_sv);
+			}
 
 			auto errorCode = uint16_t(message.payload[1]) | (uint16_t(message.payload[0]) << 8);
-			if (errorCode < 1000 || errorCode == 1004 || errorCode == 1005 || errorCode == 1006 || (errorCode > 1013  && errorCode < 3000))
+			if (errorCode < 1000 || errorCode == 1004 || errorCode == 1005 || errorCode == 1006 ||
+				(errorCode > 1013 && errorCode < 3000))
+			{
 				return writeClose(1002, ""_sv);
+			}
 
 			if (message.payload.count() == 2)
+			{
 				return writeClose(1000, ""_sv);
+			}
 
 			auto payload = StringView{message.payload}.sliceRight(2);
 			if (payload.isValidUtf8() == false)
+			{
 				return writeClose(1007, "invalid utf8 in close reason"_sv);
+			}
 
 			return writeClose(1000, ""_sv);
 		}

@@ -29,6 +29,7 @@ namespace minijava
 				core::strf(m_stream, "  "_sv);
 			}
 		}
+
 	public:
 		ASTPrinter(core::Stream* stream)
 			: m_stream(stream)

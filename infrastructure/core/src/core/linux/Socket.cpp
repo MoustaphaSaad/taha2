@@ -1,12 +1,12 @@
 #include "core/Socket.h"
-#include "core/String.h"
 #include "core/Assert.h"
+#include "core/String.h"
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/unistd.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/unistd.h>
 
 namespace core
 {
@@ -17,6 +17,7 @@ namespace core
 		int m_family = 0;
 		int m_type = 0;
 		int m_protocol = 0;
+
 	public:
 		LinuxSocket(Allocator* allocator, int handle, int family, int type, int protocol)
 			: m_allocator(allocator),
@@ -39,11 +40,15 @@ namespace core
 		bool close() override
 		{
 			if (m_handle == -1)
+			{
 				return false;
+			}
 
 			auto err = ::close(m_handle);
 			if (err == -1)
+			{
 				return false;
+			}
 
 			m_handle = -1;
 			return true;
@@ -61,7 +66,9 @@ namespace core
 			addrinfo* result = nullptr;
 			auto err = ::getaddrinfo(c_address.data(), c_port.data(), &hints, &result);
 			if (err != 0)
+			{
 				return false;
+			}
 
 			for (auto it = result; it; it = it->ai_next)
 			{
@@ -90,7 +97,9 @@ namespace core
 			addrinfo* result = nullptr;
 			auto err = ::getaddrinfo(c_host.data(), c_port.data(), &hints, &result);
 			if (err != 0)
+			{
 				return false;
+			}
 
 			err = ::bind(m_handle, result->ai_addr, (int)result->ai_addrlen);
 			if (err == -1)
@@ -106,11 +115,15 @@ namespace core
 		bool listen(int max_connections) override
 		{
 			if (max_connections == 0)
+			{
 				max_connections = SOMAXCONN;
+			}
 
 			auto err = ::listen(m_handle, max_connections);
 			if (err == -1)
+			{
 				return false;
+			}
 
 			return true;
 		}
@@ -119,7 +132,9 @@ namespace core
 		{
 			auto handle = ::accept(m_handle, nullptr, nullptr);
 			if (handle == -1)
+			{
 				return nullptr;
+			}
 
 			return unique_from<LinuxSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
 		}
@@ -155,9 +170,12 @@ namespace core
 		{
 			switch (m_family)
 			{
-			case AF_UNSPEC: return FAMILY_UNSPEC;
-			case AF_INET: return FAMILY_IPV4;
-			case AF_INET6: return FAMILY_IPV6;
+			case AF_UNSPEC:
+				return FAMILY_UNSPEC;
+			case AF_INET:
+				return FAMILY_IPV4;
+			case AF_INET6:
+				return FAMILY_IPV6;
 			default:
 				unreachable();
 				return FAMILY(0);
@@ -168,8 +186,10 @@ namespace core
 		{
 			switch (m_type)
 			{
-			case SOCK_STREAM: return TYPE_TCP;
-			case SOCK_DGRAM: return TYPE_UDP;
+			case SOCK_STREAM:
+				return TYPE_TCP;
+			case SOCK_DGRAM:
+				return TYPE_UDP;
 			default:
 				unreachable();
 				return TYPE(0);
@@ -181,17 +201,23 @@ namespace core
 			sockaddr addr{};
 			socklen_t size = sizeof(addr);
 			if (getsockname(m_handle, &addr, &size) != 0)
+			{
 				return 0;
+			}
 
 			char portName[6] = {0};
 			if (getnameinfo(&addr, size, NULL, 0, portName, sizeof(portName), NI_NUMERICSERV) != 0)
+			{
 				return 0;
+			}
 
 			errno = 0;
 			auto endPtr = portName;
 			auto res = strtoul(portName, &endPtr, 10);
 			if (errno == ERANGE || endPtr != portName + strlen(portName))
+			{
 				return 0;
+			}
 			validate(res <= UINT16_MAX);
 			return uint16_t(res);
 		}
@@ -200,7 +226,9 @@ namespace core
 		{
 			auto err = ::recv(m_handle, (char*)buffer, (int)size, 0);
 			if (err == -1)
+			{
 				return 0;
+			}
 
 			return (size_t)err;
 		}
@@ -209,7 +237,9 @@ namespace core
 		{
 			auto err = ::send(m_handle, (const char*)buffer, (int)size, 0);
 			if (err == -1)
+			{
 				return 0;
+			}
 
 			return (size_t)err;
 		}
@@ -263,7 +293,9 @@ namespace core
 
 		auto handle = ::socket(osFamily, osType, osProtocol);
 		if (handle == -1)
+		{
 			return nullptr;
+		}
 
 		return unique_from<LinuxSocket>(allocator, allocator, handle, osFamily, osType, osProtocol);
 	}

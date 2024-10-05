@@ -1,9 +1,9 @@
 #include <doctest/doctest.h>
 
-#include <core/UUID.h>
 #include <core/Hash.h>
-#include <core/String.h>
 #include <core/Mallocator.h>
+#include <core/String.h>
+#include <core/UUID.h>
 
 TEST_CASE("basic core::UUID test")
 {
@@ -53,4 +53,3 @@ TEST_CASE("core::UUID parsing")
 	REQUIRE(res.isError() == false);
 	REQUIRE(res.value() == core::UUID{});
 }
-

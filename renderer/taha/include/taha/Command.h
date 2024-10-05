@@ -55,7 +55,11 @@ namespace taha
 		{}
 		virtual ~Command() = default;
 
-		KIND kind() const { return m_kind; }
+		KIND kind() const
+		{
+			return m_kind;
+		}
+
 	private:
 		KIND m_kind = KIND_NONE;
 	};

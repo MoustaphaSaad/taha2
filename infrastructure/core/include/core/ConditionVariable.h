@@ -10,6 +10,7 @@ namespace core
 	{
 		struct IConditionVariable;
 		Unique<IConditionVariable> m_condition_variable;
+
 	public:
 		CORE_EXPORT explicit ConditionVariable(Allocator* allocator);
 		CORE_EXPORT ConditionVariable(ConditionVariable&& other) noexcept;
@@ -18,11 +19,13 @@ namespace core
 
 		CORE_EXPORT void wait(Mutex& mutex);
 
-		template<typename Predicate>
+		template <typename Predicate>
 		void wait(Mutex& mutex, Predicate&& predicate)
 		{
 			while (!predicate())
+			{
 				wait(mutex);
+			}
 		}
 
 		CORE_EXPORT void notify_one();

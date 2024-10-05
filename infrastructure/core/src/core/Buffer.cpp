@@ -8,7 +8,9 @@ namespace core
 	void Buffer::destroy()
 	{
 		if (m_allocator == nullptr || m_memory.empty())
+		{
 			return;
+		}
 
 		m_allocator->release(m_memory);
 		m_allocator->free(m_memory);
@@ -55,10 +57,14 @@ namespace core
 		{
 			auto new_capacity = m_memory.count() * 2;
 			if (new_capacity == 0)
+			{
 				new_capacity = 8;
+			}
 
 			if (new_capacity < m_count + count)
+			{
 				new_capacity = m_count + count;
+			}
 
 			grow(new_capacity);
 		}

@@ -9,7 +9,8 @@
 
 namespace core
 {
-	template <typename T> class Array
+	template <typename T>
+	class Array
 	{
 		Allocator* m_allocator = nullptr;
 		Span<T> m_memory;
@@ -18,10 +19,14 @@ namespace core
 		void destroy()
 		{
 			if (m_memory.empty())
+			{
 				return;
+			}
 
 			for (size_t i = 0; i < m_count; ++i)
+			{
 				m_memory[i].~T();
+			}
 			m_allocator->releaseT(m_memory);
 			m_allocator->freeT(m_memory);
 		}
@@ -33,7 +38,9 @@ namespace core
 			m_memory = m_allocator->allocT<T>(m_count);
 			m_allocator->commitT(m_memory);
 			for (size_t i = 0; i < m_count; ++i)
+			{
 				::new (&m_memory[i]) T(other.m_memory[i]);
+			}
 		}
 
 		void moveFrom(Array& other)
@@ -54,9 +61,13 @@ namespace core
 			for (size_t i = 0; i < m_count; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					::new (&new_memory[i]) T(std::move(m_memory[i]));
+				}
 				else
+				{
 					::new (&new_memory[i]) T(m_memory[i]);
+				}
 				m_memory[i].~T();
 			}
 
@@ -72,21 +83,33 @@ namespace core
 			{
 				size_t new_capacity = m_memory.count() * 2;
 				if (new_capacity == 0)
+				{
 					new_capacity = 8;
+				}
 
 				if (new_capacity < m_memory.count() + i)
+				{
 					new_capacity = m_memory.count() + i;
+				}
 
 				grow(new_capacity);
 			}
 		}
 
 	public:
-		explicit Array(Allocator* a): m_allocator(a) {}
+		explicit Array(Allocator* a)
+			: m_allocator(a)
+		{}
 
-		Array(const Array& other) { copyFrom(other); }
+		Array(const Array& other)
+		{
+			copyFrom(other);
+		}
 
-		Array(Array&& other) noexcept { moveFrom(other); }
+		Array(Array&& other) noexcept
+		{
+			moveFrom(other);
+		}
 
 		Array& operator=(const Array& other)
 		{
@@ -102,7 +125,10 @@ namespace core
 			return *this;
 		}
 
-		~Array() { destroy(); }
+		~Array()
+		{
+			destroy();
+		}
 
 		T& operator[](size_t i)
 		{
@@ -116,9 +142,18 @@ namespace core
 			return m_memory[i];
 		}
 
-		Allocator* allocator() const { return m_allocator; }
-		size_t count() const { return m_count; }
-		size_t capacity() const { return m_memory.count(); }
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
+		size_t count() const
+		{
+			return m_count;
+		}
+		size_t capacity() const
+		{
+			return m_memory.count();
+		}
 
 		void push(const T& v)
 		{
@@ -136,7 +171,8 @@ namespace core
 			++m_count;
 		}
 
-		template <typename... TArgs> void emplace(TArgs&&... args)
+		template <typename... TArgs>
+		void emplace(TArgs&&... args)
 		{
 			ensureSpaceExists();
 			m_allocator->commitT(m_memory.slice(m_count, m_count + 1));
@@ -155,12 +191,17 @@ namespace core
 		void clear()
 		{
 			for (size_t i = 0; i < m_count; ++i)
+			{
 				m_memory[i].~T();
+			}
 			m_allocator->releaseT(m_memory.sliceLeft(m_count));
 			m_count = 0;
 		}
 
-		void reserve(size_t added_count) { ensureSpaceExists(added_count); }
+		void reserve(size_t added_count)
+		{
+			ensureSpaceExists(added_count);
+		}
 
 		void resize(size_t new_count)
 		{
@@ -169,12 +210,16 @@ namespace core
 				ensureSpaceExists(new_count - m_count);
 				m_allocator->commitT(m_memory.slice(m_count, new_count));
 				for (; m_count < new_count; ++m_count)
+				{
 					::new (&m_memory[m_count]) T();
+				}
 			}
 			else if (new_count < m_count)
 			{
 				for (size_t i = new_count; i < m_count; ++i)
+				{
 					m_memory[i].~T();
+				}
 				m_allocator->releaseT(m_memory.slice(new_count, m_count));
 				m_count = new_count;
 			}
@@ -187,12 +232,16 @@ namespace core
 				ensureSpaceExists(new_count - m_count);
 				m_allocator->commitT(m_memory.slice(m_count, new_count));
 				for (; m_count < new_count; ++m_count)
+				{
 					::new (&m_memory[m_count]) T(value);
+				}
 			}
 			else
 			{
 				for (size_t i = new_count; i < m_count; ++i)
+				{
 					m_memory[i].~T();
+				}
 				m_allocator->releaseT(m_memory.slice(new_count, m_count));
 				m_count = new_count;
 			}
@@ -201,16 +250,22 @@ namespace core
 		void shrink_to_fit()
 		{
 			if (m_memory.count() == m_count)
+			{
 				return;
+			}
 
 			auto new_memory = m_allocator->allocT<T>(m_count);
 			m_allocator->commitT(new_memory);
 			for (size_t i = 0; i < m_count; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					::new (&new_memory[i]) T(std::move(m_memory[i]));
+				}
 				else
+				{
 					::new (&new_memory[i]) T(m_memory[i]);
+				}
 				m_memory[i].~T();
 			}
 
@@ -220,7 +275,7 @@ namespace core
 			m_memory = new_memory;
 		}
 
-		template<typename TFunc>
+		template <typename TFunc>
 		void removeIf(TFunc&& func)
 		{
 			auto beginIt = begin();
@@ -240,20 +295,40 @@ namespace core
 			m_count -= removedCount;
 
 			for (auto it = frontIt; it != endIt; ++it)
+			{
 				it->~T();
+			}
 
 			m_allocator->releaseT(m_memory.slice(m_count, m_count + removedCount));
 		}
 
-		T* data() { return m_memory.data(); }
-		const T* data() const { return m_memory.data(); }
+		T* data()
+		{
+			return m_memory.data();
+		}
+		const T* data() const
+		{
+			return m_memory.data();
+		}
 
-		T* begin() { return m_memory.begin(); }
+		T* begin()
+		{
+			return m_memory.begin();
+		}
 
-		const T* begin() const { return m_memory.begin(); }
+		const T* begin() const
+		{
+			return m_memory.begin();
+		}
 
-		T* end() { return m_memory.sliceLeft(m_count).end(); }
+		T* end()
+		{
+			return m_memory.sliceLeft(m_count).end();
+		}
 
-		const T* end() const { return m_memory.sliceLeft(m_count).end(); }
+		const T* end() const
+		{
+			return m_memory.sliceLeft(m_count).end();
+		}
 	};
 }

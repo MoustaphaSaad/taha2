@@ -40,10 +40,7 @@ namespace core
 	bool IPCMutex::tryLock()
 	{
 		auto res = WaitForSingleObject(m_mutex->handle, 0);
-		return (
-			res == WAIT_OBJECT_0 ||
-			res == WAIT_ABANDONED
-		);
+		return (res == WAIT_OBJECT_0 || res == WAIT_ABANDONED);
 	}
 
 	void IPCMutex::unlock()

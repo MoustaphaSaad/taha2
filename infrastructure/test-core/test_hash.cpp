@@ -2,8 +2,8 @@
 
 #include <core/Hash.h>
 #include <core/Mallocator.h>
-#include <core/Unique.h>
 #include <core/Shared.h>
+#include <core/Unique.h>
 
 TEST_CASE("basic core::Hash test")
 {
@@ -13,11 +13,15 @@ TEST_CASE("basic core::Hash test")
 	REQUIRE(numbers.capacity() == 0);
 
 	for (int i = 0; i < 10; ++i)
+	{
 		numbers.insert(i, i + 1);
+	}
 	REQUIRE(numbers.count() == 10);
 
 	for (int i = 0; i < 10; ++i)
+	{
 		REQUIRE(numbers.lookup(i)->value == i + 1);
+	}
 	REQUIRE(numbers.capacity() >= numbers.count());
 
 	numbers.clear();

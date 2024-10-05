@@ -10,23 +10,30 @@ namespace minijava
 	{
 		auto absolutePathResult = core::Path::abs(path, allocator);
 		if (absolutePathResult.isError())
+		{
 			return absolutePathResult.releaseError();
+		}
 		auto absolutePath = absolutePathResult.releaseValue();
 
 		auto contentResult = core::File::content(allocator, absolutePath);
 		if (contentResult.isError())
+		{
 			return contentResult.releaseError();
+		}
 		auto content = contentResult.releaseValue();
 
 		auto filePath = core::String{path, allocator};
 
-		return core::unique_from<Unit>(allocator, std::move(filePath), std::move(absolutePath), std::move(content), allocator);
+		return core::unique_from<Unit>(
+			allocator, std::move(filePath), std::move(absolutePath), std::move(content), allocator);
 	}
 
 	bool Unit::scan()
 	{
 		if (m_stage >= STAGE_SCANNED)
+		{
 			return m_stage != STAGE_FAILED;
+		}
 
 		Scanner scanner{this, m_allocator};
 		while (true)
@@ -34,10 +41,14 @@ namespace minijava
 			auto token = scanner.scan();
 
 			if (token.kind() == Token::KIND_EOF)
+			{
 				break;
+			}
 
 			if (token.kind() != Token::KIND_NONE)
+			{
 				m_token.push(std::move(token));
+			}
 		}
 
 		if (hasErrors())
@@ -56,12 +67,13 @@ namespace minijava
 	{
 		for (const auto& token: m_token)
 		{
-			core::strf(stream, "Token: \"{}\", Type: \"{}\", Line: {}:{}\n"_sv,
+			core::strf(
+				stream,
+				"Token: \"{}\", Type: \"{}\", Line: {}:{}\n"_sv,
 				token.text(),
 				token.kind(),
 				token.location().position.line,
-				token.location().position.column
-			);
+				token.location().position.column);
 		}
 	}
 
@@ -72,7 +84,9 @@ namespace minijava
 			const auto& err = m_errors[i];
 
 			if (i > 0)
+			{
 				core::strf(stream, "\n"_sv);
+			}
 
 			if (err.location().position.line > 0)
 			{
@@ -85,10 +99,7 @@ namespace minijava
 					{
 						auto r = core::Rune::decode(it);
 
-						if (r == '\r' || r == '\n')
-						{
-
-						}
+						if (r == '\r' || r == '\n') {}
 						else if (it >= err.location().range.begin() && it < err.location().range.end())
 						{
 							core::strf(stream, "^"_sv);
@@ -111,8 +122,7 @@ namespace minijava
 					err.location().unit->m_filePath,
 					err.location().position.line,
 					err.location().position.column,
-					err.message()
-				);
+					err.message());
 			}
 			else
 			{

@@ -13,12 +13,14 @@
 
 namespace taha
 {
-	core::Result<core::Unique<DX11Renderer>> DX11Renderer::create(core::Allocator *allocator)
+	core::Result<core::Unique<DX11Renderer>> DX11Renderer::create(core::Allocator* allocator)
 	{
 		DXPtr<IDXGIFactory1> factory;
 		auto res = CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)factory.getPtrAddress());
 		if (FAILED(res))
+		{
 			return core::errf(allocator, "CreateDXGIFactory1 failed, ErrorCode({})"_sv, res);
+		}
 
 		DXPtr<IDXGIAdapter1> selectedAdapter1;
 		DXGI_ADAPTER_DESC1 selectedAdapterDesc1{};
@@ -37,14 +39,16 @@ namespace taha
 
 		DXPtr<ID3D11Device> device;
 		DXPtr<ID3D11DeviceContext> context;
-		D3D_FEATURE_LEVEL features[] {
+		D3D_FEATURE_LEVEL features[]{
 			D3D_FEATURE_LEVEL_11_1,
 			D3D_FEATURE_LEVEL_11_0,
 		};
 
 		UINT flags = 0;
 		if (true)
+		{
 			flags = D3D11_CREATE_DEVICE_DEBUG;
+		}
 
 		res = D3D11CreateDevice(
 			selectedAdapter1.get(),
@@ -56,12 +60,19 @@ namespace taha
 			D3D11_SDK_VERSION,
 			device.getPtrAddress(),
 			nullptr,
-			context.getPtrAddress()
-		);
+			context.getPtrAddress());
 		if (FAILED(res))
+		{
 			return core::errf(allocator, "D3D11CreateDevice failed, ErrorCode({})"_sv, res);
+		}
 
-		return core::unique_from<DX11Renderer>(allocator, std::move(factory), std::move(selectedAdapter1), std::move(device), std::move(context), allocator);
+		return core::unique_from<DX11Renderer>(
+			allocator,
+			std::move(factory),
+			std::move(selectedAdapter1),
+			std::move(device),
+			std::move(context),
+			allocator);
 	}
 
 	core::Unique<Frame> DX11Renderer::createFrameForWindow(NativeWindowDesc desc)
@@ -84,24 +95,34 @@ namespace taha
 			DXPtr<IDXGIOutput> output;
 			auto res = m_adapter->EnumOutputs(0, output.getPtrAddress());
 			if (FAILED(res))
+			{
 				return nullptr;
+			}
 
 			UINT modesCount = 0;
-			res = output->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &modesCount, nullptr);
+			res = output->GetDisplayModeList(
+				DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &modesCount, nullptr);
 			if (FAILED(res))
+			{
 				return nullptr;
+			}
 
 			core::Array<DXGI_MODE_DESC> modes{m_allocator};
 			modes.resize_fill(modesCount, DXGI_MODE_DESC{});
 
-			res = output->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &modesCount, modes.begin());
+			res = output->GetDisplayModeList(
+				DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &modesCount, modes.begin());
 			if (FAILED(res))
+			{
 				return nullptr;
+			}
 
 			for (const auto& mode: modes)
 			{
 				if (mode.Width == desc.width && mode.Height == desc.height)
+				{
 					swapchainDesc.BufferDesc.RefreshRate = mode.RefreshRate;
+				}
 			}
 		}
 		else
@@ -113,17 +134,23 @@ namespace taha
 		DXPtr<IDXGISwapChain> swapchain;
 		auto res = m_factory->CreateSwapChain(m_device.get(), &swapchainDesc, swapchain.getPtrAddress());
 		if (FAILED(res))
+		{
 			return nullptr;
+		}
 
 		DXPtr<ID3D11Texture2D> colorTexture;
 		res = swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)colorTexture.getPtrAddress());
 		if (FAILED(res))
+		{
 			return nullptr;
+		}
 
 		DXPtr<ID3D11RenderTargetView> renderTargetView;
 		res = m_device->CreateRenderTargetView(colorTexture.get(), nullptr, renderTargetView.getPtrAddress());
 		if (FAILED(res))
+		{
 			return nullptr;
+		}
 
 		DXPtr<ID3D11Texture2D> depthTexture;
 		D3D11_TEXTURE2D_DESC depthDesc{};
@@ -137,20 +164,32 @@ namespace taha
 		depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 		res = m_device->CreateTexture2D(&depthDesc, nullptr, depthTexture.getPtrAddress());
 		if (FAILED(res))
+		{
 			return nullptr;
+		}
 
 		DXPtr<ID3D11DepthStencilView> depthStencilView;
 		D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc{};
 		depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 		depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-		res = m_device->CreateDepthStencilView(depthTexture.get(), &depthStencilViewDesc, depthStencilView.getPtrAddress());
+		res = m_device->CreateDepthStencilView(
+			depthTexture.get(), &depthStencilViewDesc, depthStencilView.getPtrAddress());
 		if (FAILED(res))
+		{
 			return nullptr;
+		}
 
-		return core::unique_from<DX11Frame>(m_allocator, this, std::move(swapchain), std::move(colorTexture), std::move(depthTexture), std::move(renderTargetView), std::move(depthStencilView));
+		return core::unique_from<DX11Frame>(
+			m_allocator,
+			this,
+			std::move(swapchain),
+			std::move(colorTexture),
+			std::move(depthTexture),
+			std::move(renderTargetView),
+			std::move(depthStencilView));
 	}
 
-	void DX11Renderer::submitCommandsAndExecute(Frame *frame, const core::Array<core::Unique<Command>> &commands)
+	void DX11Renderer::submitCommandsAndExecute(Frame* frame, const core::Array<core::Unique<Command>>& commands)
 	{
 		// write rendering algorithm here
 		// for now we get the clear command at the beginning and clear the frame
@@ -159,7 +198,8 @@ namespace taha
 		auto clear = dynamic_cast<ClearCommand*>(commands[0].get());
 
 		auto dx11Frame = dynamic_cast<DX11Frame*>(frame);
-		m_deviceContext->OMSetRenderTargets(1, dx11Frame->m_renderTargetView.getPtrAddress(), dx11Frame->m_depthStencilView.get());
+		m_deviceContext->OMSetRenderTargets(
+			1, dx11Frame->m_renderTargetView.getPtrAddress(), dx11Frame->m_depthStencilView.get());
 
 		D3D11_VIEWPORT viewport{};
 		viewport.Width = 640;
@@ -177,8 +217,13 @@ namespace taha
 		scissor.bottom = viewport.Height;
 		m_deviceContext->RSSetScissorRects(1, &scissor);
 
-		m_deviceContext->ClearRenderTargetView(dx11Frame->m_renderTargetView.get(), &clear->action.color[0].value.elements.r);
-		m_deviceContext->ClearDepthStencilView(dx11Frame->m_depthStencilView.get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, clear->action.depth.value, clear->action.stencil.value);
+		m_deviceContext->ClearRenderTargetView(
+			dx11Frame->m_renderTargetView.get(), &clear->action.color[0].value.elements.r);
+		m_deviceContext->ClearDepthStencilView(
+			dx11Frame->m_depthStencilView.get(),
+			D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+			clear->action.depth.value,
+			clear->action.stencil.value);
 
 		dx11Frame->m_swapchain->Present(0, 0);
 	}

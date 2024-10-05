@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
-#include <core/OS.h>
-#include <core/Mallocator.h>
 #include <core/Log.h>
+#include <core/Mallocator.h>
+#include <core/OS.h>
 
 TEST_CASE("core::OS")
 {

@@ -39,9 +39,13 @@ namespace core
 		}
 
 		if (m_cursor < 0)
+		{
 			m_cursor = 0;
+		}
 		if (m_cursor > (int64_t)m_buffer.count())
+		{
 			m_cursor = (int64_t)m_buffer.count();
+		}
 		return m_cursor;
 	}
 

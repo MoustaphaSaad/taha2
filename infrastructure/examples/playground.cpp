@@ -1,5 +1,5 @@
-#include <core/Stacktrace.h>
 #include <core/File.h>
+#include <core/Stacktrace.h>
 
 int main(int argc, char** argv)
 {

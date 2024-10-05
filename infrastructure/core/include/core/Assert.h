@@ -10,7 +10,8 @@ namespace core
 
 	CORE_EXPORT core::Log* setAssertLog(core::Log* log);
 
-	CORE_EXPORT void validateMsg(bool expr, const char* msg, std::source_location loc = std::source_location::current());
+	CORE_EXPORT void
+	validateMsg(bool expr, const char* msg, std::source_location loc = std::source_location::current());
 
 	inline void validate(bool expr, std::source_location loc = std::source_location::current())
 	{

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "taha/Exports.h"
 #include "taha/Command.h"
+#include "taha/Exports.h"
 
 #include <core/Array.h>
 #include <core/Unique.h>
@@ -15,6 +15,7 @@ namespace taha
 		core::Allocator* m_allocator = nullptr;
 		core::Array<core::Unique<Command>> m_commands;
 		Frame* m_frame = nullptr;
+
 	public:
 		TAHA_EXPORT Encoder(Frame* frame, const FrameAction& action, core::Allocator* allocator);
 		Encoder(const Encoder&) = delete;

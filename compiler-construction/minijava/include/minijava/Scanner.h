@@ -26,6 +26,7 @@ namespace minijava
 		core::StringView scanSingleLineComment();
 		core::StringView scanMultiLineComment();
 		Token::KIND inferKeywordType(core::StringView id);
+
 	public:
 		explicit Scanner(Unit* unit, core::Allocator* allocator);
 

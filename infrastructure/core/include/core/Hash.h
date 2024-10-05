@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/Allocator.h"
-#include "core/HashFunction.h"
 #include "core/Assert.h"
+#include "core/HashFunction.h"
 
 #include <cstdint>
 #include <cstring>
@@ -11,7 +11,12 @@
 
 namespace core
 {
-	enum HASH_FLAGS: uint8_t { HASH_EMPTY, HASH_USED, HASH_DELETED };
+	enum HASH_FLAGS : uint8_t
+	{
+		HASH_EMPTY,
+		HASH_USED,
+		HASH_DELETED
+	};
 
 	// hash table slot with the index and hash
 	class HashSlot
@@ -20,34 +25,47 @@ namespace core
 		// remaining bits = index
 		size_t index = 0;
 		size_t hash = 0;
+
 	public:
 		HashSlot() = default;
 
 		HashSlot(size_t value_index, size_t value_hash)
-			:index(value_index),
-			 hash(value_hash)
+			: index(value_index),
+			  hash(value_hash)
 		{}
 
 		// returns the flags of the given hash slot
 		HASH_FLAGS flags() const
 		{
 			if constexpr (sizeof(size_t) == 8)
+			{
 				return HASH_FLAGS((index & 0xC000000000000000) >> 62);
+			}
 			else if constexpr (sizeof(size_t) == 4)
+			{
 				return HASH_FLAGS((index & 0xC0000000) >> 30);
+			}
 			else
+			{
 				static_assert("unexpected sizeof(size_t)");
+			}
 		}
 
 		// returns the index into values array of the given hash slot
 		size_t valueIndex() const
 		{
 			if constexpr (sizeof(size_t) == 8)
+			{
 				return size_t(index & 0x3FFFFFFFFFFFFFFF);
+			}
 			else if constexpr (sizeof(size_t) == 4)
+			{
 				return size_t(index & 0x3FFFFFFF);
+			}
 			else
+			{
 				static_assert("unexpected sizeof(size_t)");
+			}
 		}
 
 		size_t valueHash() const
@@ -100,7 +118,7 @@ namespace core
 		}
 	};
 
-	template<typename T, typename THash = Hash<T>>
+	template <typename T, typename THash = Hash<T>>
 	class Set
 	{
 		Allocator* m_allocator = nullptr;
@@ -121,7 +139,9 @@ namespace core
 		void destroy()
 		{
 			for (size_t i = 0; i < m_valuesCount; ++i)
+			{
 				m_values[i].~T();
+			}
 			m_allocator->releaseT(m_values);
 			m_allocator->freeT(m_values);
 
@@ -149,12 +169,16 @@ namespace core
 			m_values = m_allocator->allocT<T>(m_valuesCount);
 			m_allocator->commitT(m_values);
 			for (size_t i = 0; i < m_valuesCount; ++i)
+			{
 				::new (&m_values[i]) T(other.m_values[i]);
+			}
 
 			m_slots = m_allocator->allocT<HashSlot>(other.m_slots.count());
 			m_allocator->commitT(m_slots);
 			for (auto& slot: m_slots)
+			{
 				::new (&slot) HashSlot();
+			}
 
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
@@ -199,14 +223,16 @@ namespace core
 			other.m_valuesCount = 0;
 		}
 
-		Search_Result
-		findSlotForInsert(Span<const HashSlot> _slots, Span<const T> _values, const T& key)
+		Search_Result findSlotForInsert(Span<const HashSlot> _slots, Span<const T> _values, const T& key)
 		{
 			Search_Result res{};
 			res.hash = THash{}(key, size_t(_slots.data()));
 
 			auto cap = _slots.count();
-			if (cap == 0) return res;
+			if (cap == 0)
+			{
+				return res;
+			}
 
 			auto index = res.hash & (cap - 1);
 			auto ix = index;
@@ -285,13 +311,16 @@ namespace core
 			res.hash = THash{}(key, size_t(m_slots.data()));
 
 			auto cap = m_slots.count();
-			if (cap == 0) return res;
+			if (cap == 0)
+			{
+				return res;
+			}
 
 			auto index = res.hash & (cap - 1);
 			auto ix = index;
 
 			// linear probing
-			while(true)
+			while (true)
 			{
 				const auto& slot = m_slots[ix];
 				auto slot_hash = slot.valueHash();
@@ -306,9 +335,7 @@ namespace core
 				}
 
 				// if the cell is used and it's the same value then we found it
-				if (slot_flags == HASH_FLAGS::HASH_USED &&
-					slot_hash == res.hash &&
-					m_values[slot_index] == key)
+				if (slot_flags == HASH_FLAGS::HASH_USED && slot_hash == res.hash && m_values[slot_index] == key)
 				{
 					break;
 				}
@@ -334,7 +361,9 @@ namespace core
 			auto new_slots = m_allocator->allocT<HashSlot>(new_count);
 			m_allocator->commitT(new_slots);
 			for (auto& slot: new_slots)
+			{
 				::new (&slot) HashSlot();
+			}
 
 			m_deletedCount = 0;
 			// if 12/16th of table is occupied, grow
@@ -394,9 +423,13 @@ namespace core
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<T>)
+				{
 					::new (&new_values[i]) T(std::move(m_values[i]));
+				}
 				else
+				{
 					::new (&new_values[i]) T(m_values[i]);
+				}
 				m_values[i].~T();
 			}
 
@@ -412,16 +445,20 @@ namespace core
 			{
 				size_t new_capacity = m_values.count() * 2;
 				if (new_capacity == 0)
+				{
 					new_capacity = 8;
+				}
 
 				if (new_capacity < m_values.count() + i)
+				{
 					new_capacity = m_values.count() + i;
+				}
 
 				valuesGrow(new_capacity);
 			}
 		}
 
-		template<typename R>
+		template <typename R>
 		void valuesPush(R&& key)
 		{
 			valuesEnsureSpaceExists();
@@ -472,7 +509,7 @@ namespace core
 			destroy();
 		}
 
-		template<typename R>
+		template <typename R>
 		void insert(R&& key)
 		{
 			maintainSpaceComplexity();
@@ -514,14 +551,21 @@ namespace core
 		void clear()
 		{
 			for (auto& slot: m_slots)
+			{
 				slot = HashSlot{};
+			}
 			for (auto& value: m_values)
+			{
 				value.~T();
+			}
 			m_valuesCount = 0;
 			m_deletedCount = 0;
 		}
 
-		Allocator* allocator() const { return m_allocator; }
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
 
 		size_t count() const
 		{
@@ -571,23 +615,27 @@ namespace core
 			}
 		}
 
-		template<typename R>
+		template <typename R>
 		ConstIterator lookup(const R& key) const
 		{
 			auto res = findSlotForLookup(key);
 			if (res.index == m_slots.count())
+			{
 				return nullptr;
+			}
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
 			return &m_values[index];
 		}
 
-		template<typename R>
+		template <typename R>
 		bool remove(const R& key)
 		{
 			auto res = findSlotForLookup(key);
 			if (res.index == m_slots.count())
+			{
 				return false;
+			}
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
 			slot.setFlags(HASH_DELETED);
@@ -631,14 +679,14 @@ namespace core
 		}
 	};
 
-	template<typename TKey, typename TValue>
+	template <typename TKey, typename TValue>
 	struct KeyValue
 	{
 		TKey key;
 		TValue value;
 	};
 
-	template<typename TKey, typename TValue, typename THash = Hash<TKey>>
+	template <typename TKey, typename TValue, typename THash = Hash<TKey>>
 	class Map
 	{
 		Allocator* m_allocator = nullptr;
@@ -659,7 +707,9 @@ namespace core
 		void destroy()
 		{
 			for (size_t i = 0; i < m_valuesCount; ++i)
+			{
 				m_values[i].~KeyValue();
+			}
 			m_allocator->releaseT(m_values);
 			m_allocator->freeT(m_values);
 
@@ -687,12 +737,16 @@ namespace core
 			m_values = m_allocator->allocT<KeyValue<const TKey, TValue>>(m_valuesCount);
 			m_allocator->commitT(m_values);
 			for (size_t i = 0; i < m_valuesCount; ++i)
+			{
 				::new (&m_values[i]) KeyValue<const TKey, TValue>(other.m_values[i]);
+			}
 
 			m_slots = m_allocator->allocT<HashSlot>(other.m_slots.count());
 			m_allocator->commitT(m_slots);
 			for (auto& slot: m_slots)
+			{
 				::new (&slot) HashSlot();
+			}
 
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
@@ -737,14 +791,17 @@ namespace core
 			other.m_valuesCount = 0;
 		}
 
-		Search_Result
-		findSlotForInsert(Span<const HashSlot> _slots, Span<const KeyValue<const TKey, TValue>> _values, const TKey& key)
+		Search_Result findSlotForInsert(
+			Span<const HashSlot> _slots, Span<const KeyValue<const TKey, TValue>> _values, const TKey& key)
 		{
 			Search_Result res{};
 			res.hash = THash{}(key, size_t(_slots.data()));
 
 			auto cap = _slots.count();
-			if (cap == 0) return res;
+			if (cap == 0)
+			{
+				return res;
+			}
 
 			auto index = res.hash & (cap - 1);
 			auto ix = index;
@@ -823,13 +880,16 @@ namespace core
 			res.hash = THash{}(key, size_t(m_slots.data()));
 
 			auto cap = m_slots.count();
-			if (cap == 0) return res;
+			if (cap == 0)
+			{
+				return res;
+			}
 
 			auto index = res.hash & (cap - 1);
 			auto ix = index;
 
 			// linear probing
-			while(true)
+			while (true)
 			{
 				const auto& slot = m_slots[ix];
 				auto slot_hash = slot.valueHash();
@@ -844,9 +904,7 @@ namespace core
 				}
 
 				// if the cell is used and it's the same value then we found it
-				if (slot_flags == HASH_FLAGS::HASH_USED &&
-					slot_hash == res.hash &&
-					m_values[slot_index].key == key)
+				if (slot_flags == HASH_FLAGS::HASH_USED && slot_hash == res.hash && m_values[slot_index].key == key)
 				{
 					break;
 				}
@@ -872,7 +930,9 @@ namespace core
 			auto new_slots = m_allocator->allocT<HashSlot>(new_count);
 			m_allocator->commitT(new_slots);
 			for (auto& slot: new_slots)
+			{
 				::new (&slot) HashSlot();
+			}
 
 			m_deletedCount = 0;
 			// if 12/16th of table is occupied, grow
@@ -932,9 +992,13 @@ namespace core
 			for (size_t i = 0; i < m_valuesCount; ++i)
 			{
 				if constexpr (std::is_move_constructible_v<KeyValue<const TKey, TValue>>)
+				{
 					::new (&new_values[i]) KeyValue<const TKey, TValue>(std::move(m_values[i]));
+				}
 				else
+				{
 					::new (&new_values[i]) KeyValue<const TKey, TValue>(m_values[i]);
+				}
 				m_values[i].~KeyValue();
 			}
 
@@ -950,16 +1014,20 @@ namespace core
 			{
 				size_t new_capacity = m_values.count() * 2;
 				if (new_capacity == 0)
+				{
 					new_capacity = 8;
+				}
 
 				if (new_capacity < m_values.count() + i)
+				{
 					new_capacity = m_values.count() + i;
+				}
 
 				valuesGrow(new_capacity);
 			}
 		}
 
-		template<typename R, typename U>
+		template <typename R, typename U>
 		void valuesPush(R&& key, U&& value)
 		{
 			valuesEnsureSpaceExists();
@@ -1010,7 +1078,7 @@ namespace core
 			destroy();
 		}
 
-		template<typename R, typename U>
+		template <typename R, typename U>
 		void insert(R&& key, U&& value = U{})
 		{
 			maintainSpaceComplexity();
@@ -1052,14 +1120,21 @@ namespace core
 		void clear()
 		{
 			for (auto& slot: m_slots)
+			{
 				slot = HashSlot{};
+			}
 			for (auto& value: m_values)
+			{
 				value.~KeyValue();
+			}
 			m_valuesCount = 0;
 			m_deletedCount = 0;
 		}
 
-		Allocator* allocator() const { return m_allocator; }
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
 
 		size_t count() const
 		{
@@ -1109,23 +1184,27 @@ namespace core
 			}
 		}
 
-		template<typename R>
+		template <typename R>
 		ConstIterator lookup(const R& key) const
 		{
 			auto res = findSlotForLookup(key);
 			if (res.index == m_slots.count())
+			{
 				return end();
+			}
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
 			return &m_values[index];
 		}
 
-		template<typename R>
+		template <typename R>
 		bool remove(const R& key)
 		{
 			auto res = findSlotForLookup(key);
 			if (res.index == m_slots.count())
+			{
 				return false;
+			}
 			auto& slot = m_slots[res.index];
 			auto index = slot.valueIndex();
 			slot.setFlags(HASH_DELETED);

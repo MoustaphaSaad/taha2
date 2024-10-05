@@ -1,7 +1,7 @@
-#include <core/Mallocator.h>
-#include <core/Log.h>
-#include <core/StringView.h>
 #include <core/Hash.h>
+#include <core/Log.h>
+#include <core/Mallocator.h>
+#include <core/StringView.h>
 
 #include <budget-byte/Ledger.h>
 
@@ -47,7 +47,9 @@ public:
 	static core::Result<Args> parse(int argc, char** argv, core::Allocator* allocator)
 	{
 		if (argc < 2)
+		{
 			return core::errf(allocator, "no command found"_sv);
+		}
 
 		// special case the help command
 		Args res{allocator};
@@ -60,7 +62,9 @@ public:
 		}
 
 		if (argc < 3)
+		{
 			return core::errf(allocator, "no command found"_sv);
+		}
 
 		res.m_command = core::StringView{argv[2]};
 		for (int i = 3; i < argc; ++i)
@@ -72,7 +76,9 @@ public:
 				if (i + 1 < argc)
 				{
 					if (res.hasOption(option))
+					{
 						return core::errf(allocator, "option {} is already defined"_sv, option);
+					}
 
 					auto value = core::StringView{argv[i + 1]}.trim();
 					++i;
@@ -91,10 +97,22 @@ public:
 		return res;
 	}
 
-	core::StringView file() const { return m_file; }
-	core::StringView command() const { return m_command; }
-	bool hasOption(core::StringView key) const { return m_options.lookup(key) != m_options.end(); }
-	core::StringView getOption(core::StringView key) const { return m_options.lookup(key)->value; }
+	core::StringView file() const
+	{
+		return m_file;
+	}
+	core::StringView command() const
+	{
+		return m_command;
+	}
+	bool hasOption(core::StringView key) const
+	{
+		return m_options.lookup(key) != m_options.end();
+	}
+	core::StringView getOption(core::StringView key) const
+	{
+		return m_options.lookup(key)->value;
+	}
 	core::HumanError loadOptions(std::initializer_list<Option> options) const
 	{
 		for (auto& option: options)
@@ -199,8 +217,7 @@ int main(int argc, char** argv)
 		errno = 0;
 		char* endPtr = nullptr;
 		parsedAmount = std::strtoull(amount.begin(), &endPtr, 10);
-		if ((errno == ERANGE && (parsedAmount == ULLONG_MAX || parsedAmount == 0)) ||
-			(errno != 0 && parsedAmount == 0))
+		if ((errno == ERANGE && (parsedAmount == ULLONG_MAX || parsedAmount == 0)) || (errno != 0 && parsedAmount == 0))
 		{
 			log.critical("failed to read number {}"_sv, amount);
 			return EXIT_FAILURE;
@@ -231,8 +248,7 @@ int main(int argc, char** argv)
 		std::chrono::year_month_day stdDate{
 			std::chrono::year{(int)parsedDate.year()},
 			std::chrono::month{(unsigned)parsedDate.month()},
-			std::chrono::day{(unsigned)parsedDate.day()}
-		};
+			std::chrono::day{(unsigned)parsedDate.day()}};
 		err = ledger.addTransaction(parsedAmount, src, dst, stdDate, notes);
 		if (err)
 		{
@@ -241,7 +257,13 @@ int main(int argc, char** argv)
 		}
 
 		auto tm = std::chrono::sys_days{stdDate};
-		log.info("Success, amount = {}, src = {}, dst = {}, date = {:%Y-%m-%d}, notes = {}"_sv, parsedAmount, src, dst, tm, notes);
+		log.info(
+			"Success, amount = {}, src = {}, dst = {}, date = {:%Y-%m-%d}, notes = {}"_sv,
+			parsedAmount,
+			src,
+			dst,
+			tm,
+			notes);
 		return EXIT_SUCCESS;
 	}
 	return EXIT_SUCCESS;
