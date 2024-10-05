@@ -41,14 +41,14 @@ namespace core
 		if (m_thread && m_thread->handle != INVALID_HANDLE_VALUE)
 		{
 			[[maybe_unused]] auto res = CloseHandle(m_thread->handle);
-			assert(res == TRUE);
+			assertTrue(res == TRUE);
 		}
 	}
 
 	void Thread::join()
 	{
 		[[maybe_unused]] auto res = WaitForSingleObject(m_thread->handle, INFINITE);
-		assert(res == WAIT_OBJECT_0);
+		assertTrue(res == WAIT_OBJECT_0);
 	}
 
 	void Thread::detach()
@@ -56,7 +56,7 @@ namespace core
 		if (m_thread->handle != INVALID_HANDLE_VALUE)
 		{
 			[[maybe_unused]] auto res = CloseHandle(m_thread->handle);
-			assert(res == TRUE);
+			assertTrue(res == TRUE);
 		}
 		m_thread->handle = INVALID_HANDLE_VALUE;
 	}

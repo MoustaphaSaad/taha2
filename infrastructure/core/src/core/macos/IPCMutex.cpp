@@ -18,7 +18,7 @@ namespace core
 		int flags = O_WRONLY | O_CREAT | O_APPEND;
 		auto osName = String{name, allocator};
 		auto handle = ::open(osName.data(), flags, S_IRWXU);
-		assert(handle != -1);
+		assertTrue(handle != -1);
 
 		m_mutex = unique_from<IIPCMutex>(allocator);
 		m_mutex->handle = handle;
@@ -38,7 +38,7 @@ namespace core
 	void IPCMutex::lock()
 	{
 		[[maybe_unused]] auto res = flock(m_mutex->handle, LOCK_EX);
-		assert(res != -1);
+		assertTrue(res != -1);
 	}
 
 	bool IPCMutex::tryLock()
@@ -50,6 +50,6 @@ namespace core
 	void IPCMutex::unlock()
 	{
 		[[maybe_unused]] auto res = flock(m_mutex->handle, LOCK_UN);
-		assert(res != -1);
+		assertTrue(res != -1);
 	}
 }

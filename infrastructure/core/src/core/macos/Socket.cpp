@@ -32,7 +32,7 @@ namespace core
 			if (m_handle != -1)
 			{
 				[[maybe_unused]] auto err = ::close(m_handle);
-				assert(err != -1);
+				assertTrue(err != -1);
 				m_handle = -1;
 			}
 		}
@@ -218,7 +218,7 @@ namespace core
 			{
 				return 0;
 			}
-			assert(res <= UINT16_MAX);
+			assertTrue(res <= UINT16_MAX);
 			return uint16_t(res);
 		}
 
