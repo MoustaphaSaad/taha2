@@ -1,13 +1,13 @@
 #pragma once
 
-#include "minijava/Token.h"
 #include "minijava/Error.h"
+#include "minijava/Token.h"
 
-#include <core/String.h>
-#include <core/Result.h>
-#include <core/Unique.h>
 #include <core/Array.h>
+#include <core/Result.h>
 #include <core/Stream.h>
+#include <core/String.h>
+#include <core/Unique.h>
 
 namespace minijava
 {
@@ -25,18 +25,33 @@ namespace minijava
 
 		bool scan();
 
-		core::StringView content() const { return m_content; }
-		void pushLine(core::StringView line) { m_lines.push(line); }
-		void pushError(Error error) { m_errors.push(std::move(error)); }
-		bool hasErrors() const { return m_errors.count() > 0; }
+		core::StringView content() const
+		{
+			return m_content;
+		}
+		void pushLine(core::StringView line)
+		{
+			m_lines.push(line);
+		}
+		void pushError(Error error)
+		{
+			m_errors.push(std::move(error));
+		}
+		bool hasErrors() const
+		{
+			return m_errors.count() > 0;
+		}
 
 		void dumpTokens(core::Stream* stream);
 		void dumpErrors(core::Stream* stream);
 
-		const core::Array<Token>& tokens() const { return m_token; }
+		const core::Array<Token>& tokens() const
+		{
+			return m_token;
+		}
 
 	private:
-		template<typename T, typename... TArgs>
+		template <typename T, typename... TArgs>
 		friend inline core::Unique<T> core::unique_from(core::Allocator* allocator, TArgs&&... args);
 
 		core::Allocator* m_allocator = nullptr;

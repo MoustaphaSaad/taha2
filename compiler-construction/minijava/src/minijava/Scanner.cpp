@@ -5,13 +5,7 @@ namespace minijava
 {
 	bool Scanner::isSpace(core::Rune r) const
 	{
-		return (
-			r == ' ' ||
-			r == '\n' ||
-			r == '\r' ||
-			r == '\v' ||
-			r == '\t'
-		);
+		return (r == ' ' || r == '\n' || r == '\r' || r == '\v' || r == '\t');
 	}
 
 	bool Scanner::eof() const
@@ -47,16 +41,24 @@ namespace minijava
 	void Scanner::skipWhitespace()
 	{
 		while (isSpace(m_rune))
+		{
 			if (eat() == false)
+			{
 				break;
+			}
+		}
 	}
 
 	core::StringView Scanner::scanID()
 	{
 		auto beginIt = m_it;
 		while (m_rune.isLetter() || m_rune.isNumber() || m_rune == '_')
+		{
 			if (eat() == false)
+			{
 				break;
+			}
+		}
 		return m_unit->content().slice(beginIt, m_it);
 	}
 
@@ -64,8 +66,12 @@ namespace minijava
 	{
 		auto beginIt = m_it;
 		while (m_rune.isNumber())
+		{
 			if (eat() == false)
+			{
 				break;
+			}
+		}
 		return m_unit->content().slice(beginIt, m_it);
 	}
 
@@ -75,11 +81,17 @@ namespace minijava
 		while (m_rune == '\n')
 		{
 			if (m_rune == '\r')
+			{
 				if (eat() == false || m_rune == '\n')
+				{
 					break;
+				}
+			}
 
 			if (eat() == false)
+			{
 				break;
+			}
 		}
 		return m_unit->content().slice(beginIt, m_it);
 	}
@@ -92,7 +104,9 @@ namespace minijava
 			if (m_rune == '*')
 			{
 				if (eat() == false)
+				{
 					break;
+				}
 
 				if (m_rune == '/')
 				{
@@ -110,24 +124,78 @@ namespace minijava
 
 	Token::KIND Scanner::inferKeywordType(core::StringView id)
 	{
-		if (id == "boolean"_sv) return Token::KIND_KEYWORD_BOOLEAN;
-		else if (id == "class"_sv) return Token::KIND_KEYWORD_CLASS;
-		else if (id == "else"_sv) return Token::KIND_KEYWORD_ELSE;
-		else if (id == "false"_sv) return Token::KIND_KEYWORD_FALSE;
-		else if (id == "if"_sv) return Token::KIND_KEYWORD_IF;
-		else if (id == "int"_sv) return Token::KIND_KEYWORD_INT;
-		else if (id == "String"_sv) return Token::KIND_KEYWORD_STRING;
-		else if (id == "length"_sv) return Token::KIND_KEYWORD_LENGTH;
-		else if (id == "main"_sv) return Token::KIND_KEYWORD_MAIN;
-		else if (id == "new"_sv) return Token::KIND_KEYWORD_NEW;
-		else if (id == "public"_sv) return Token::KIND_KEYWORD_PUBLIC;
-		else if (id == "return"_sv) return Token::KIND_KEYWORD_RETURN;
-		else if (id == "static"_sv) return Token::KIND_KEYWORD_STATIC;
-		else if (id == "this"_sv) return Token::KIND_KEYWORD_THIS;
-		else if (id == "true"_sv) return Token::KIND_KEYWORD_TRUE;
-		else if (id == "void"_sv) return Token::KIND_KEYWORD_VOID;
-		else if (id == "while"_sv) return Token::KIND_KEYWORD_WHILE;
-		else return Token::KIND_NONE;
+		if (id == "boolean"_sv)
+		{
+			return Token::KIND_KEYWORD_BOOLEAN;
+		}
+		else if (id == "class"_sv)
+		{
+			return Token::KIND_KEYWORD_CLASS;
+		}
+		else if (id == "else"_sv)
+		{
+			return Token::KIND_KEYWORD_ELSE;
+		}
+		else if (id == "false"_sv)
+		{
+			return Token::KIND_KEYWORD_FALSE;
+		}
+		else if (id == "if"_sv)
+		{
+			return Token::KIND_KEYWORD_IF;
+		}
+		else if (id == "int"_sv)
+		{
+			return Token::KIND_KEYWORD_INT;
+		}
+		else if (id == "String"_sv)
+		{
+			return Token::KIND_KEYWORD_STRING;
+		}
+		else if (id == "length"_sv)
+		{
+			return Token::KIND_KEYWORD_LENGTH;
+		}
+		else if (id == "main"_sv)
+		{
+			return Token::KIND_KEYWORD_MAIN;
+		}
+		else if (id == "new"_sv)
+		{
+			return Token::KIND_KEYWORD_NEW;
+		}
+		else if (id == "public"_sv)
+		{
+			return Token::KIND_KEYWORD_PUBLIC;
+		}
+		else if (id == "return"_sv)
+		{
+			return Token::KIND_KEYWORD_RETURN;
+		}
+		else if (id == "static"_sv)
+		{
+			return Token::KIND_KEYWORD_STATIC;
+		}
+		else if (id == "this"_sv)
+		{
+			return Token::KIND_KEYWORD_THIS;
+		}
+		else if (id == "true"_sv)
+		{
+			return Token::KIND_KEYWORD_TRUE;
+		}
+		else if (id == "void"_sv)
+		{
+			return Token::KIND_KEYWORD_VOID;
+		}
+		else if (id == "while"_sv)
+		{
+			return Token::KIND_KEYWORD_WHILE;
+		}
+		else
+		{
+			return Token::KIND_NONE;
+		}
 	}
 
 	Scanner::Scanner(Unit* unit, core::Allocator* allocator)
@@ -135,18 +203,16 @@ namespace minijava
 		  m_allocator(allocator)
 	{
 		if (m_unit->content().count() > 0)
+		{
 			m_rune = core::Rune::decode(m_unit->content().data() + m_it);
+		}
 	}
 
 	Token Scanner::scan()
 	{
 		skipWhitespace();
 
-		Location location{
-			.position = m_position,
-			.range = m_unit->content().slice(m_it, m_it),
-			.unit = m_unit
-		};
+		Location location{.position = m_position, .range = m_unit->content().slice(m_it, m_it), .unit = m_unit};
 
 		if (eof())
 		{
@@ -159,7 +225,9 @@ namespace minijava
 			auto id = scanID();
 			auto kind = inferKeywordType(id);
 			if (kind == Token::KIND_NONE)
+			{
 				kind = Token::KIND_ID;
+			}
 			location.range = id;
 			return Token{kind, id, location};
 		}

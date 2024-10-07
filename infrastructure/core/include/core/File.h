@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/Exports.h"
-#include "core/Stream.h"
-#include "core/Unique.h"
-#include "core/StringView.h"
 #include "core/Allocator.h"
-#include "core/String.h"
+#include "core/Exports.h"
 #include "core/Result.h"
+#include "core/Stream.h"
+#include "core/String.h"
+#include "core/StringView.h"
+#include "core/Unique.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
@@ -26,9 +26,11 @@ namespace core
 			OPEN_MODE_CREATE_APPEND,
 			// opens the file if it exists, fails otherwise
 			OPEN_MODE_OPEN_ONLY,
-			// opens the file if it exists and its content will be overwritten, if it doesn't exist the function will fail
+			// opens the file if it exists and its content will be overwritten, if it doesn't exist the function will
+			// fail
 			OPEN_MODE_OPEN_OVERWRITE,
-			// opens the file if it exists and new writes will append to the file, if it doesn't exist the function will fail
+			// opens the file if it exists and new writes will append to the file, if it doesn't exist the function will
+			// fail
 			OPEN_MODE_OPEN_APPEND,
 		};
 
@@ -62,7 +64,12 @@ namespace core
 			IO_MODE_READ_WRITE,
 		};
 
-		CORE_EXPORT static Unique<File> open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode = SHARE_MODE_ALL);
+		CORE_EXPORT static Unique<File> open(
+			Allocator* allocator,
+			StringView name,
+			IO_MODE io_mode,
+			OPEN_MODE open_mode,
+			SHARE_MODE share_mode = SHARE_MODE_ALL);
 		CORE_EXPORT static Result<String> content(Allocator* allocator, StringView name);
 		CORE_EXPORT static File* STDOUT;
 		CORE_EXPORT static File* STDERR;

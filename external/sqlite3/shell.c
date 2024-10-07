@@ -26692,7 +26692,7 @@ static int do_meta_command(char *zLine, ShellState *p){
        const char *zUsage;      /* Usage notes */
     } aCtrl[] = {
     {"always",             SQLITE_TESTCTRL_ALWAYS, 1,     "BOOLEAN"         },
-    {"assert",             SQLITE_TESTCTRL_ASSERT, 1,     "BOOLEAN"         },
+    {"assertTrue",             SQLITE_TESTCTRL_ASSERT, 1,     "BOOLEAN"         },
   /*{"benign_malloc_hooks",SQLITE_TESTCTRL_BENIGN_MALLOC_HOOKS,1, ""        },*/
   /*{"bitvec_test",        SQLITE_TESTCTRL_BITVEC_TEST, 1,  ""              },*/
     {"byteorder",          SQLITE_TESTCTRL_BYTEORDER, 0,  ""                },

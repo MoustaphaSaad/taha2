@@ -6,11 +6,17 @@
 
 namespace fmt
 {
-	template <> struct formatter<VkResult>
+	template <>
+	struct formatter<VkResult>
 	{
-		template <typename ParseContext> constexpr auto parse(ParseContext& ctx) { return ctx.begin(); }
+		template <typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
+		{
+			return ctx.begin();
+		}
 
-		template <typename FormatContext> auto format(VkResult r, FormatContext& ctx)
+		template <typename FormatContext>
+		auto format(VkResult r, FormatContext& ctx)
 		{
 			switch (r)
 			{
@@ -74,7 +80,8 @@ namespace taha
 		return 0;
 	}
 #elif TAHA_OS_LINUX
-	static void registryListener(void* data, wl_registry* registry, uint32_t id, const char* interface, uint32_t version)
+	static void
+	registryListener(void* data, wl_registry* registry, uint32_t id, const char* interface, uint32_t version)
 	{
 		if (core::StringView{interface} == core::StringView{wl_compositor_interface.name})
 		{
@@ -98,11 +105,16 @@ namespace taha
 		return res;
 	}
 
-	static size_t findExtensionByName(const core::Array<VkExtensionProperties>& availableExtensions, core::StringView requiredExtension)
+	static size_t findExtensionByName(
+		const core::Array<VkExtensionProperties>& availableExtensions, core::StringView requiredExtension)
 	{
 		for (size_t i = 0; i < availableExtensions.count(); ++i)
+		{
 			if (core::StringView{availableExtensions[i].extensionName} == requiredExtension)
+			{
 				return i;
+			}
+		}
 		return SIZE_MAX;
 	}
 
@@ -119,8 +131,12 @@ namespace taha
 	static size_t findLayerByName(const core::Array<VkLayerProperties>& availableLayers, core::StringView requiredLayer)
 	{
 		for (size_t i = 0; i < availableLayers.count(); ++i)
+		{
 			if (core::StringView{availableLayers[i].layerName} == requiredLayer)
+			{
 				return i;
+			}
+		}
 		return SIZE_MAX;
 	}
 
@@ -135,14 +151,17 @@ namespace taha
 		vkGetPhysicalDeviceFeatures(physicalDevice, &physicalDeviceFeatures);
 
 		if (physicalDeviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+		{
 			score += 1000;
+		}
 
 		score += physicalDeviceProperties.limits.maxImageDimension2D;
 
 		return score;
 	}
 
-	static core::Array<VkQueueFamilyProperties> enumerateQueueFamilies(VkPhysicalDevice device, core::Allocator* allocator)
+	static core::Array<VkQueueFamilyProperties>
+	enumerateQueueFamilies(VkPhysicalDevice device, core::Allocator* allocator)
 	{
 		uint32_t queueFamiliesCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamiliesCount, nullptr);
@@ -159,7 +178,8 @@ namespace taha
 		uint32_t presentFamily;
 	};
 
-	static core::Result<RequiredQueueFamilies> getRequiredQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, core::Allocator* allocator)
+	static core::Result<RequiredQueueFamilies>
+	getRequiredQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface, core::Allocator* allocator)
 	{
 		bool graphicsFamilySet = false;
 		bool presentFamilySet = false;
@@ -185,18 +205,27 @@ namespace taha
 			}
 
 			if (graphicsFamilySet && presentFamilySet)
+			{
 				return res;
+			}
 		}
 
 		if (graphicsFamilySet == false)
+		{
 			return core::errf(allocator, "physical device not suitable, no graphics family support"_sv);
+		}
 		else if (presentFamilySet == false)
+		{
 			return core::errf(allocator, "physical device not suitable, no present family support"_sv);
+		}
 		else
+		{
 			return res;
+		}
 	}
 
-	static core::Array<VkExtensionProperties> enumeratePhysicalDeviceExtensions(VkPhysicalDevice device, core::Allocator* allocator)
+	static core::Array<VkExtensionProperties>
+	enumeratePhysicalDeviceExtensions(VkPhysicalDevice device, core::Allocator* allocator)
 	{
 		uint32_t physicalDeviceExtensionCount = 0;
 		vkEnumerateDeviceExtensionProperties(device, nullptr, &physicalDeviceExtensionCount, nullptr);
@@ -249,9 +278,11 @@ namespace taha
 		for (auto format: formats)
 		{
 			if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			{
 				return format;
+			}
 		}
-		core::validate(formats.count() > 0);
+		core::assertTrue(formats.count() > 0);
 		return formats[0];
 	}
 
@@ -260,7 +291,9 @@ namespace taha
 		for (auto mode: presentModes)
 		{
 			if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
 				return mode;
+			}
 		}
 		return VK_PRESENT_MODE_FIFO_KHR;
 	}
@@ -268,13 +301,27 @@ namespace taha
 	static VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities, int width, int height)
 	{
 		if (capabilities.currentExtent.width != UINT32_MAX)
+		{
 			return capabilities.currentExtent;
+		}
 
-		VkExtent2D res {(uint32_t)width, (uint32_t)height};
-		if (res.width > capabilities.maxImageExtent.width) res.width = capabilities.maxImageExtent.width;
-		if (res.width < capabilities.minImageExtent.width) res.width = capabilities.minImageExtent.width;
-		if (res.height > capabilities.maxImageExtent.height) res.height = capabilities.maxImageExtent.height;
-		if (res.height < capabilities.minImageExtent.height) res.height = capabilities.minImageExtent.height;
+		VkExtent2D res{(uint32_t)width, (uint32_t)height};
+		if (res.width > capabilities.maxImageExtent.width)
+		{
+			res.width = capabilities.maxImageExtent.width;
+		}
+		if (res.width < capabilities.minImageExtent.width)
+		{
+			res.width = capabilities.minImageExtent.width;
+		}
+		if (res.height > capabilities.maxImageExtent.height)
+		{
+			res.height = capabilities.maxImageExtent.height;
+		}
+		if (res.height < capabilities.minImageExtent.height)
+		{
+			res.height = capabilities.minImageExtent.height;
+		}
 		return res;
 	}
 
@@ -288,13 +335,21 @@ namespace taha
 
 		const char* typeName = "unknown";
 		if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+		{
 			typeName = "general";
+		}
 		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+		{
 			typeName = "validation";
+		}
 		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+		{
 			typeName = "performance";
+		}
 		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+		{
 			typeName = "binding";
+		}
 
 		if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
 		{
@@ -326,7 +381,10 @@ namespace taha
 		core::Array<VkSurfaceFormatKHR> formats;
 		core::Array<VkPresentModeKHR> presentModes;
 
-		SwapchainSupport(core::Allocator* allocator): formats(allocator), presentModes(allocator) {}
+		SwapchainSupport(core::Allocator* allocator)
+			: formats(allocator),
+			  presentModes(allocator)
+		{}
 	};
 
 	static core::Result<SwapchainSupport>
@@ -335,28 +393,38 @@ namespace taha
 		SwapchainSupport support{allocator};
 		auto result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, dummySurface, &support.capabilities);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(allocator, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed, ErrorCode({})"_sv, result);
+		}
 
 		uint32_t formatCount{};
 		result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, dummySurface, &formatCount, nullptr);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(allocator, "vkGetPhysicalDeviceSurfaceFormatsKHR failed, ErrorCode({})"_sv, result);
+		}
 
 		support.formats.resize_fill(formatCount, VkSurfaceFormatKHR{});
 		result = vkGetPhysicalDeviceSurfaceFormatsKHR(device, dummySurface, &formatCount, support.formats.data());
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(allocator, "vkGetPhysicalDeviceSurfaceFormatsKHR failed, ErrorCode({})"_sv, result);
+		}
 
 		uint32_t presentModeCount{};
 		result = vkGetPhysicalDeviceSurfacePresentModesKHR(device, dummySurface, &presentModeCount, nullptr);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(allocator, "vkGetPhysicalDeviceSurfacePresentModesKHR failed, ErrorCode({})"_sv, result);
+		}
 
 		support.presentModes.resize_fill(presentModeCount, VkPresentModeKHR{});
 		result = vkGetPhysicalDeviceSurfacePresentModesKHR(
 			device, dummySurface, &presentModeCount, support.presentModes.data());
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(allocator, "vkGetPhysicalDeviceSurfacePresentModesKHR failed, ErrorCode({})"_sv, result);
+		}
 
 		return support;
 	}
@@ -368,13 +436,17 @@ namespace taha
 		uint32_t extensionCount = 0;
 		auto res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 		if (res != VK_SUCCESS)
+		{
 			return false;
+		}
 
 		core::Array<VkExtensionProperties> availableExtensions{allocator};
 		availableExtensions.resize_fill(extensionCount, VkExtensionProperties{});
 		res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 		if (res != VK_SUCCESS)
+		{
 			return false;
+		}
 
 		int requiredExtensionsCount = sizeof(REQUIRED_DEVICE_EXTENSIONS) / sizeof(*REQUIRED_DEVICE_EXTENSIONS);
 		for (auto extension: availableExtensions)
@@ -412,7 +484,9 @@ namespace taha
 	{
 		auto swapchainSupportResult = querySwapchainSupport(device, dummySurface, allocator);
 		if (swapchainSupportResult.isError())
+		{
 			return PhysicalDeviceCheckResult{};
+		}
 		auto swapchainSupport = swapchainSupportResult.releaseValue();
 
 		PhysicalDeviceCheckResult res{};
@@ -429,18 +503,26 @@ namespace taha
 		for (uint32_t i = 0; i < queueFamilyCount; ++i)
 		{
 			if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
 				res.graphicsFamilyIndex = int(i);
+			}
 
 			VkBool32 presentationSupported = false;
 			auto result = vkGetPhysicalDeviceSurfaceSupportKHR(device, i, dummySurface, &presentationSupported);
 			if (result != VK_SUCCESS)
+			{
 				continue;
+			}
 
 			if (presentationSupported)
+			{
 				res.presentationFamilyIndex = int(i);
+			}
 
 			if (res.suitable())
+			{
 				break;
+			}
 		}
 
 		return res;
@@ -458,7 +540,9 @@ namespace taha
 		{
 			static auto volkInitializeResult = volkInitialize();
 			if (volkInitializeResult != VK_SUCCESS)
+			{
 				return core::errf(allocator, "volkInitialize failed, ErrorCode({})"_sv, volkInitializeResult);
+			}
 		}
 
 		// create instance
@@ -476,7 +560,10 @@ namespace taha
 		};
 		coreDefer
 		{
-			if (instance2 != VK_NULL_HANDLE) vkDestroyInstance(instance2, nullptr);
+			if (instance2 != VK_NULL_HANDLE)
+			{
+				vkDestroyInstance(instance2, nullptr);
+			}
 		};
 		{
 			VkApplicationInfo appInfo{
@@ -495,13 +582,19 @@ namespace taha
 #endif
 
 			if (enableValidation)
+			{
 				instanceExtensions.push(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+			}
 
 			// check for instance extension availability
 			auto availableExtensions = enumerateInstanceExtensions(allocator);
 			for (auto requiredExtension: instanceExtensions)
+			{
 				if (findExtensionByName(availableExtensions, core::StringView{requiredExtension}) == SIZE_MAX)
+				{
 					return core::errf(allocator, "required extension '{}' is not supported"_sv, requiredExtension);
+				}
+			}
 
 			// create instance
 			VkInstanceCreateInfo instanceCreateInfo{
@@ -516,8 +609,12 @@ namespace taha
 				// check for instance layers availability
 				auto availableLayers = enumerateInstanceLayers(allocator);
 				for (auto requiredLayer: validationLayers2)
+				{
 					if (findLayerByName(availableLayers, core::StringView{requiredLayer}) == SIZE_MAX)
+					{
 						return core::errf(allocator, "required layer '{}' is not supported"_sv, requiredLayer);
+					}
+				}
 
 				instanceCreateInfo.enabledLayerCount = sizeof(validationLayers2) / sizeof(*validationLayers2);
 				instanceCreateInfo.ppEnabledLayerNames = validationLayers2;
@@ -526,7 +623,9 @@ namespace taha
 
 			auto result = vkCreateInstance(&instanceCreateInfo, nullptr, &instance2);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(allocator, "vkCreateInstance failed, ErrorCode({})"_sv, result);
+			}
 
 			volkLoadInstance(instance2);
 		}
@@ -536,18 +635,29 @@ namespace taha
 		coreDefer
 		{
 			if (debugMessenger2 != VK_NULL_HANDLE)
+			{
 				vkDestroyDebugUtilsMessengerEXT(instance2, debugMessenger2, nullptr);
+			}
 		};
 		if (enableValidation)
 		{
-			auto result = vkCreateDebugUtilsMessengerEXT(instance2, &debugMessengerCreateInfo2, nullptr, &debugMessenger2);
+			auto result =
+				vkCreateDebugUtilsMessengerEXT(instance2, &debugMessengerCreateInfo2, nullptr, &debugMessenger2);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(allocator, "vkCreateDebugUtilsMessengerEXT failed, ErrorCode({})"_sv, result);
+			}
 		}
 
 		// create dummy window to check for presentation support
 		VkSurfaceKHR dummySurface2 = VK_NULL_HANDLE;
-		coreDefer { if (dummySurface2 != VK_NULL_HANDLE) vkDestroySurfaceKHR(instance2, dummySurface2, nullptr); };
+		coreDefer
+		{
+			if (dummySurface2 != VK_NULL_HANDLE)
+			{
+				vkDestroySurfaceKHR(instance2, dummySurface2, nullptr);
+			}
+		};
 		{
 #if TAHA_OS_WINDOWS
 			constexpr TCHAR CLASS_NAME[] = L"DummyWindowClass";
@@ -572,8 +682,13 @@ namespace taha
 				GetModuleHandle(nullptr),
 				nullptr);
 			if (dummyHwnd == nullptr)
+			{
 				return core::errf(allocator, "CreateWindowEx failed, ErrorCode({})"_sv, GetLastError());
-			coreDefer { CloseWindow(dummyHwnd); };
+			}
+			coreDefer
+			{
+				CloseWindow(dummyHwnd);
+			};
 
 			VkWin32SurfaceCreateInfoKHR dummySurfaceCreateInfo{
 				.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
@@ -583,10 +698,15 @@ namespace taha
 
 			auto result = vkCreateWin32SurfaceKHR(instance2, &dummySurfaceCreateInfo, nullptr, &dummySurface2);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(allocator, "vkCreateWin32SurfaceKHR failed, ErrorCode({})"_sv, result);
+			}
 #elif TAHA_OS_LINUX
 			auto display = wl_display_connect(nullptr);
-			coreDefer{wl_display_disconnect(display);};
+			coreDefer
+			{
+				wl_display_disconnect(display);
+			};
 
 			auto registry = wl_display_get_registry(display);
 			wl_compositor* compositor = nullptr;
@@ -595,20 +715,28 @@ namespace taha
 				.global_remove = registryRemover,
 			};
 			wl_registry_add_listener(registry, &listener, &compositor);
-			coreDefer {wl_compositor_destroy(compositor);};
+			coreDefer
+			{
+				wl_compositor_destroy(compositor);
+			};
 			wl_display_roundtrip(display);
 
 			auto surface = wl_compositor_create_surface(compositor);
-			coreDefer {wl_surface_destroy(surface);};
+			coreDefer
+			{
+				wl_surface_destroy(surface);
+			};
 
-			VkWaylandSurfaceCreateInfoKHR dummySurfaceCreateInfo {
+			VkWaylandSurfaceCreateInfoKHR dummySurfaceCreateInfo{
 				.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
 				.display = display,
 				.surface = surface,
 			};
 			auto result = vkCreateWaylandSurfaceKHR(instance2, &dummySurfaceCreateInfo, nullptr, &dummySurface2);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(allocator, "vkCreateWaylandSurfaceKHR failed, ErrorCode({})"_sv, result);
+			}
 #endif
 		}
 
@@ -622,20 +750,26 @@ namespace taha
 			uint32_t physicalDeviceCount = 0;
 			auto result = vkEnumeratePhysicalDevices(instance2, &physicalDeviceCount, nullptr);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(allocator, "vkEnumeratePhysicalDevices failed, ErrorCode({})"_sv, result);
+			}
 
 			core::Array<VkPhysicalDevice> physicalDevices{allocator};
 			physicalDevices.resize_fill(physicalDeviceCount, VK_NULL_HANDLE);
 			result = vkEnumeratePhysicalDevices(instance2, &physicalDeviceCount, physicalDevices.data());
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(allocator, "vkEnumeratePhysicalDevices failed, ErrorCode({})"_sv, result);
+			}
 
 			int maxScore = 0;
 			for (auto device: physicalDevices)
 			{
 				auto requiredQueueFamiliesResult = getRequiredQueueFamilies(device, dummySurface2, allocator);
 				if (requiredQueueFamiliesResult.isError())
+				{
 					continue;
+				}
 				requiredQueueFamilies2 = requiredQueueFamiliesResult.releaseValue();
 
 				auto extensions = enumeratePhysicalDeviceExtensions(device, allocator);
@@ -650,11 +784,15 @@ namespace taha
 				}
 
 				if (allExtensionsFound == false)
+				{
 					continue;
+				}
 
 				auto swapchainSupport = SwapchainSupport2::query(device, dummySurface2, allocator);
 				if (swapchainSupport.formats.count() == 0 || swapchainSupport.presentModes.count() == 0)
+				{
 					continue;
+				}
 
 				auto score = ratePhysicalDevice(device);
 				if (score > maxScore)
@@ -665,7 +803,9 @@ namespace taha
 			}
 
 			if (physicalDevice2 == VK_NULL_HANDLE)
+			{
 				return core::errf(allocator, "failed to find suitable physical device"_sv);
+			}
 		}
 
 		// create logical device
@@ -675,7 +815,9 @@ namespace taha
 		coreDefer
 		{
 			if (logicalDevice2 != VK_NULL_HANDLE)
+			{
 				vkDestroyDevice(logicalDevice2, nullptr);
+			}
 		};
 		{
 			float queuePriority = 1.0f;
@@ -697,7 +839,9 @@ namespace taha
 			VkDeviceQueueCreateInfo queues[2] = {graphicsQueueCreateInfo, presentQueueCreateInfo};
 			uint32_t queuesCount = 2;
 			if (requiredQueueFamilies2.graphicsFamily == requiredQueueFamilies2.presentFamily)
+			{
 				queuesCount = 1;
+			}
 
 			VkPhysicalDeviceFeatures enabledFeatures{};
 
@@ -718,7 +862,9 @@ namespace taha
 
 			auto result = vkCreateDevice(physicalDevice2, &createInfo, nullptr, &logicalDevice2);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
+			}
 
 			vkGetDeviceQueue(logicalDevice2, requiredQueueFamilies2.graphicsFamily, 0, &graphicsQueue);
 			vkGetDeviceQueue(logicalDevice2, requiredQueueFamilies2.presentFamily, 0, &presentQueue);
@@ -752,10 +898,22 @@ namespace taha
 
 	VkRenderer::~VkRenderer()
 	{
-		if (m_dummySurface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, m_dummySurface, nullptr);
-		if (m_logicalDevice != VK_NULL_HANDLE) vkDestroyDevice(m_logicalDevice, nullptr);
-		if (m_debugMessenger != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
-		if (m_instance != VK_NULL_HANDLE) vkDestroyInstance(m_instance, nullptr);
+		if (m_dummySurface != VK_NULL_HANDLE)
+		{
+			vkDestroySurfaceKHR(m_instance, m_dummySurface, nullptr);
+		}
+		if (m_logicalDevice != VK_NULL_HANDLE)
+		{
+			vkDestroyDevice(m_logicalDevice, nullptr);
+		}
+		if (m_debugMessenger != VK_NULL_HANDLE)
+		{
+			vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
+		}
+		if (m_instance != VK_NULL_HANDLE)
+		{
+			vkDestroyInstance(m_instance, nullptr);
+		}
 	}
 
 	core::Unique<Frame> VkRenderer::createFrameForWindow(NativeWindowDesc desc)
@@ -770,8 +928,16 @@ namespace taha
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		auto result = vkCreateWin32SurfaceKHR(m_instance, &createInfo, nullptr, &surface);
 		if (result != VK_SUCCESS)
+		{
 			return nullptr;
-		coreDefer { if (surface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, surface, nullptr); };
+		}
+		coreDefer
+		{
+			if (surface != VK_NULL_HANDLE)
+			{
+				vkDestroySurfaceKHR(m_instance, surface, nullptr);
+			}
+		};
 
 		// create swapchain
 		auto swapchainSupport = SwapchainSupport2::query(m_physicalDevice, surface, m_allocator);
@@ -781,9 +947,11 @@ namespace taha
 
 		uint32_t imageCount = swapchainSupport.capabilities.minImageCount + 1;
 		if (swapchainSupport.capabilities.maxImageCount > 0 && imageCount > swapchainSupport.capabilities.maxImageCount)
+		{
 			imageCount = swapchainSupport.capabilities.maxImageCount;
+		}
 
-		VkSwapchainCreateInfoKHR swapchainCreateInfo {
+		VkSwapchainCreateInfoKHR swapchainCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 			.surface = surface,
 			.minImageCount = imageCount,
@@ -791,7 +959,7 @@ namespace taha
 			.imageColorSpace = format.colorSpace,
 			.imageExtent = extent,
 			.imageArrayLayers = 1,
-			.imageUsage =  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
 			.preTransform = swapchainSupport.capabilities.currentTransform,
 			.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 			.presentMode = presentMode,
@@ -808,18 +976,26 @@ namespace taha
 		}
 		else
 		{
-			swapchainCreateInfo.imageSharingMode =VK_SHARING_MODE_EXCLUSIVE;
+			swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		}
 
 		VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 		result = vkCreateSwapchainKHR(m_logicalDevice, &swapchainCreateInfo, nullptr, &swapchain);
 		if (result != VK_SUCCESS)
+		{
 			return nullptr;
-		coreDefer { if (swapchain != VK_NULL_HANDLE) vkDestroySwapchainKHR(m_logicalDevice, swapchain, nullptr); };
-			// return core::errf(m_allocator, "vkCreateSwapchainKHR failed, ErrorCode({})"_sv, result);
+		}
+		coreDefer
+		{
+			if (swapchain != VK_NULL_HANDLE)
+			{
+				vkDestroySwapchainKHR(m_logicalDevice, swapchain, nullptr);
+			}
+		};
+		// return core::errf(m_allocator, "vkCreateSwapchainKHR failed, ErrorCode({})"_sv, result);
 
 		vkGetSwapchainImagesKHR(m_logicalDevice, swapchain, &imageCount, nullptr);
-		core::Array<VkImage> swapchainImages {m_allocator};
+		core::Array<VkImage> swapchainImages{m_allocator};
 		swapchainImages.resize_fill(imageCount, VK_NULL_HANDLE);
 		vkGetSwapchainImagesKHR(m_logicalDevice, swapchain, &imageCount, swapchainImages.data());
 
@@ -831,36 +1007,34 @@ namespace taha
 				.image = swapchainImages[i],
 				.viewType = VK_IMAGE_VIEW_TYPE_2D,
 				.format = format.format,
-				.components = {
-					.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-					.g = VK_COMPONENT_SWIZZLE_IDENTITY,
-					.b = VK_COMPONENT_SWIZZLE_IDENTITY,
-					.a = VK_COMPONENT_SWIZZLE_IDENTITY,
-				},
-				.subresourceRange = {
-					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-					.baseMipLevel = 0,
-					.levelCount = 1,
-					.baseArrayLayer = 0,
-					.layerCount = 1,
-				},
+				.components =
+					{
+						.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+						.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+						.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+						.a = VK_COMPONENT_SWIZZLE_IDENTITY,
+					},
+				.subresourceRange =
+					{
+						.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1,
+					},
 			};
 
 			VkImageView view = VK_NULL_HANDLE;
 			auto result = vkCreateImageView(m_logicalDevice, &imageViewCreateInfo, nullptr, &view);
 			if (result != VK_SUCCESS)
+			{
 				return nullptr;
+			}
 			swapchainImageViews.push(view);
 		}
 
 		auto res = core::unique_from<VkFrame>(
-			m_allocator,
-			this,
-			surface,
-			swapchain,
-			std::move(swapchainImages),
-			std::move(swapchainImageViews)
-		);
+			m_allocator, this, surface, swapchain, std::move(swapchainImages), std::move(swapchainImageViews));
 		surface = VK_NULL_HANDLE;
 		swapchain = VK_NULL_HANDLE;
 		return res;
@@ -874,7 +1048,9 @@ namespace taha
 		VkSurfaceKHR surface;
 		auto result = vkCreateWaylandSurfaceKHR(m_instance, &createInfo, nullptr, &surface);
 		if (result != VK_SUCCESS)
+		{
 			return nullptr;
+		}
 
 		return core::unique_from<VkFrame>(
 			m_allocator,
@@ -882,8 +1058,7 @@ namespace taha
 			surface,
 			VK_NULL_HANDLE,
 			core::Array<VkImage>{m_allocator},
-			core::Array<VkImageView>{m_allocator}
-		);
+			core::Array<VkImageView>{m_allocator});
 #endif
 
 		return nullptr;

@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include <core/Shared.h>
 #include <core/Mallocator.h>
+#include <core/Shared.h>
 
 TEST_CASE("basic core::Unique test")
 {
@@ -32,10 +32,22 @@ class SharedFoo: public core::SharedFromThis<SharedFoo>
 public:
 	virtual ~SharedFoo() = default;
 
-	core::Weak<SharedFoo> getWeakPtr() { return weakFromThis(); }
-	core::Weak<const SharedFoo> getWeakPtr() const { return weakFromThis(); }
-	core::Shared<SharedFoo> getPtr() { return sharedFromThis(); }
-	core::Shared<const SharedFoo> getPtr() const { return sharedFromThis(); }
+	core::Weak<SharedFoo> getWeakPtr()
+	{
+		return weakFromThis();
+	}
+	core::Weak<const SharedFoo> getWeakPtr() const
+	{
+		return weakFromThis();
+	}
+	core::Shared<SharedFoo> getPtr()
+	{
+		return sharedFromThis();
+	}
+	core::Shared<const SharedFoo> getPtr() const
+	{
+		return sharedFromThis();
+	}
 };
 
 class SharedBar: public SharedFoo
@@ -44,7 +56,10 @@ class SharedBar: public SharedFoo
 class SharedBaz
 {
 public:
-	operator SharedFoo() const { return SharedFoo{}; }
+	operator SharedFoo() const
+	{
+		return SharedFoo{};
+	}
 };
 
 TEST_CASE("pointer to parent class")
@@ -56,7 +71,7 @@ TEST_CASE("pointer to parent class")
 		auto bar = core::shared_from<SharedBar>(&allocator);
 		foo = bar;
 
-		static_assert(std::is_convertible_v<SharedBar *, core::SharedFromThis<SharedFoo> *>);
+		static_assert(std::is_convertible_v<SharedBar*, core::SharedFromThis<SharedFoo>*>);
 		auto sharedFoo = foo->getPtr();
 		REQUIRE(sharedFoo == foo);
 	}
@@ -78,8 +93,7 @@ public:
 class DerivedClass: public core::SharedFromThis<DerivedClass>, public BaseClass
 {
 public:
-	void foo() override
-	{}
+	void foo() override {}
 };
 
 TEST_CASE("pointer to base class with multiple inheritance")

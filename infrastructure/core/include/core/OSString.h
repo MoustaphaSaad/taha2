@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/Exports.h"
 #include "core/Allocator.h"
-#include "core/StringView.h"
-#include "core/String.h"
 #include "core/Buffer.h"
+#include "core/Exports.h"
+#include "core/String.h"
+#include "core/StringView.h"
 
 namespace core
 {

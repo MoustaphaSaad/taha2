@@ -1,7 +1,7 @@
 #include "core/File.h"
-#include "core/OSString.h"
-#include "core/Mallocator.h"
 #include "core/Assert.h"
+#include "core/Mallocator.h"
+#include "core/OSString.h"
 
 #include <Windows.h>
 
@@ -17,10 +17,11 @@ namespace core
 			if (m_handle != INVALID_HANDLE_VALUE && m_closeHandle)
 			{
 				[[maybe_unused]] auto res = CloseHandle(m_handle);
-				validate(SUCCEEDED(res));
+				assertTrue(SUCCEEDED(res));
 				m_handle = INVALID_HANDLE_VALUE;
 			}
 		}
+
 	public:
 		WinOSFile(HANDLE handle, bool close_handle = true)
 			: m_handle(handle),
@@ -36,7 +37,7 @@ namespace core
 		{
 			DWORD dwNumberOfBytesRead = 0;
 			auto res = ReadFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesRead, nullptr);
-			validate(SUCCEEDED(res));
+			assertTrue(SUCCEEDED(res));
 			return dwNumberOfBytesRead;
 		}
 
@@ -60,17 +61,19 @@ namespace core
 				DWORD nNumberOfCharsWritten = 0;
 				DWORD nNumberOfCharsToWrite = DWORD(osStr.sizeInBytes());
 				if (nNumberOfCharsToWrite > 0)
+				{
 					--nNumberOfCharsToWrite;
+				}
 				nNumberOfCharsToWrite /= sizeof(TCHAR);
 				auto res = WriteConsole(m_handle, osStr.data(), nNumberOfCharsToWrite, &nNumberOfCharsWritten, nullptr);
-				validate(SUCCEEDED(res));
+				assertTrue(SUCCEEDED(res));
 				return nNumberOfCharsWritten * sizeof(TCHAR);
 			}
 			else
 			{
 				DWORD dwNumberOfBytesWritten = 0;
 				auto res = WriteFile(m_handle, buffer, DWORD(size), &dwNumberOfBytesWritten, nullptr);
-				validate(SUCCEEDED(res));
+				assertTrue(SUCCEEDED(res));
 				return dwNumberOfBytesWritten;
 			}
 		}
@@ -97,7 +100,7 @@ namespace core
 			liDistanceToMove.QuadPart = offset;
 			LARGE_INTEGER liNewFilePointer{};
 			auto res = SetFilePointerEx(m_handle, liDistanceToMove, &liNewFilePointer, dwMoveMethod);
-			validate(SUCCEEDED(res));
+			assertTrue(SUCCEEDED(res));
 			return liNewFilePointer.QuadPart;
 		}
 
@@ -107,7 +110,7 @@ namespace core
 			liDistanceToMove.QuadPart = 0;
 			LARGE_INTEGER liNewFilePointer{};
 			auto res = SetFilePointerEx(m_handle, liDistanceToMove, &liNewFilePointer, FILE_CURRENT);
-			validate(SUCCEEDED(res));
+			assertTrue(SUCCEEDED(res));
 			return liNewFilePointer.QuadPart;
 		}
 	};
@@ -120,11 +123,12 @@ namespace core
 	File* File::STDERR = &core::STDERR;
 	File* File::STDIN = &core::STDIN;
 
-	Unique<File> File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
+	Unique<File>
+	File::open(Allocator* allocator, StringView name, IO_MODE io_mode, OPEN_MODE open_mode, SHARE_MODE share_mode)
 	{
 		// translate the io mode
 		DWORD dwDesiredAccess = 0;
-		switch(io_mode)
+		switch (io_mode)
 		{
 		case File::IO_MODE_READ:
 			dwDesiredAccess = GENERIC_READ;
@@ -142,7 +146,7 @@ namespace core
 
 		// translate the open mode
 		DWORD dwCreationDisposition = 0;
-		switch(open_mode)
+		switch (open_mode)
 		{
 		case OPEN_MODE_CREATE_ONLY:
 			dwCreationDisposition = CREATE_NEW;
@@ -198,7 +202,7 @@ namespace core
 			break;
 		}
 
-		auto osName = core::OSString{ name, allocator };
+		auto osName = core::OSString{name, allocator};
 		auto handle = CreateFile(
 			(LPWSTR)osName.data(),
 			dwDesiredAccess,
@@ -206,14 +210,14 @@ namespace core
 			NULL,
 			dwCreationDisposition,
 			FILE_ATTRIBUTE_NORMAL,
-			NULL
-		);
+			NULL);
 
 		if (handle == INVALID_HANDLE_VALUE)
+		{
 			return nullptr;
+		}
 
-		if (open_mode == OPEN_MODE_CREATE_APPEND ||
-			open_mode == OPEN_MODE_OPEN_APPEND)
+		if (open_mode == OPEN_MODE_CREATE_APPEND || open_mode == OPEN_MODE_OPEN_APPEND)
 		{
 			SetFilePointer(handle, NULL, NULL, FILE_END);
 		}

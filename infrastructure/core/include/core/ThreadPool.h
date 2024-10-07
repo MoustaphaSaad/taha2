@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/Exports.h"
 #include "core/Allocator.h"
 #include "core/Array.h"
-#include "core/Thread.h"
+#include "core/Exports.h"
 #include "core/NotificationQueue.h"
+#include "core/Thread.h"
 #include "core/WaitGroup.h"
 
 #include <atomic>
@@ -21,7 +21,7 @@ namespace core
 		WaitGroup m_wait_group;
 		std::atomic<size_t> m_next_queue = 0;
 
-		template<typename TFunc>
+		template <typename TFunc>
 		void pushFunc(TFunc&& func, const Weak<ExecutionQueue>& execQueue)
 		{
 			m_wait_group.add(1);
@@ -29,8 +29,12 @@ namespace core
 			constexpr size_t K = 4;
 			auto n = m_next_queue.fetch_add(1);
 			for (size_t i = 0; i < m_threads_count * K; ++i)
+			{
 				if (m_queue[(i + n) % m_threads_count].tryPush(std::forward<TFunc>(func), execQueue))
+				{
 					return;
+				}
+			}
 			m_queue[n % m_threads_count].push(std::forward<TFunc>(func), execQueue);
 		}
 
@@ -40,13 +44,13 @@ namespace core
 		CORE_EXPORT ThreadPool& operator=(ThreadPool&& other) = default;
 		CORE_EXPORT ~ThreadPool();
 
-		template<typename TFunc>
+		template <typename TFunc>
 		void run(TFunc&& func)
 		{
 			pushFunc(std::forward<TFunc>(func), nullptr);
 		}
 
-		template<typename TFunc>
+		template <typename TFunc>
 		void runFromExecutionQueue(TFunc&& func, const Weak<ExecutionQueue>& execQueue)
 		{
 			pushFunc(std::forward<TFunc>(func), execQueue);
@@ -57,6 +61,9 @@ namespace core
 			m_wait_group.wait();
 		}
 
-		size_t threadsCount() const { return m_threads_count; }
+		size_t threadsCount() const
+		{
+			return m_threads_count;
+		}
 	};
 }

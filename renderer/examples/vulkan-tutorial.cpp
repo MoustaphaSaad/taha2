@@ -8,16 +8,16 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #if TAHA_OS_WINDOWS
-#define GLFW_EXPOSE_NATIVE_WIN32 1
+	#define GLFW_EXPOSE_NATIVE_WIN32 1
 #elif TAHA_OS_LINUX
-#define GLFW_EXPOSE_NATIVE_WAYLAND 1
+	#define GLFW_EXPOSE_NATIVE_WAYLAND 1
 #endif
 #include <GLFW/glfw3native.h>
 
 #define GLM_FORCE_RADIANS 1
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE 1
-#include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -28,7 +28,7 @@ struct Vertex
 
 	static VkVertexInputBindingDescription getBindingDescription()
 	{
-		return VkVertexInputBindingDescription {
+		return VkVertexInputBindingDescription{
 			.binding = 0,
 			.stride = sizeof(Vertex),
 			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
@@ -57,14 +57,12 @@ struct Vertex
 
 constexpr Vertex VERTICES[] = {
 	Vertex{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-	Vertex{{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-	Vertex{{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}},
-	Vertex{{-0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}},
+	Vertex{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+	Vertex{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+	Vertex{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
 };
 
-constexpr uint16_t INDICES[] = {
-	0, 1, 2, 2, 3, 0
-};
+constexpr uint16_t INDICES[] = {0, 1, 2, 2, 3, 0};
 
 class HelloTriangleApplication
 {
@@ -83,10 +81,22 @@ public:
 
 	core::HumanError run()
 	{
-		if (auto err = initWindow()) return err;
-		if (auto err = initVulkan()) return err;
-		if (auto err = mainLoop()) return err;
-		if (auto err = cleanup()) return err;
+		if (auto err = initWindow())
+		{
+			return err;
+		}
+		if (auto err = initVulkan())
+		{
+			return err;
+		}
+		if (auto err = mainLoop())
+		{
+			return err;
+		}
+		if (auto err = cleanup())
+		{
+			return err;
+		}
 		return {};
 	}
 
@@ -100,7 +110,9 @@ private:
 	core::HumanError initWindow()
 	{
 		if (glfwInit() == GLFW_FALSE)
+		{
 			return core::errf(m_allocator, "glfwInit failed"_sv);
+		}
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
@@ -114,37 +126,84 @@ private:
 	core::HumanError initVulkan()
 	{
 		if (auto result = volkInitialize(); result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "volkInitialize failed, ErrorCode({})"_sv, result);
+		}
 
-		if (auto err = createInstance()) return err;
+		if (auto err = createInstance())
+		{
+			return err;
+		}
 
-		if (auto err = setupDebugMessenger()) return err;
+		if (auto err = setupDebugMessenger())
+		{
+			return err;
+		}
 
-		if (auto err = createSurface()) return err;
+		if (auto err = createSurface())
+		{
+			return err;
+		}
 
-		if (auto err = pickPhysicalDevice()) return err;
+		if (auto err = pickPhysicalDevice())
+		{
+			return err;
+		}
 
-		if (auto err = createLogicalDevice()) return err;
+		if (auto err = createLogicalDevice())
+		{
+			return err;
+		}
 
-		if (auto err = createSwapchain()) return err;
+		if (auto err = createSwapchain())
+		{
+			return err;
+		}
 
-		if (auto err = createImageViews()) return err;
+		if (auto err = createImageViews())
+		{
+			return err;
+		}
 
-		if (auto err = createRenderPass()) return err;
+		if (auto err = createRenderPass())
+		{
+			return err;
+		}
 
-		if (auto err = createGraphicsPipeline()) return err;
+		if (auto err = createGraphicsPipeline())
+		{
+			return err;
+		}
 
-		if (auto err = createFramebuffers()) return err;
+		if (auto err = createFramebuffers())
+		{
+			return err;
+		}
 
-		if (auto err = createCommandPool()) return err;
+		if (auto err = createCommandPool())
+		{
+			return err;
+		}
 
-		if (auto err = createVertexBuffer()) return err;
+		if (auto err = createVertexBuffer())
+		{
+			return err;
+		}
 
-		if (auto err = createIndexBuffer()) return err;
+		if (auto err = createIndexBuffer())
+		{
+			return err;
+		}
 
-		if (auto err = createCommandBuffers()) return err;
+		if (auto err = createCommandBuffers())
+		{
+			return err;
+		}
 
-		if (auto err = createSyncObjects()) return err;
+		if (auto err = createSyncObjects())
+		{
+			return err;
+		}
 
 		return {};
 	}
@@ -166,7 +225,13 @@ private:
 		vkWaitForFences(m_logicalDevice, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
 
 		uint32_t imageIndex = 0;
-		auto result = vkAcquireNextImageKHR(m_logicalDevice, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
+		auto result = vkAcquireNextImageKHR(
+			m_logicalDevice,
+			m_swapchain,
+			UINT64_MAX,
+			m_imageAvailableSemaphores[m_currentFrame],
+			VK_NULL_HANDLE,
+			&imageIndex);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
 			(void)recreateSwapchain();
@@ -205,7 +270,7 @@ private:
 		}
 
 		VkSwapchainKHR swapchains[] = {m_swapchain};
-		VkPresentInfoKHR presentInfo {
+		VkPresentInfoKHR presentInfo{
 			.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 			.waitSemaphoreCount = 1,
 			.pWaitSemaphores = signalSemaphores,
@@ -234,11 +299,23 @@ private:
 	{
 		cleanupSwapchain();
 
-		if (m_indexBuffer != VK_NULL_HANDLE) vkDestroyBuffer(m_logicalDevice, m_indexBuffer, nullptr);
-		if (m_indexBufferMemory != VK_NULL_HANDLE) vkFreeMemory(m_logicalDevice, m_indexBufferMemory, nullptr);
+		if (m_indexBuffer != VK_NULL_HANDLE)
+		{
+			vkDestroyBuffer(m_logicalDevice, m_indexBuffer, nullptr);
+		}
+		if (m_indexBufferMemory != VK_NULL_HANDLE)
+		{
+			vkFreeMemory(m_logicalDevice, m_indexBufferMemory, nullptr);
+		}
 
-		if (m_vertexBuffer != VK_NULL_HANDLE) vkDestroyBuffer(m_logicalDevice, m_vertexBuffer, nullptr);
-		if (m_vertexBufferMemory != VK_NULL_HANDLE) vkFreeMemory(m_logicalDevice, m_vertexBufferMemory, nullptr);
+		if (m_vertexBuffer != VK_NULL_HANDLE)
+		{
+			vkDestroyBuffer(m_logicalDevice, m_vertexBuffer, nullptr);
+		}
+		if (m_vertexBufferMemory != VK_NULL_HANDLE)
+		{
+			vkFreeMemory(m_logicalDevice, m_vertexBufferMemory, nullptr);
+		}
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 		{
@@ -249,13 +326,34 @@ private:
 
 		vkDestroyCommandPool(m_logicalDevice, m_commandPool, nullptr);
 
-		if (m_graphicsPipeline != VK_NULL_HANDLE) vkDestroyPipeline(m_logicalDevice, m_graphicsPipeline, nullptr);
-		if (m_pipelineLayout != VK_NULL_HANDLE) vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
-		if (m_renderPass != VK_NULL_HANDLE) vkDestroyRenderPass(m_logicalDevice, m_renderPass, nullptr);
-		if (m_logicalDevice != VK_NULL_HANDLE) vkDestroyDevice(m_logicalDevice, nullptr);
-		if (m_surface != VK_NULL_HANDLE) vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
-		if (m_debugMessenger != VK_NULL_HANDLE) vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
-		if (m_instance != VK_NULL_HANDLE) vkDestroyInstance(m_instance, nullptr);
+		if (m_graphicsPipeline != VK_NULL_HANDLE)
+		{
+			vkDestroyPipeline(m_logicalDevice, m_graphicsPipeline, nullptr);
+		}
+		if (m_pipelineLayout != VK_NULL_HANDLE)
+		{
+			vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
+		}
+		if (m_renderPass != VK_NULL_HANDLE)
+		{
+			vkDestroyRenderPass(m_logicalDevice, m_renderPass, nullptr);
+		}
+		if (m_logicalDevice != VK_NULL_HANDLE)
+		{
+			vkDestroyDevice(m_logicalDevice, nullptr);
+		}
+		if (m_surface != VK_NULL_HANDLE)
+		{
+			vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
+		}
+		if (m_debugMessenger != VK_NULL_HANDLE)
+		{
+			vkDestroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
+		}
+		if (m_instance != VK_NULL_HANDLE)
+		{
+			vkDestroyInstance(m_instance, nullptr);
+		}
 
 		volkFinalize();
 
@@ -267,10 +365,14 @@ private:
 	core::HumanError createInstance()
 	{
 		if (m_enableValidationLayers)
+		{
 			if (auto err = checkValidationLayerSupport())
+			{
 				return err;
+			}
+		}
 
-		VkApplicationInfo applicationInfo {
+		VkApplicationInfo applicationInfo{
 			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 			.pApplicationName = "Hello Triangle",
 			.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -300,29 +402,40 @@ private:
 
 		auto result = vkCreateInstance(&instanceInfo, nullptr, &m_instance);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateInstance failed, ErrorCode({})"_sv, result);
+		}
 
 		volkLoadInstance(m_instance);
 
 		return {};
 	}
 
-	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-														VkDebugUtilsMessageTypeFlagsEXT type,
-														const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-														void* pUserData)
+	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+		VkDebugUtilsMessageTypeFlagsEXT type,
+		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData)
 	{
 		auto log = (core::Log*)pUserData;
 
 		const char* typeName = "unknown";
 		if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+		{
 			typeName = "general";
+		}
 		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+		{
 			typeName = "validation";
+		}
 		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+		{
 			typeName = "performance";
+		}
 		else if (type == VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+		{
 			typeName = "binding";
+		}
 
 		if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
 		{
@@ -366,14 +479,18 @@ private:
 	core::HumanError setupDebugMessenger()
 	{
 		if (m_enableValidationLayers == false)
+		{
 			return {};
+		}
 
 		VkDebugUtilsMessengerCreateInfoEXT createInfo{};
 		populateDebugMessengerCreateInfo(createInfo);
 
 		auto result = vkCreateDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateDebugUtilsMessengerEXT failed, ErrorCode({})"_sv, result);
+		}
 		return {};
 	}
 
@@ -381,7 +498,9 @@ private:
 	{
 		auto result = glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_surface);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "glfwCreateWindowSurface failed, ErrorCode({})"_sv, result);
+		}
 		return {};
 	}
 
@@ -398,35 +517,49 @@ private:
 		{
 			auto familyProperties = listPhysicalDeviceFamilyProperties(device);
 
-			core::validate(familyProperties.count() < UINT32_MAX);
+			core::assertTrue(familyProperties.count() < UINT32_MAX);
 			uint32_t graphicsQueueFamily = UINT32_MAX;
 			uint32_t presentQueueFamily = UINT32_MAX;
 			for (size_t i = 0; i < familyProperties.count(); ++i)
 			{
 				if (familyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+				{
 					graphicsQueueFamily = (uint32_t)i;
+				}
 
 				VkBool32 presentSupport = false;
 				vkGetPhysicalDeviceSurfaceSupportKHR(device, (uint32_t)i, m_surface, &presentSupport);
 
 				if (presentSupport)
+				{
 					presentQueueFamily = (uint32_t)i;
+				}
 
 				if (graphicsQueueFamily != UINT32_MAX && presentQueueFamily != UINT32_MAX)
+				{
 					break;
+				}
 			}
 
 			if (graphicsQueueFamily == UINT32_MAX || presentQueueFamily == UINT32_MAX)
+			{
 				continue;
+			}
 
 			auto extensions = listPhysicalDeviceExtensions(device);
 			for (auto requiredExtensionName: DEVICE_EXTENSIONS)
+			{
 				if (findExtensionByName(extensions, core::StringView{requiredExtensionName}) == SIZE_MAX)
+				{
 					continue;
+				}
+			}
 
 			auto swapchainSupport = querySwapchainSupport(device);
 			if (swapchainSupport.formats.count() == 0 || swapchainSupport.presentModes.count() == 0)
+			{
 				continue;
+			}
 
 			m_graphicsQueueFamily = graphicsQueueFamily;
 			m_presentQueueFamily = presentQueueFamily;
@@ -435,21 +568,23 @@ private:
 		}
 
 		if (m_physicalDevice == VK_NULL_HANDLE)
+		{
 			return core::errf(m_allocator, "failed to find suitable physical device"_sv);
+		}
 		return {};
 	}
 
 	core::HumanError createLogicalDevice()
 	{
 		float queuePriority = 1.0f;
-		VkDeviceQueueCreateInfo graphicsQueueCreateInfo {
+		VkDeviceQueueCreateInfo graphicsQueueCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 			.queueFamilyIndex = m_graphicsQueueFamily,
 			.queueCount = 1,
 			.pQueuePriorities = &queuePriority,
 		};
 
-		VkDeviceQueueCreateInfo presentQueueCreateInfo {
+		VkDeviceQueueCreateInfo presentQueueCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 			.queueFamilyIndex = m_presentQueueFamily,
 			.queueCount = 1,
@@ -459,7 +594,9 @@ private:
 		VkDeviceQueueCreateInfo queues[] = {graphicsQueueCreateInfo, presentQueueCreateInfo};
 		uint32_t queuesCount = 2;
 		if (m_presentQueueFamily == m_graphicsQueueFamily)
+		{
 			queuesCount = 1;
+		}
 
 		VkPhysicalDeviceFeatures deviceFeatures{};
 		VkDeviceCreateInfo createInfo{
@@ -479,7 +616,9 @@ private:
 
 		auto result = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_logicalDevice);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateDevice failed, ErrorCode({})"_sv, result);
+		}
 
 		vkGetDeviceQueue(m_logicalDevice, m_graphicsQueueFamily, 0, &m_graphicsQueue);
 		vkGetDeviceQueue(m_logicalDevice, m_presentQueueFamily, 0, &m_presentQueue);
@@ -495,9 +634,10 @@ private:
 		auto extent = chooseSwapchainExtent(swapchainSupport.capabilities);
 
 		uint32_t imageCount = swapchainSupport.capabilities.minImageCount + 1;
-		if (swapchainSupport.capabilities.maxImageCount > 0 &&
-			imageCount > swapchainSupport.capabilities.maxImageCount)
+		if (swapchainSupport.capabilities.maxImageCount > 0 && imageCount > swapchainSupport.capabilities.maxImageCount)
+		{
 			imageCount = swapchainSupport.capabilities.maxImageCount;
+		}
 
 		uint32_t queueFamilyIndices[] = {m_graphicsQueueFamily, m_presentQueueFamily};
 
@@ -530,7 +670,9 @@ private:
 
 		auto result = vkCreateSwapchainKHR(m_logicalDevice, &createInfo, nullptr, &m_swapchain);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateSwapchainKHR failed, ErrorCode({})"_sv, result);
+		}
 
 		vkGetSwapchainImagesKHR(m_logicalDevice, m_swapchain, &imageCount, nullptr);
 		m_swapchainImages.resize_fill(imageCount, VK_NULL_HANDLE);
@@ -544,12 +686,19 @@ private:
 	void cleanupSwapchain()
 	{
 		for (auto framebuffer: m_swapchainFramebuffers)
+		{
 			vkDestroyFramebuffer(m_logicalDevice, framebuffer, nullptr);
+		}
 
 		for (auto view: m_swapchainImageViews)
+		{
 			vkDestroyImageView(m_logicalDevice, view, nullptr);
+		}
 
-		if (m_swapchain != VK_NULL_HANDLE) vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
+		if (m_swapchain != VK_NULL_HANDLE)
+		{
+			vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
+		}
 	}
 
 	core::HumanError recreateSwapchain()
@@ -566,9 +715,18 @@ private:
 
 		cleanupSwapchain();
 
-		if (auto err = createSwapchain()) return err;
-		if (auto err = createImageViews()) return err;
-		if (auto err = createFramebuffers()) return err;
+		if (auto err = createSwapchain())
+		{
+			return err;
+		}
+		if (auto err = createImageViews())
+		{
+			return err;
+		}
+		if (auto err = createFramebuffers())
+		{
+			return err;
+		}
 
 		return {};
 	}
@@ -583,29 +741,28 @@ private:
 				.image = m_swapchainImages[i],
 				.viewType = VK_IMAGE_VIEW_TYPE_2D,
 				.format = m_swapchainFormat,
-				.components = {
-					.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-					.g = VK_COMPONENT_SWIZZLE_IDENTITY,
-					.b = VK_COMPONENT_SWIZZLE_IDENTITY,
-					.a = VK_COMPONENT_SWIZZLE_IDENTITY,
-				},
-				.subresourceRange = {
-					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-					.levelCount = 1,
-					.layerCount = 1
-				},
+				.components =
+					{
+						.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+						.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+						.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+						.a = VK_COMPONENT_SWIZZLE_IDENTITY,
+					},
+				.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1},
 			};
 
 			auto result = vkCreateImageView(m_logicalDevice, &createInfo, nullptr, &m_swapchainImageViews[i]);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(m_allocator, "vkCreateImageView failed, ErrorCode({})"_sv, result);
+			}
 		}
 		return {};
 	}
 
 	core::HumanError createRenderPass()
 	{
-		VkAttachmentDescription colorAttachment {
+		VkAttachmentDescription colorAttachment{
 			.format = m_swapchainFormat,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -616,12 +773,12 @@ private:
 			.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 		};
 
-		VkAttachmentReference colorAttachmentRef {
+		VkAttachmentReference colorAttachmentRef{
 			.attachment = 0,
 			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		};
 
-		VkSubpassDescription subpass {
+		VkSubpassDescription subpass{
 			.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = 1,
 			.pColorAttachments = &colorAttachmentRef,
@@ -636,7 +793,7 @@ private:
 			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 		};
 
-		VkRenderPassCreateInfo renderPassInfo {
+		VkRenderPassCreateInfo renderPassInfo{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 			.attachmentCount = 1,
 			.pAttachments = &colorAttachment,
@@ -648,7 +805,9 @@ private:
 
 		auto result = vkCreateRenderPass(m_logicalDevice, &renderPassInfo, nullptr, &m_renderPass);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateRenderPass failed, ErrorCode({})"_sv, result);
+		}
 
 		return {};
 	}
@@ -661,34 +820,48 @@ private:
 		m_log->debug("vert path: {}"_sv, vertShaderPath);
 		auto vertShaderResult = core::File::content(m_allocator, vertShaderPath);
 		if (vertShaderResult.isError())
+		{
 			return vertShaderResult.releaseError();
+		}
 		auto vertShader = vertShaderResult.releaseValue();
 
 		auto fragShaderResult = core::File::content(m_allocator, fragShaderPath);
 		if (fragShaderResult.isError())
+		{
 			return fragShaderResult.releaseError();
+		}
 		auto fragShader = fragShaderResult.releaseValue();
 
 		auto vertShaderModuleResult = createShaderModule(core::Span<const std::byte>{vertShader});
 		if (vertShaderModuleResult.isError())
+		{
 			return vertShaderModuleResult.releaseError();
+		}
 		auto vertShaderModule = vertShaderModuleResult.releaseValue();
-		coreDefer { vkDestroyShaderModule(m_logicalDevice, vertShaderModule, nullptr); };
+		coreDefer
+		{
+			vkDestroyShaderModule(m_logicalDevice, vertShaderModule, nullptr);
+		};
 
 		auto fragShaderModuleResult = createShaderModule(core::Span<const std::byte>{fragShader});
 		if (fragShaderModuleResult.isError())
+		{
 			return fragShaderModuleResult.releaseError();
+		}
 		auto fragShaderModule = fragShaderModuleResult.releaseValue();
-		coreDefer { vkDestroyShaderModule(m_logicalDevice, fragShaderModule, nullptr); };
+		coreDefer
+		{
+			vkDestroyShaderModule(m_logicalDevice, fragShaderModule, nullptr);
+		};
 
-		VkPipelineShaderStageCreateInfo vertShaderStageInfo {
+		VkPipelineShaderStageCreateInfo vertShaderStageInfo{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_VERTEX_BIT,
 			.module = vertShaderModule,
 			.pName = "main",
 		};
 
-		VkPipelineShaderStageCreateInfo fragShaderStageInfo {
+		VkPipelineShaderStageCreateInfo fragShaderStageInfo{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
 			.module = fragShaderModule,
@@ -699,7 +872,7 @@ private:
 
 		auto bindingDescription = Vertex::getBindingDescription();
 		auto attributeDescriptions = Vertex::getAttributeDescriptions(m_allocator);
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo {
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 			.vertexBindingDescriptionCount = 1,
 			.pVertexBindingDescriptions = &bindingDescription,
@@ -707,7 +880,7 @@ private:
 			.pVertexAttributeDescriptions = attributeDescriptions.data(),
 		};
 
-		VkPipelineInputAssemblyStateCreateInfo inputAssembly {
+		VkPipelineInputAssemblyStateCreateInfo inputAssembly{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
 			.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
 		};
@@ -718,7 +891,7 @@ private:
 			.scissorCount = 1,
 		};
 
-		VkPipelineRasterizationStateCreateInfo rasterizer {
+		VkPipelineRasterizationStateCreateInfo rasterizer{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 			.depthClampEnable = VK_FALSE,
 			.rasterizerDiscardEnable = VK_FALSE,
@@ -729,21 +902,19 @@ private:
 			.lineWidth = 1.0f,
 		};
 
-		VkPipelineMultisampleStateCreateInfo multisampling {
+		VkPipelineMultisampleStateCreateInfo multisampling{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
 			.sampleShadingEnable = VK_FALSE,
 		};
 
-		VkPipelineColorBlendAttachmentState colorBlendAttachment {
+		VkPipelineColorBlendAttachmentState colorBlendAttachment{
 			.blendEnable = VK_FALSE,
-			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
-							  VK_COLOR_COMPONENT_G_BIT |
-							  VK_COLOR_COMPONENT_B_BIT |
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
 							  VK_COLOR_COMPONENT_A_BIT,
 		};
 
-		VkPipelineColorBlendStateCreateInfo colorBlending {
+		VkPipelineColorBlendStateCreateInfo colorBlending{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
 			.logicOpEnable = VK_FALSE,
 			.logicOp = VK_LOGIC_OP_COPY,
@@ -752,21 +923,23 @@ private:
 		};
 
 		VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-		VkPipelineDynamicStateCreateInfo dynamicState {
+		VkPipelineDynamicStateCreateInfo dynamicState{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
 			.dynamicStateCount = sizeof(dynamicStates) / sizeof(*dynamicStates),
 			.pDynamicStates = dynamicStates,
 		};
 
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo {
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo{
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		};
 
 		auto result = vkCreatePipelineLayout(m_logicalDevice, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreatePipelineLayout failed, ErrorCode({})"_sv, result);
+		}
 
-		VkGraphicsPipelineCreateInfo pipelineInfo {
+		VkGraphicsPipelineCreateInfo pipelineInfo{
 			.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 			.stageCount = 2,
 			.pStages = shaderStages,
@@ -784,9 +957,12 @@ private:
 			.basePipelineIndex = -1,
 		};
 
-		result = vkCreateGraphicsPipelines(m_logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline);
+		result =
+			vkCreateGraphicsPipelines(m_logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_graphicsPipeline);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateGraphicsPipelines failed, ErrorCode({})"_sv, result);
+		}
 
 		return {};
 	}
@@ -797,30 +973,30 @@ private:
 
 		for (size_t i = 0; i < m_swapchainImageViews.count(); ++i)
 		{
-			VkImageView attachments[] = {
-				m_swapchainImageViews[i]
-			};
+			VkImageView attachments[] = {m_swapchainImageViews[i]};
 
-			VkFramebufferCreateInfo framebufferCreateInfo {
+			VkFramebufferCreateInfo framebufferCreateInfo{
 				.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass = m_renderPass,
 				.attachmentCount = 1,
 				.pAttachments = attachments,
 				.width = m_swapchainExtent.width,
 				.height = m_swapchainExtent.height,
-				.layers = 1
-			};
+				.layers = 1};
 
-			auto result = vkCreateFramebuffer(m_logicalDevice, &framebufferCreateInfo, nullptr, &m_swapchainFramebuffers[i]);
+			auto result =
+				vkCreateFramebuffer(m_logicalDevice, &framebufferCreateInfo, nullptr, &m_swapchainFramebuffers[i]);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(m_allocator, "vkCreateFramebuffer failed, ErrorCode({})"_sv, result);
+			}
 		}
 		return {};
 	}
 
 	core::HumanError createCommandPool()
 	{
-		VkCommandPoolCreateInfo poolInfo {
+		VkCommandPoolCreateInfo poolInfo{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 			.queueFamilyIndex = m_graphicsQueueFamily,
@@ -828,7 +1004,9 @@ private:
 
 		auto result = vkCreateCommandPool(m_logicalDevice, &poolInfo, nullptr, &m_commandPool);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateCommandPool failed, ErrorCode({})"_sv, result);
+		}
 		return {};
 	}
 
@@ -836,7 +1014,7 @@ private:
 	{
 		m_commandBuffers.resize_fill(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
 
-		VkCommandBufferAllocateInfo commandBufferAllocateInfo {
+		VkCommandBufferAllocateInfo commandBufferAllocateInfo{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 			.commandPool = m_commandPool,
 			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
@@ -845,7 +1023,9 @@ private:
 
 		auto result = vkAllocateCommandBuffers(m_logicalDevice, &commandBufferAllocateInfo, m_commandBuffers.data());
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkAllocateCommandBuffers failed, ErrorCode({})"_sv, result);
+		}
 
 		return {};
 	}
@@ -860,7 +1040,7 @@ private:
 			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 		};
 
-		VkFenceCreateInfo fenceInfo {
+		VkFenceCreateInfo fenceInfo{
 			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 			.flags = VK_FENCE_CREATE_SIGNALED_BIT,
 		};
@@ -869,15 +1049,21 @@ private:
 		{
 			auto result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
+			}
 
 			result = vkCreateSemaphore(m_logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(m_allocator, "vkCreateSemaphore failed, ErrorCode({})"_sv, result);
+			}
 
 			result = vkCreateFence(m_logicalDevice, &fenceInfo, nullptr, &m_inFlightFences[i]);
 			if (result != VK_SUCCESS)
+			{
 				return core::errf(m_allocator, "vkCreateFence failed, ErrorCode({})"_sv, result);
+			}
 		}
 
 		return {};
@@ -890,8 +1076,7 @@ private:
 
 		for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
 		{
-			if (typeFilter & (1 << i) &&
-				(memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+			if (typeFilter & (1 << i) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
 			{
 				return i;
 			}
@@ -900,9 +1085,14 @@ private:
 		return core::errf(m_allocator, "failed to find suitable memory type!"_sv);
 	}
 
-	core::HumanError createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+	core::HumanError createBuffer(
+		VkDeviceSize size,
+		VkBufferUsageFlags usage,
+		VkMemoryPropertyFlags properties,
+		VkBuffer& buffer,
+		VkDeviceMemory& bufferMemory)
 	{
-		VkBufferCreateInfo bufferInfo {
+		VkBufferCreateInfo bufferInfo{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 			.size = size,
 			.usage = usage,
@@ -911,14 +1101,18 @@ private:
 
 		auto result = vkCreateBuffer(m_logicalDevice, &bufferInfo, nullptr, &buffer);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateBuffer failed, ErrorCode({})"_sv, result);
+		}
 
 		VkMemoryRequirements memoryRequirements{};
 		vkGetBufferMemoryRequirements(m_logicalDevice, buffer, &memoryRequirements);
 
 		auto memoryTypeResult = findMemoryType(memoryRequirements.memoryTypeBits, properties);
 		if (memoryTypeResult.isError())
+		{
 			return memoryTypeResult.releaseError();
+		}
 		auto memoryType = memoryTypeResult.releaseValue();
 
 		VkMemoryAllocateInfo allocInfo{
@@ -929,7 +1123,9 @@ private:
 
 		result = vkAllocateMemory(m_logicalDevice, &allocInfo, nullptr, &bufferMemory);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkAllocateMemory failed, ErrorCode({})"_sv, result);
+		}
 
 		vkBindBufferMemory(m_logicalDevice, buffer, bufferMemory, 0);
 		return {};
@@ -983,11 +1179,13 @@ private:
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			stagingBuffer,
-			stagingBufferMemory
-		);
+			stagingBufferMemory);
 		if (err)
+		{
 			return err;
-		coreDefer {
+		}
+		coreDefer
+		{
 			vkDestroyBuffer(m_logicalDevice, stagingBuffer, nullptr);
 			vkFreeMemory(m_logicalDevice, stagingBufferMemory, nullptr);
 		};
@@ -1002,10 +1200,11 @@ private:
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			m_vertexBuffer,
-			m_vertexBufferMemory
-		);
+			m_vertexBufferMemory);
 		if (err)
+		{
 			return err;
+		}
 
 		copyBuffer(stagingBuffer, m_vertexBuffer, bufferSize);
 
@@ -1023,11 +1222,13 @@ private:
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			stagingBuffer,
-			stagingBufferMemory
-		);
+			stagingBufferMemory);
 		if (err)
+		{
 			return err;
-		coreDefer {
+		}
+		coreDefer
+		{
 			vkDestroyBuffer(m_logicalDevice, stagingBuffer, nullptr);
 			vkFreeMemory(m_logicalDevice, stagingBufferMemory, nullptr);
 		};
@@ -1042,10 +1243,11 @@ private:
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			m_indexBuffer,
-			m_indexBufferMemory
-		);
+			m_indexBufferMemory);
 		if (err)
+		{
 			return err;
+		}
 
 		copyBuffer(stagingBuffer, m_indexBuffer, bufferSize);
 		return {};
@@ -1053,22 +1255,25 @@ private:
 
 	core::HumanError recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 	{
-		VkCommandBufferBeginInfo beginInfo {
+		VkCommandBufferBeginInfo beginInfo{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		};
 
 		auto result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkBeginCommandBuffer failed, ErrorCode({})"_sv, result);
+		}
 
-		VkClearValue clearColor {.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}};
-		VkRenderPassBeginInfo renderPassInfo {
+		VkClearValue clearColor{.color = {.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}};
+		VkRenderPassBeginInfo renderPassInfo{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 			.renderPass = m_renderPass,
 			.framebuffer = m_swapchainFramebuffers[imageIndex],
-			.renderArea = {
-				.extent = m_swapchainExtent,
-			},
+			.renderArea =
+				{
+					.extent = m_swapchainExtent,
+				},
 			.clearValueCount = 1,
 			.pClearValues = &clearColor,
 		};
@@ -1083,10 +1288,7 @@ private:
 		vkCmdBindIndexBuffer(commandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
 		VkViewport viewport{
-			.width = (float)m_swapchainExtent.width,
-			.height = (float)m_swapchainExtent.height,
-			.maxDepth = 1.0f
-		};
+			.width = (float)m_swapchainExtent.width, .height = (float)m_swapchainExtent.height, .maxDepth = 1.0f};
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
 		VkRect2D scissor{
@@ -1094,19 +1296,21 @@ private:
 		};
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-		vkCmdDrawIndexed(commandBuffer, sizeof(INDICES)/sizeof(*INDICES), 1, 0, 0, 0);
+		vkCmdDrawIndexed(commandBuffer, sizeof(INDICES) / sizeof(*INDICES), 1, 0, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffer);
 
 		result = vkEndCommandBuffer(commandBuffer);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkEndCommandBuffer failed, ErrorCode({})"_sv, result);
+		}
 		return {};
 	}
 
 	core::Result<VkShaderModule> createShaderModule(core::Span<const std::byte> code)
 	{
-		VkShaderModuleCreateInfo createInfo {
+		VkShaderModuleCreateInfo createInfo{
 			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
 			.codeSize = code.sizeInBytes(),
 			.pCode = (uint32_t*)code.data(),
@@ -1115,49 +1319,69 @@ private:
 		VkShaderModule module = VK_NULL_HANDLE;
 		auto result = vkCreateShaderModule(m_logicalDevice, &createInfo, nullptr, &module);
 		if (result != VK_SUCCESS)
+		{
 			return core::errf(m_allocator, "vkCreateShaderModule failed, ErrorCode({})"_sv, result);
+		}
 		return module;
 	}
 
 	VkSurfaceFormatKHR chooseSwapchainSurfaceFormat(const core::Array<VkSurfaceFormatKHR>& formats)
 	{
 		for (auto format: formats)
+		{
 			if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+			{
 				return format;
+			}
+		}
 		return formats[0];
 	}
 
 	VkPresentModeKHR chooseSwapchainPresentMode(const core::Array<VkPresentModeKHR>& modes)
 	{
 		for (auto mode: modes)
+		{
 			if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
 				return mode;
+			}
+		}
 		return VK_PRESENT_MODE_FIFO_KHR;
 	}
 
 	VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities)
 	{
 		if (capabilities.currentExtent.width != UINT32_MAX)
+		{
 			return capabilities.currentExtent;
+		}
 
 		int width = 0;
 		int height = 0;
 		glfwGetFramebufferSize(m_window, &width, &height);
 
-		VkExtent2D actualExtent {
+		VkExtent2D actualExtent{
 			.width = (uint32_t)width,
 			.height = (uint32_t)height,
 		};
 
 		if (actualExtent.width < capabilities.minImageExtent.width)
+		{
 			actualExtent.width = capabilities.minImageExtent.width;
+		}
 		if (actualExtent.width > capabilities.maxImageExtent.width)
+		{
 			actualExtent.width = capabilities.maxImageExtent.width;
+		}
 
 		if (actualExtent.height < capabilities.minImageExtent.height)
+		{
 			actualExtent.height = capabilities.minImageExtent.height;
+		}
 		if (actualExtent.height > capabilities.maxImageExtent.height)
+		{
 			actualExtent.height = capabilities.maxImageExtent.height;
+		}
 
 		return actualExtent;
 	}
@@ -1204,8 +1428,12 @@ private:
 	size_t findExtensionByName(const core::Array<VkExtensionProperties>& extensions, core::StringView name)
 	{
 		for (size_t i = 0; i < extensions.count(); ++i)
+		{
 			if (core::StringView{extensions[i].extensionName} == name)
+			{
 				return i;
+			}
+		}
 		return SIZE_MAX;
 	}
 
@@ -1239,10 +1467,14 @@ private:
 		auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 		core::Array<const char*> extensions{m_allocator};
 		for (uint32_t i = 0; i < glfwExtensionCount; ++i)
+		{
 			extensions.push(glfwExtensions[i]);
+		}
 
 		if (m_enableValidationLayers)
+		{
 			extensions.push(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		}
 		return extensions;
 	}
 
@@ -1250,8 +1482,12 @@ private:
 	{
 		auto layers = listInstanceLayers();
 		for (auto requiredLayer: VALIDATION_LAYERS)
+		{
 			if (findLayerByName(layers, core::StringView{requiredLayer}) == SIZE_MAX)
+			{
 				return core::errf(m_allocator, "required layer '{}' not found"_sv, requiredLayer);
+			}
+		}
 		return {};
 	}
 
@@ -1270,8 +1506,12 @@ private:
 	size_t findLayerByName(const core::Array<VkLayerProperties>& layers, core::StringView layerName)
 	{
 		for (size_t i = 0; i < layers.count(); ++i)
+		{
 			if (core::StringView{layers[i].layerName} == layerName)
+			{
 				return i;
+			}
+		}
 		return SIZE_MAX;
 	}
 
@@ -1336,11 +1576,17 @@ int main()
 
 namespace fmt
 {
-	template <> struct formatter<VkResult>
+	template <>
+	struct formatter<VkResult>
 	{
-		template <typename ParseContext> constexpr auto parse(ParseContext& ctx) { return ctx.begin(); }
+		template <typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
+		{
+			return ctx.begin();
+		}
 
-		template <typename FormatContext> auto format(VkResult r, FormatContext& ctx)
+		template <typename FormatContext>
+		auto format(VkResult r, FormatContext& ctx)
 		{
 			switch (r)
 			{

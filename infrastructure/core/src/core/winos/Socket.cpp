@@ -1,9 +1,9 @@
 #include "core/Socket.h"
-#include "core/String.h"
 #include "core/Assert.h"
+#include "core/String.h"
 
-#include <WinSock2.h>
 #include <WS2tcpip.h>
+#include <WinSock2.h>
 
 namespace core
 {
@@ -13,8 +13,8 @@ namespace core
 		{
 			WSADATA wsaData;
 			auto err = WSAStartup(MAKEWORD(2, 2), &wsaData);
-			validate(err == 0);
-			validate(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
+			assertTrue(err == 0);
+			assertTrue(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2);
 		}
 
 		~WinOSSocketInitializer()
@@ -31,6 +31,7 @@ namespace core
 		int m_family = 0;
 		int m_type = 0;
 		int m_protocol = 0;
+
 	public:
 		WinOSSocket(Allocator* allocator, SOCKET handle, int family, int type, int protocol)
 			: m_allocator(allocator),
@@ -45,18 +46,22 @@ namespace core
 			if (m_handle != INVALID_SOCKET)
 			{
 				[[maybe_unused]] auto res = ::closesocket(m_handle);
-				validate(res == 0);
+				assertTrue(res == 0);
 			}
 		}
 
 		bool close() override
 		{
 			if (m_handle == INVALID_SOCKET)
+			{
 				return false;
+			}
 
 			auto err = ::closesocket(m_handle);
 			if (err == SOCKET_ERROR)
+			{
 				return false;
+			}
 
 			m_handle = INVALID_SOCKET;
 			return true;
@@ -74,7 +79,9 @@ namespace core
 			addrinfo* result = nullptr;
 			auto err = ::getaddrinfo(c_address.data(), c_port.data(), &hints, &result);
 			if (err != 0)
+			{
 				return false;
+			}
 
 			for (auto it = result; it; it = it->ai_next)
 			{
@@ -103,7 +110,9 @@ namespace core
 			addrinfo* result = nullptr;
 			auto err = ::getaddrinfo(c_host.data(), c_port.data(), &hints, &result);
 			if (err != 0)
+			{
 				return false;
+			}
 
 			err = ::bind(m_handle, result->ai_addr, (int)result->ai_addrlen);
 			if (err == SOCKET_ERROR)
@@ -119,11 +128,15 @@ namespace core
 		bool listen(int max_connections) override
 		{
 			if (max_connections == 0)
+			{
 				max_connections = SOMAXCONN;
+			}
 
 			auto err = ::listen(m_handle, max_connections);
 			if (err == SOCKET_ERROR)
+			{
 				return false;
+			}
 
 			return true;
 		}
@@ -132,7 +145,9 @@ namespace core
 		{
 			auto handle = ::accept(m_handle, nullptr, nullptr);
 			if (handle == INVALID_SOCKET)
+			{
 				return nullptr;
+			}
 
 			return unique_from<WinOSSocket>(m_allocator, m_allocator, handle, m_family, m_type, m_protocol);
 		}
@@ -168,9 +183,12 @@ namespace core
 		{
 			switch (m_family)
 			{
-			case AF_UNSPEC: return FAMILY_UNSPEC;
-			case AF_INET: return FAMILY_IPV4;
-			case AF_INET6: return FAMILY_IPV6;
+			case AF_UNSPEC:
+				return FAMILY_UNSPEC;
+			case AF_INET:
+				return FAMILY_IPV4;
+			case AF_INET6:
+				return FAMILY_IPV6;
 			default:
 				unreachable();
 				return FAMILY(0);
@@ -181,8 +199,10 @@ namespace core
 		{
 			switch (m_type)
 			{
-			case SOCK_STREAM: return TYPE_TCP;
-			case SOCK_DGRAM: return TYPE_UDP;
+			case SOCK_STREAM:
+				return TYPE_TCP;
+			case SOCK_DGRAM:
+				return TYPE_UDP;
 			default:
 				unreachable();
 				return TYPE(0);
@@ -194,18 +214,24 @@ namespace core
 			sockaddr addr{};
 			socklen_t size = sizeof(addr);
 			if (getsockname(m_handle, &addr, &size) != 0)
+			{
 				return 0;
+			}
 
 			char portName[6] = {0};
 			if (getnameinfo(&addr, size, NULL, 0, portName, sizeof(portName), NI_NUMERICSERV) != 0)
+			{
 				return 0;
+			}
 
 			errno = 0;
 			auto endPtr = portName;
 			auto res = strtoul(portName, &endPtr, 10);
 			if (errno == ERANGE || endPtr != portName + strlen(portName))
+			{
 				return 0;
-			validate(res <= UINT16_MAX);
+			}
+			assertTrue(res <= UINT16_MAX);
 			return uint16_t(res);
 		}
 
@@ -213,7 +239,9 @@ namespace core
 		{
 			auto err = ::recv(m_handle, (char*)buffer, (int)size, 0);
 			if (err == SOCKET_ERROR)
+			{
 				return 0;
+			}
 
 			return (size_t)err;
 		}
@@ -222,7 +250,9 @@ namespace core
 		{
 			auto err = ::send(m_handle, (const char*)buffer, (int)size, 0);
 			if (err == SOCKET_ERROR)
+			{
 				return 0;
+			}
 
 			return (size_t)err;
 		}
@@ -276,7 +306,9 @@ namespace core
 
 		auto handle = ::socket(osFamily, osType, osProtocol);
 		if (handle == INVALID_SOCKET)
+		{
 			return nullptr;
+		}
 
 		return unique_from<WinOSSocket>(allocator, allocator, handle, osFamily, osType, osProtocol);
 	}

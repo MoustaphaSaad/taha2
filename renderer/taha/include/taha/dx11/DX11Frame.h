@@ -1,8 +1,8 @@
 #pragma once
 
 #include "taha/Frame.h"
-#include "taha/dx11/DXPtr.h"
 #include "taha/dx11/DX11Renderer.h"
+#include "taha/dx11/DXPtr.h"
 
 struct IDXGISwapChain;
 struct ID3D11Texture2D;
@@ -28,6 +28,7 @@ namespace taha
 		{
 			m_renderer->submitCommandsAndExecute(this, commands);
 		}
+
 	public:
 		DX11Frame(
 			DX11Renderer* renderer,

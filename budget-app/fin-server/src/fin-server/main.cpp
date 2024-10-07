@@ -1,6 +1,6 @@
+#include <core/EventLoop.h>
 #include <core/FastLeak.h>
 #include <core/Log.h>
-#include <core/EventLoop.h>
 
 #include <fin/Server.h>
 
@@ -33,7 +33,9 @@ public:
 	static core::Result<Args> parse(int argc, char** argv, core::Allocator* allocator)
 	{
 		if (argc < 2)
+		{
 			return core::errf(allocator, "no command found"_sv);
+		}
 
 		// special case the help command
 		Args res{allocator};
@@ -73,9 +75,18 @@ public:
 		return res;
 	}
 
-	core::StringView file() const { return m_file; }
-	bool help() const { return m_help; }
-	bool create() const { return m_create; }
+	core::StringView file() const
+	{
+		return m_file;
+	}
+	bool help() const
+	{
+		return m_help;
+	}
+	bool create() const
+	{
+		return m_create;
+	}
 };
 
 int main(int argc, char** argv)
@@ -107,13 +118,7 @@ int main(int argc, char** argv)
 		auto threadedEventLoop = threadedEventLoopResult.releaseValue();
 
 		auto serverResult = fin::Server::create(
-			args.file(),
-			""_sv,
-			fin::Server::FLAG::CREATE_LEDGER,
-			threadedEventLoop->next(),
-			&log,
-			&allocator
-		);
+			args.file(), ""_sv, fin::Server::FLAG::CREATE_LEDGER, threadedEventLoop->next(), &log, &allocator);
 		if (serverResult.isError())
 		{
 			log.critical("failed to create server instance, {}"_sv, serverResult.releaseError());

@@ -17,12 +17,14 @@ namespace taha
 		core::Array<VkImageView> m_swapchainImageViews;
 
 		TAHA_EXPORT void endEncodingAndSubmit(const core::Array<core::Unique<Command>>& commands) override;
+
 	public:
-		VkFrame(VkRenderer* renderer,
-				VkSurfaceKHR surface,
-				VkSwapchainKHR swapchain,
-				core::Array<VkImage> swapchainImages,
-				core::Array<VkImageView> swapchainImageViews)
+		VkFrame(
+			VkRenderer* renderer,
+			VkSurfaceKHR surface,
+			VkSwapchainKHR swapchain,
+			core::Array<VkImage> swapchainImages,
+			core::Array<VkImageView> swapchainImageViews)
 			: m_renderer(renderer),
 			  m_surface(surface),
 			  m_swapchain(swapchain),

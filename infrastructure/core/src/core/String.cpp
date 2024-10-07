@@ -8,7 +8,9 @@ namespace core
 	void String::destroy()
 	{
 		if (m_allocator == nullptr || m_memory.empty())
+		{
 			return;
+		}
 
 		m_allocator->releaseT(m_memory);
 		m_allocator->freeT(m_memory);
@@ -56,10 +58,14 @@ namespace core
 		{
 			auto new_capacity = m_memory.count() * 2;
 			if (new_capacity == 0)
+			{
 				new_capacity = 8;
+			}
 
 			if (new_capacity < m_count + count)
+			{
 				new_capacity = m_count + count;
+			}
 
 			grow(new_capacity);
 		}
@@ -84,7 +90,9 @@ namespace core
 	{
 		bool null_terminated = buffer.count() > 0 && buffer[buffer.count() - 1] == std::byte('\0');
 		if (null_terminated == false)
+		{
 			buffer.push((std::byte)'\0');
+		}
 
 		m_allocator = buffer.m_allocator;
 		m_memory = Span<char>{(char*)buffer.m_memory.data(), buffer.m_memory.count()};
@@ -98,7 +106,9 @@ namespace core
 	{
 		// +1 for the null terminator
 		if (new_count + 1 > m_memory.count())
+		{
 			grow(new_count + 1);
+		}
 
 		m_count = new_count;
 		m_memory[m_count] = '\0';
@@ -120,7 +130,7 @@ namespace core
 		ensureSpaceExists(m_count + 5);
 
 		auto width = Rune::encode(r, m_memory.data() + m_count);
-		validate(width > 0 && width <= 4);
+		assertTrue(width > 0 && width <= 4);
 		m_count += width;
 		m_memory[m_count] = '\0';
 	}
@@ -164,7 +174,7 @@ namespace core
 		out.ensureSpaceExists(m_count);
 		// find the first pattern or -1
 		size_t search_it = find(search, 0);
-		size_t it		 = 0;
+		size_t it = 0;
 		// while we didn't finish the string
 		while (it < m_count)
 		{
@@ -173,7 +183,9 @@ namespace core
 			{
 				// push the remaining content
 				if (it < m_count)
+				{
 					out.push(StringView{m_memory.data() + it, m_count - it});
+				}
 
 				// exit we finished the string
 				break;
@@ -181,7 +193,9 @@ namespace core
 
 			// push the preceding content
 			if (search_it > it)
+			{
 				out.push(StringView{m_memory.data() + it, search_it - it});
+			}
 
 			// push the replacement string
 			out.push(replace);

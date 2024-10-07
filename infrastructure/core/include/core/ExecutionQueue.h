@@ -1,19 +1,18 @@
 #pragma once
 
-#include "core/ThreadPool.h"
-#include "core/Queue.h"
-#include "core/Func.h"
-#include "core/Mutex.h"
-#include "core/Lock.h"
 #include "core/Assert.h"
+#include "core/Func.h"
+#include "core/Lock.h"
+#include "core/Mutex.h"
+#include "core/Queue.h"
+#include "core/ThreadPool.h"
 
 namespace core
 {
 	class ExecutionQueue: public SharedFromThis<ExecutionQueue>
 	{
-		template<typename TPtr, typename... TArgs>
-		friend inline Shared<TPtr>
-		shared_from(Allocator* allocator, TArgs&&... args);
+		template <typename TPtr, typename... TArgs>
+		friend inline Shared<TPtr> shared_from(Allocator* allocator, TArgs&&... args);
 
 		Queue<Func<void()>> m_queue;
 		Mutex m_mutex;
@@ -23,13 +22,14 @@ namespace core
 			: m_queue(allocator),
 			  m_mutex(allocator)
 		{}
+
 	public:
 		static Shared<ExecutionQueue> create(Allocator* allocator)
 		{
 			return shared_from<ExecutionQueue>(allocator, allocator);
 		}
 
-		template<typename TFunc>
+		template <typename TFunc>
 		void push(ThreadPool* pool, TFunc&& func)
 		{
 			auto lock = lockGuard(m_mutex);
@@ -47,7 +47,7 @@ namespace core
 		bool signalFuncExecutionFinishedAndTryPop(Func<void()>& func)
 		{
 			auto lock = lockGuard(m_mutex);
-			validate(m_scheduled == true);
+			assertTrue(m_scheduled == true);
 			if (m_queue.count() > 0)
 			{
 				func = std::move(m_queue.front());

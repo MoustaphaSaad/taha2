@@ -5,12 +5,12 @@
 // -p 9011:9011 --name wstest crossbario/autobahn-testsuite wstest -m fuzzingclient -s /config/fuzzingclient.json
 
 #include <core/FastLeak.h>
-#include <core/Log.h>
-#include <core/ws/Server.h>
-#include <core/Url.h>
-#include <core/Thread.h>
 #include <core/Lock.h>
+#include <core/Log.h>
+#include <core/Thread.h>
+#include <core/Url.h>
 #include <core/WaitGroup.h>
+#include <core/ws/Server.h>
 
 #include <tracy/Tracy.hpp>
 
@@ -20,7 +20,7 @@ class EchoServer
 {
 	struct ClientData
 	{
-		template<typename TPtr, typename... TArgs>
+		template <typename TPtr, typename... TArgs>
 		friend inline core::Shared<TPtr> core::shared_from(core::Allocator* allocator, TArgs&&... args);
 
 		core::ws::Client client;
@@ -56,18 +56,24 @@ class EchoServer
 		{
 			auto messageResult = client.readMessage();
 			if (messageResult.isError())
+			{
 				return messageResult.releaseError();
+			}
 			auto message = messageResult.releaseValue();
 
 			if (message.kind == core::ws::Message::KIND_TEXT)
 			{
 				if (auto err = client.writeText(core::StringView{message.payload}))
+				{
 					return err;
+				}
 			}
 			else if (message.kind == core::ws::Message::KIND_BINARY)
 			{
 				if (auto err = client.writeBinary(core::Span<const std::byte>{message.payload}))
+				{
 					return err;
+				}
 			}
 			else if (message.kind == core::ws::Message::KIND_CLOSE)
 			{
@@ -76,7 +82,9 @@ class EchoServer
 			else
 			{
 				if (auto err = client.handleMessage(message))
+				{
 					return err;
+				}
 			}
 		}
 	}
@@ -88,12 +96,15 @@ class EchoServer
 		  m_clients(allocator),
 		  m_waitgroup(allocator)
 	{}
+
 public:
 	static core::Result<EchoServer> create(core::StringView url, core::Log* log, core::Allocator* allocator)
 	{
 		auto serverResult = core::ws::Server::connect(url, 4096ULL, 64ULL * 1024ULL * 1024ULL, log, allocator);
 		if (serverResult.isError())
+		{
 			return errf(allocator, "failed to create server, {}"_sv, serverResult.releaseError());
+		}
 		return EchoServer{serverResult.releaseValue(), allocator};
 	}
 
@@ -103,23 +114,27 @@ public:
 		{
 			auto clientResult = m_server.accept();
 			if (clientResult.isError())
+			{
 				break;
+			}
 			auto client = clientResult.releaseValue();
 			auto clientData = core::shared_from<ClientData>(m_allocator, std::move(client));
 			m_waitgroup.add(1);
-			core::Thread clientThread{m_allocator, [this, clientData]{
-				pushClient(clientData);
-				(void)handleClient(clientData);
-				popClient(clientData);
-				m_waitgroup.done();
-			}};
+			core::Thread clientThread{m_allocator, [this, clientData] {
+										  pushClient(clientData);
+										  (void)handleClient(clientData);
+										  popClient(clientData);
+										  m_waitgroup.done();
+									  }};
 			clientData->thread = core::unique_from<core::Thread>(m_allocator, std::move(clientThread));
 		}
 
 		{
 			auto lock = core::lockGuard(m_mutex);
 			for (const auto& clientData: m_clients)
+			{
 				clientData->client.close();
+			}
 		}
 		m_waitgroup.wait();
 	}
@@ -135,14 +150,18 @@ EchoServer* SERVER;
 void signalHandler(int signal)
 {
 	if (signal == SIGINT)
+	{
 		SERVER->close();
+	}
 }
 
 int main(int argc, char** argv)
 {
 	auto url = "ws://localhost:9011"_sv;
 	if (argc > 1)
+	{
 		url = core::StringView{argv[1]};
+	}
 
 	signal(SIGINT, signalHandler);
 

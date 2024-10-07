@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include <core/OSString.h>
 #include <core/Mallocator.h>
+#include <core/OSString.h>
 
 TEST_CASE("core::OSString roundtrip")
 {

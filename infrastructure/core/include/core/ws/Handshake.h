@@ -1,14 +1,15 @@
 #pragma once
 
 #include "core/Exports.h"
-#include "core/String.h"
 #include "core/Result.h"
+#include "core/String.h"
 
 namespace core::ws
 {
 	class Handshake
 	{
 		String m_key;
+
 	public:
 		explicit Handshake(Allocator* allocator)
 			: m_key(allocator)
@@ -18,7 +19,10 @@ namespace core::ws
 			: m_key(key)
 		{}
 
-		StringView key() const { return m_key; }
+		StringView key() const
+		{
+			return m_key;
+		}
 
 		CORE_EXPORT static Result<Handshake> parse(StringView request, Allocator* allocator);
 		CORE_EXPORT static Result<Handshake> parseResponse(StringView response, Allocator* allocator);

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/Exports.h"
-#include "core/Assert.h"
 #include "core/Allocator.h"
-#include "core/StringView.h"
+#include "core/Assert.h"
+#include "core/Exports.h"
 #include "core/Span.h"
+#include "core/StringView.h"
 
 #include <cstddef>
 #include <utility>
@@ -69,19 +69,28 @@ namespace core
 
 		std::byte& operator[](size_t i)
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 
 		const std::byte& operator[](size_t i) const
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 
-		explicit operator StringView() const { return StringView{m_memory.sliceLeft(m_count)}; }
-		explicit operator Span<const std::byte>() const { return m_memory.sliceLeft(m_count); }
-		explicit operator Span<std::byte>() { return m_memory.sliceLeft(m_count); }
+		explicit operator StringView() const
+		{
+			return StringView{m_memory.sliceLeft(m_count)};
+		}
+		explicit operator Span<const std::byte>() const
+		{
+			return m_memory.sliceLeft(m_count);
+		}
+		explicit operator Span<std::byte>()
+		{
+			return m_memory.sliceLeft(m_count);
+		}
 
 		void push(std::byte b)
 		{
@@ -108,13 +117,31 @@ namespace core
 		CORE_EXPORT void push(const std::byte* ptr, size_t size);
 
 		CORE_EXPORT void resize(size_t new_count);
-		void reserve(size_t extra_count) { ensureSpaceExists(extra_count); }
+		void reserve(size_t extra_count)
+		{
+			ensureSpaceExists(extra_count);
+		}
 		CORE_EXPORT void clear();
 
-		size_t count() const { return m_count; }
-		size_t capacity() const { return m_memory.count(); }
-		std::byte* data() { return m_memory.data(); }
-		const std::byte* data() const { return m_memory.data(); }
-		Allocator* allocator() const { return m_allocator; }
+		size_t count() const
+		{
+			return m_count;
+		}
+		size_t capacity() const
+		{
+			return m_memory.count();
+		}
+		std::byte* data()
+		{
+			return m_memory.data();
+		}
+		const std::byte* data() const
+		{
+			return m_memory.data();
+		}
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
 	};
 }

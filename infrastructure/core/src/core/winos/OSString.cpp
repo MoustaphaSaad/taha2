@@ -20,15 +20,26 @@ namespace core
 
 	String OSString::toUtf8(Allocator* allocator) const
 	{
-		auto countNeeded = WideCharToMultiByte(CP_UTF8, NULL, (LPTSTR)m_buffer.data(), int(m_buffer.count() / sizeof(TCHAR)), NULL, 0, NULL, NULL);
+		auto countNeeded = WideCharToMultiByte(
+			CP_UTF8, NULL, (LPTSTR)m_buffer.data(), int(m_buffer.count() / sizeof(TCHAR)), NULL, 0, NULL, NULL);
 		if (countNeeded == 0)
+		{
 			return String{allocator};
+		}
 
 		String str{allocator};
 		// countNeeded includes null byte
 		str.resize(countNeeded - 1);
 
-		countNeeded = WideCharToMultiByte(CP_UTF8, NULL, (LPTSTR)m_buffer.data(), int(m_buffer.count() / sizeof(TCHAR)), str.data(), int(str.count()), NULL, NULL);
+		countNeeded = WideCharToMultiByte(
+			CP_UTF8,
+			NULL,
+			(LPTSTR)m_buffer.data(),
+			int(m_buffer.count() / sizeof(TCHAR)),
+			str.data(),
+			int(str.count()),
+			NULL,
+			NULL);
 		return str;
 	}
 }

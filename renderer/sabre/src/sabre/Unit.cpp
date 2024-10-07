@@ -8,7 +8,9 @@ namespace sabre
 	{
 		auto content = core::File::content(allocator, filepath);
 		if (content.isError())
+		{
 			return content.releaseError();
+		}
 
 		auto unit = core::unique_from<Unit>(allocator, allocator);
 		auto package = core::unique_from<UnitPackage>(allocator, allocator);

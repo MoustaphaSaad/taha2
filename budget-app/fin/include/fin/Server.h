@@ -2,15 +2,15 @@
 
 #include "fin/Exports.h"
 
-#include <core/Result.h>
-#include <core/Unique.h>
-#include <core/StringView.h>
-#include <core/Log.h>
 #include <core/Allocator.h>
 #include <core/EventLoop.h>
-#include <core/websocket/Server.h>
 #include <core/IPCMutex.h>
 #include <core/Lock.h>
+#include <core/Log.h>
+#include <core/Result.h>
+#include <core/StringView.h>
+#include <core/Unique.h>
+#include <core/websocket/Server.h>
 
 namespace fin
 {
@@ -29,16 +29,24 @@ namespace fin
 	public:
 		FIN_EXPORT static core::Result<LockInfo> create(core::StringView path, core::Allocator* allocator);
 
-		core::StringView absPath() const { return m_absPath; }
-		core::StringView lockName() const { return m_lockName; }
-		core::StringView portFilePath() const { return m_portFilePath; }
+		core::StringView absPath() const
+		{
+			return m_absPath;
+		}
+		core::StringView lockName() const
+		{
+			return m_lockName;
+		}
+		core::StringView portFilePath() const
+		{
+			return m_portFilePath;
+		}
 	};
 
 	class Server
 	{
-		template<typename T, typename... TArgs>
-		friend inline core::Unique<T>
-		core::unique_from(core::Allocator* allocator, TArgs&&... args);
+		template <typename T, typename... TArgs>
+		friend inline core::Unique<T> core::unique_from(core::Allocator* allocator, TArgs&&... args);
 
 		core::EventLoop* m_eventLoop = nullptr;
 		core::Unique<core::websocket::Server> m_server;
@@ -53,8 +61,7 @@ namespace fin
 			core::Shared<core::EventThread> serverThread,
 			LockInfo lockInfo,
 			core::IPCMutex ipcMutex,
-			core::Lock<core::IPCMutex> ipcMutexLock
-		)
+			core::Lock<core::IPCMutex> ipcMutexLock)
 			: m_eventLoop(std::move(eventLoop)),
 			  m_server(std::move(server)),
 			  m_serverThread(std::move(serverThread)),
@@ -66,7 +73,7 @@ namespace fin
 	public:
 		enum class FLAG
 		{
-			NONE          = 0 << 0,
+			NONE = 0 << 0,
 			CREATE_LEDGER = 1 << 0,
 		};
 
@@ -76,10 +83,12 @@ namespace fin
 			FLAG flags,
 			core::EventLoop* eventLoop,
 			core::Log* log,
-			core::Allocator* allocator
-		);
+			core::Allocator* allocator);
 
-		uint16_t listeningPort() const { return m_server->listeningPort(); }
+		uint16_t listeningPort() const
+		{
+			return m_server->listeningPort();
+		}
 	};
 
 	inline Server::FLAG operator|(Server::FLAG f1, Server::FLAG f2)

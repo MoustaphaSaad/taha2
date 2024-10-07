@@ -23,7 +23,10 @@ namespace core
 		Rune m_rune;
 
 	public:
-		RuneIterator(const char* ptr, Rune rune): m_ptr(ptr), m_rune(rune) {}
+		RuneIterator(const char* ptr, Rune rune)
+			: m_ptr(ptr),
+			  m_rune(rune)
+		{}
 
 		RuneIterator& operator++()
 		{
@@ -39,10 +42,22 @@ namespace core
 			return copy;
 		}
 
-		bool operator==(RuneIterator other) const { return m_ptr == other.m_ptr; }
-		bool operator!=(RuneIterator other) const { return m_ptr != other.m_ptr; }
-		const Rune& operator*() const { return m_rune; }
-		const Rune* operator->() const { return &m_rune; }
+		bool operator==(RuneIterator other) const
+		{
+			return m_ptr == other.m_ptr;
+		}
+		bool operator!=(RuneIterator other) const
+		{
+			return m_ptr != other.m_ptr;
+		}
+		const Rune& operator*() const
+		{
+			return m_rune;
+		}
+		const Rune* operator->() const
+		{
+			return &m_rune;
+		}
 	};
 
 	class StringRunes
@@ -51,10 +66,19 @@ namespace core
 		const char* m_end = nullptr;
 
 	public:
-		StringRunes(const char* begin, const char* end): m_begin(begin), m_end(end) {}
+		StringRunes(const char* begin, const char* end)
+			: m_begin(begin),
+			  m_end(end)
+		{}
 
-		RuneIterator begin() const { return RuneIterator(m_begin, Rune::decode(m_begin)); }
-		RuneIterator end() const { return RuneIterator(m_end, Rune{}); }
+		RuneIterator begin() const
+		{
+			return RuneIterator(m_begin, Rune::decode(m_begin));
+		}
+		RuneIterator end() const
+		{
+			return RuneIterator(m_end, Rune{});
+		}
 	};
 
 	class StringView
@@ -85,74 +109,144 @@ namespace core
 			m_count = strlen(ptr);
 		}
 
-		StringView(const char* begin, size_t count): m_begin(begin), m_count(count) {}
+		StringView(const char* begin, size_t count)
+			: m_begin(begin),
+			  m_count(count)
+		{}
 
-		StringView(const char* begin, const char* end): m_begin(begin), m_count(end - begin)
-		{ validate(begin <= end);
+		StringView(const char* begin, const char* end)
+			: m_begin(begin),
+			  m_count(end - begin)
+		{
+			assertTrue(begin <= end);
 		}
 
-		StringView(const Span<const std::byte>& span): m_begin((const char*)span.data()), m_count(span.count()) {}
+		StringView(const Span<const std::byte>& span)
+			: m_begin((const char*)span.data()),
+			  m_count(span.count())
+		{}
 
-		StringView(const Span<std::byte>& span): m_begin((const char*)span.data()), m_count(span.count()) {}
+		StringView(const Span<std::byte>& span)
+			: m_begin((const char*)span.data()),
+			  m_count(span.count())
+		{}
 
-		StringView(const Span<const char>& span): m_begin(span.data()), m_count(span.count()) {}
+		StringView(const Span<const char>& span)
+			: m_begin(span.data()),
+			  m_count(span.count())
+		{}
 
-		StringView(const Span<char>& span): m_begin(span.data()), m_count(span.count()) {}
+		StringView(const Span<char>& span)
+			: m_begin(span.data()),
+			  m_count(span.count())
+		{}
 
-		operator Span<std::byte>() const { return Span<std::byte>{(std::byte*)m_begin, m_count}; }
+		operator Span<std::byte>() const
+		{
+			return Span<std::byte>{(std::byte*)m_begin, m_count};
+		}
 
-		operator Span<const std::byte>() const { return Span<const std::byte>{(std::byte*)m_begin, m_count}; }
+		operator Span<const std::byte>() const
+		{
+			return Span<const std::byte>{(std::byte*)m_begin, m_count};
+		}
 
 		const char& operator[](size_t i) const
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_begin[i];
 		}
 
-		size_t count() const { return m_count; }
-		size_t runeCount() const { return Rune::count(m_begin, m_begin + m_count); }
+		size_t count() const
+		{
+			return m_count;
+		}
+		size_t runeCount() const
+		{
+			return Rune::count(m_begin, m_begin + m_count);
+		}
 
-		const char* data() const { return m_begin; }
-		const char* begin() const { return m_begin; }
-		const char* end() const { return m_begin + m_count; }
+		const char* data() const
+		{
+			return m_begin;
+		}
+		const char* begin() const
+		{
+			return m_begin;
+		}
+		const char* end() const
+		{
+			return m_begin + m_count;
+		}
 
 		CORE_EXPORT size_t find(StringView target, size_t start = 0) const;
 		CORE_EXPORT size_t findIgnoreCase(StringView target, size_t start = 0) const;
 		CORE_EXPORT size_t find(Rune target, size_t start = 0) const;
 		CORE_EXPORT size_t findLast(StringView target, size_t start) const;
-		CORE_EXPORT size_t findLast(StringView target) const { return findLast(target, m_count); }
+		CORE_EXPORT size_t findLast(StringView target) const
+		{
+			return findLast(target, m_count);
+		}
 		CORE_EXPORT size_t findFirstByte(StringView str, size_t start = 0) const;
 
 		bool operator==(StringView other) const
 		{
 			if (m_begin == other.m_begin && m_count == other.m_count)
+			{
 				return true;
+			}
 
 			return cmp(*this, other) == 0;
 		}
-		bool operator!=(StringView other) const { return !operator==(other); }
-		bool operator<(StringView other) const { return cmp(*this, other) < 0; }
-		bool operator<=(StringView other) const { return cmp(*this, other) <= 0; }
-		bool operator>(StringView other) const { return cmp(*this, other) > 0; }
-		bool operator>=(StringView other) const { return cmp(*this, other) >= 0; }
+		bool operator!=(StringView other) const
+		{
+			return !operator==(other);
+		}
+		bool operator<(StringView other) const
+		{
+			return cmp(*this, other) < 0;
+		}
+		bool operator<=(StringView other) const
+		{
+			return cmp(*this, other) <= 0;
+		}
+		bool operator>(StringView other) const
+		{
+			return cmp(*this, other) > 0;
+		}
+		bool operator>=(StringView other) const
+		{
+			return cmp(*this, other) >= 0;
+		}
 
-		StringRunes runes() const { return StringRunes{m_begin, m_begin + m_count}; }
+		StringRunes runes() const
+		{
+			return StringRunes{m_begin, m_begin + m_count};
+		}
 		StringView slice(size_t start, size_t end) const
 		{
-			validate(start <= end && end - start <= m_count);
+			assertTrue(start <= end && end - start <= m_count);
 			return StringView{m_begin + start, end - start};
 		}
 
-		StringView sliceRight(size_t start) const { return slice(start, m_count); }
+		StringView sliceRight(size_t start) const
+		{
+			return slice(start, m_count);
+		}
 
-		StringView sliceLeft(size_t start) const { return slice(0, start); }
+		StringView sliceLeft(size_t start) const
+		{
+			return slice(0, start);
+		}
 
 		CORE_EXPORT Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const;
 
 		bool startsWith(StringView str) const
 		{
 			if (str.m_count > m_count)
+			{
 				return false;
+			}
 
 			return sliceLeft(str.m_count) == str;
 		}
@@ -160,7 +254,9 @@ namespace core
 		bool endsWith(StringView str) const
 		{
 			if (str.m_count > m_count)
+			{
 				return false;
+			}
 
 			return sliceRight(m_count - str.m_count) == str;
 		}
@@ -170,7 +266,9 @@ namespace core
 		bool startsWithIgnoreCase(StringView other) const
 		{
 			if (other.m_count > m_count)
+			{
 				return false;
+			}
 
 			return sliceLeft(other.m_count).equalsIgnoreCase(other);
 		}
@@ -178,23 +276,30 @@ namespace core
 		bool endsWithIgnoreCase(StringView other)
 		{
 			if (other.m_count > m_count)
+			{
 				return false;
+			}
 
 			return sliceRight(m_count - other.m_count).equalsIgnoreCase(other);
 		}
 
-		template <typename TFunc> StringView trimLeftPredicate(TFunc&& predicate) const
+		template <typename TFunc>
+		StringView trimLeftPredicate(TFunc&& predicate) const
 		{
 			auto self = *this;
 
 			if (self.m_count == 0)
+			{
 				return self;
+			}
 
 			auto it = begin();
 			for (; it != end(); it = Rune::next(it))
 			{
 				if (!predicate(Rune::decode(it)))
+				{
 					break;
+				}
 			}
 
 			size_t s = size_t(it - begin());
@@ -211,17 +316,22 @@ namespace core
 
 		CORE_EXPORT StringView trimLeft() const;
 
-		template <typename TFunc> StringView trimRightPredicate(TFunc&& predicate) const
+		template <typename TFunc>
+		StringView trimRightPredicate(TFunc&& predicate) const
 		{
 			auto self = *this;
 
 			if (self.m_count == 0)
+			{
 				return self;
+			}
 
 			auto it = Rune::prev(self.end());
 			auto c = Rune::decode(it);
 			if (predicate(c) == false)
+			{
 				return self;
+			}
 
 			it = Rune::prev(it);
 			while (true)
@@ -236,7 +346,9 @@ namespace core
 
 				// don't step back outside the buffer
 				if (it == self.begin())
+				{
 					break;
+				}
 
 				it = Rune::prev(it);
 			}
@@ -253,7 +365,8 @@ namespace core
 
 		StringView trimRight() const;
 
-		template <typename TFunc> StringView trimPredicate(TFunc&& predicate) const
+		template <typename TFunc>
+		StringView trimPredicate(TFunc&& predicate) const
 		{
 			return trimLeftPredicate(predicate).trimRightPredicate(predicate);
 		}
@@ -269,15 +382,24 @@ namespace core
 	};
 }
 
-inline static core::StringView operator"" _sv(const char* ptr, size_t len) { return core::StringView(ptr, len); }
+inline static core::StringView operator"" _sv(const char* ptr, size_t len)
+{
+	return core::StringView(ptr, len);
+}
 
 namespace fmt
 {
-	template <> struct formatter<core::StringView>
+	template <>
+	struct formatter<core::StringView>
 	{
-		template <typename ParseContext> constexpr auto parse(ParseContext& ctx) { return ctx.begin(); }
+		template <typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
+		{
+			return ctx.begin();
+		}
 
-		template <typename FormatContext> auto format(const core::StringView& str, FormatContext& ctx)
+		template <typename FormatContext>
+		auto format(const core::StringView& str, FormatContext& ctx)
 		{
 			return format_to(ctx.out(), fmt::runtime("{}"), fmt::string_view{str.data(), str.count()});
 		}

@@ -7,7 +7,9 @@ namespace core::msgpack
 	{
 		auto res = m_stream->write(data, size);
 		if (res < size)
+		{
 			return errf(m_allocator, "failed to write {} bytes to stream, only {} bytes were written"_sv, size, res);
+		}
 		return {};
 	}
 
@@ -19,21 +21,27 @@ namespace core::msgpack
 	HumanError Writer::write_uint16(uint16_t value)
 	{
 		if (systemEndianness() == Endianness::Little)
+		{
 			value = byteswap_uint16(value);
+		}
 		return write_blob(&value, sizeof(value));
 	}
 
 	HumanError Writer::write_uint32(uint32_t value)
 	{
 		if (systemEndianness() == Endianness::Little)
+		{
 			value = byteswap_uint32(value);
+		}
 		return write_blob(&value, sizeof(value));
 	}
 
 	HumanError Writer::write_uint64(uint64_t value)
 	{
 		if (systemEndianness() == Endianness::Little)
+		{
 			value = byteswap_uint64(value);
+		}
 		return write_blob(&value, sizeof(value));
 	}
 
@@ -110,22 +118,34 @@ namespace core::msgpack
 		}
 		else if (value <= UINT8_MAX)
 		{
-			if (auto err = writer.write_uint8(0xcc)) return err;
+			if (auto err = writer.write_uint8(0xcc))
+			{
+				return err;
+			}
 			return writer.write_uint8((uint8_t)value);
 		}
 		else if (value <= UINT16_MAX)
 		{
-			if (auto err = writer.write_uint8(0xcd)) return err;
+			if (auto err = writer.write_uint8(0xcd))
+			{
+				return err;
+			}
 			return writer.write_uint16((uint16_t)value);
 		}
 		else if (value <= UINT32_MAX)
 		{
-			if (auto err = writer.write_uint8(0xce)) return err;
+			if (auto err = writer.write_uint8(0xce))
+			{
+				return err;
+			}
 			return writer.write_uint32((uint32_t)value);
 		}
 		else if (value <= UINT64_MAX)
 		{
-			if (auto err = writer.write_uint8(0xcf)) return err;
+			if (auto err = writer.write_uint8(0xcf))
+			{
+				return err;
+			}
 			return writer.write_uint64(value);
 		}
 		else
@@ -145,22 +165,34 @@ namespace core::msgpack
 			}
 			else if (value <= INT8_MAX)
 			{
-				if (auto err = writer.write_uint8(0xd0)) return err;
+				if (auto err = writer.write_uint8(0xd0))
+				{
+					return err;
+				}
 				return writer.write_int8((int8_t)value);
 			}
 			else if (value <= INT16_MAX)
 			{
-				if (auto err = writer.write_uint8(0xd1)) return err;
+				if (auto err = writer.write_uint8(0xd1))
+				{
+					return err;
+				}
 				return writer.write_int16((int16_t)value);
 			}
 			else if (value <= INT32_MAX)
 			{
-				if (auto err = writer.write_uint8(0xd2)) return err;
+				if (auto err = writer.write_uint8(0xd2))
+				{
+					return err;
+				}
 				return writer.write_int32((int32_t)value);
 			}
 			else if (value <= INT64_MAX)
 			{
-				if (auto err = writer.write_uint8(0xd3)) return err;
+				if (auto err = writer.write_uint8(0xd3))
+				{
+					return err;
+				}
 				return writer.write_int64(value);
 			}
 			else
@@ -177,22 +209,34 @@ namespace core::msgpack
 			}
 			else if (value >= INT8_MIN)
 			{
-				if (auto err = writer.write_uint8(0xd0)) return err;
+				if (auto err = writer.write_uint8(0xd0))
+				{
+					return err;
+				}
 				return writer.write_int8((int8_t)value);
 			}
 			else if (value >= INT16_MIN)
 			{
-				if (auto err = writer.write_uint8(0xd1)) return err;
+				if (auto err = writer.write_uint8(0xd1))
+				{
+					return err;
+				}
 				return writer.write_int16((int16_t)value);
 			}
 			else if (value >= INT32_MIN)
 			{
-				if (auto err = writer.write_uint8(0xd2)) return err;
+				if (auto err = writer.write_uint8(0xd2))
+				{
+					return err;
+				}
 				return writer.write_int32((int32_t)value);
 			}
 			else if (value >= INT64_MIN)
 			{
-				if (auto err = writer.write_uint8(0xd3)) return err;
+				if (auto err = writer.write_uint8(0xd3))
+				{
+					return err;
+				}
 				return writer.write_int64(value);
 			}
 			else
@@ -205,13 +249,19 @@ namespace core::msgpack
 
 	HumanError msgpack(Writer& writer, float value)
 	{
-		if (auto err = writer.write_uint8(0xca)) return err;
+		if (auto err = writer.write_uint8(0xca))
+		{
+			return err;
+		}
 		return writer.write_float32(value);
 	}
 
 	HumanError msgpack(Writer& writer, double value)
 	{
-		if (auto err = writer.write_uint8(0xcb)) return err;
+		if (auto err = writer.write_uint8(0xcb))
+		{
+			return err;
+		}
 		return writer.write_float64(value);
 	}
 
@@ -221,25 +271,46 @@ namespace core::msgpack
 		{
 			auto prefix = (uint8_t)value.count();
 			prefix |= 0xa0;
-			if (auto err = writer.write_uint8(prefix)) return err;
+			if (auto err = writer.write_uint8(prefix))
+			{
+				return err;
+			}
 			return writer.write_blob(value.data(), value.count());
 		}
 		else if (value.count() <= UINT8_MAX)
 		{
-			if (auto err = writer.write_uint8(0xd9)) return err;
-			if (auto err = writer.write_uint8((uint8_t)value.count())) return err;
+			if (auto err = writer.write_uint8(0xd9))
+			{
+				return err;
+			}
+			if (auto err = writer.write_uint8((uint8_t)value.count()))
+			{
+				return err;
+			}
 			return writer.write_blob(value.data(), value.count());
 		}
 		else if (value.count() <= UINT16_MAX)
 		{
-			if (auto err = writer.write_uint8(0xda)) return err;
-			if (auto err = writer.write_uint16((uint16_t)value.count())) return err;
+			if (auto err = writer.write_uint8(0xda))
+			{
+				return err;
+			}
+			if (auto err = writer.write_uint16((uint16_t)value.count()))
+			{
+				return err;
+			}
 			return writer.write_blob(value.data(), value.count());
 		}
 		else if (value.count() <= UINT32_MAX)
 		{
-			if (auto err = writer.write_uint8(0xdb)) return err;
-			if (auto err = writer.write_uint32((uint32_t)value.count())) return err;
+			if (auto err = writer.write_uint8(0xdb))
+			{
+				return err;
+			}
+			if (auto err = writer.write_uint32((uint32_t)value.count()))
+			{
+				return err;
+			}
 			return writer.write_blob(value.data(), value.count());
 		}
 		else
@@ -253,20 +324,38 @@ namespace core::msgpack
 	{
 		if (size <= UINT8_MAX)
 		{
-			if (auto err = writer.write_uint8(0xc4)) return err;
-			if (auto err = writer.write_uint8((uint8_t)size)) return err;
+			if (auto err = writer.write_uint8(0xc4))
+			{
+				return err;
+			}
+			if (auto err = writer.write_uint8((uint8_t)size))
+			{
+				return err;
+			}
 			return writer.write_blob(data, size);
 		}
 		else if (size <= UINT16_MAX)
 		{
-			if (auto err = writer.write_uint8(0xc5)) return err;
-			if (auto err = writer.write_uint16((uint16_t)size)) return err;
+			if (auto err = writer.write_uint8(0xc5))
+			{
+				return err;
+			}
+			if (auto err = writer.write_uint16((uint16_t)size))
+			{
+				return err;
+			}
 			return writer.write_blob(data, size);
 		}
 		else if (size <= UINT32_MAX)
 		{
-			if (auto err = writer.write_uint8(0xc6)) return err;
-			if (auto err = writer.write_uint32((uint32_t)size)) return err;
+			if (auto err = writer.write_uint8(0xc6))
+			{
+				return err;
+			}
+			if (auto err = writer.write_uint32((uint32_t)size))
+			{
+				return err;
+			}
 			return writer.write_blob(data, size);
 		}
 		else
@@ -280,7 +369,9 @@ namespace core::msgpack
 	{
 		auto read_size = m_stream->read(data, size);
 		if (size != read_size)
+		{
 			return errf(m_allocator, "failed to read {} bytes, only {} was read"_sv, size, read_size);
+		}
 		return {};
 	}
 
@@ -291,30 +382,45 @@ namespace core::msgpack
 
 	HumanError Reader::read_uint16(uint16_t& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
+		{
 			value = byteswap_uint16(value);
+		}
 
 		return {};
 	}
 
 	HumanError Reader::read_uint32(uint32_t& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
+		{
 			value = byteswap_uint32(value);
+		}
 
 		return {};
 	}
 
 	HumanError Reader::read_uint64(uint64_t& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
+		{
 			value = byteswap_uint64(value);
+		}
 
 		return {};
 	}
@@ -326,7 +432,10 @@ namespace core::msgpack
 
 	HumanError Reader::read_int16(int16_t& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
 		{
@@ -339,7 +448,10 @@ namespace core::msgpack
 
 	HumanError Reader::read_int32(int32_t& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
 		{
@@ -352,7 +464,10 @@ namespace core::msgpack
 
 	HumanError Reader::read_int64(int64_t& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
 		{
@@ -365,7 +480,10 @@ namespace core::msgpack
 
 	HumanError Reader::read_float32(float& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
 		{
@@ -380,7 +498,10 @@ namespace core::msgpack
 
 	HumanError Reader::read_float64(double& value)
 	{
-		if (auto err = read_blob(&value, sizeof(value))) return err;
+		if (auto err = read_blob(&value, sizeof(value)))
+		{
+			return err;
+		}
 
 		if (systemEndianness() == Endianness::Little)
 		{
@@ -402,19 +523,28 @@ namespace core::msgpack
 		else if (prefix == 0xd9)
 		{
 			uint8_t count{};
-			if (auto err = read_uint8(count)) return err;
+			if (auto err = read_uint8(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else if (prefix == 0xda)
 		{
 			uint16_t count{};
-			if (auto err = read_uint16(count)) return err;
+			if (auto err = read_uint16(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else if (prefix == 0xdb)
 		{
 			uint32_t count{};
-			if (auto err = read_uint32(count)) return err;
+			if (auto err = read_uint32(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else
@@ -433,13 +563,19 @@ namespace core::msgpack
 		else if (prefix == 0xdc)
 		{
 			uint16_t count{};
-			if (auto err = read_uint16(count)) return err;
+			if (auto err = read_uint16(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else if (prefix == 0xdd)
 		{
 			uint32_t count{};
-			if (auto err = read_uint32(count)) return err;
+			if (auto err = read_uint32(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else
@@ -458,13 +594,19 @@ namespace core::msgpack
 		else if (prefix == 0xde)
 		{
 			uint16_t count{};
-			if (auto err = read_uint16(count)) return err;
+			if (auto err = read_uint16(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else if (prefix == 0xdf)
 		{
 			uint32_t count{};
-			if (auto err = read_uint32(count)) return err;
+			if (auto err = read_uint32(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else
@@ -479,19 +621,28 @@ namespace core::msgpack
 		if (prefix == 0xc4)
 		{
 			uint8_t count{};
-			if (auto err = read_uint8(count)) return err;
+			if (auto err = read_uint8(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else if (prefix == 0xc5)
 		{
 			uint16_t count{};
-			if (auto err = read_uint16(count)) return err;
+			if (auto err = read_uint16(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else if (prefix == 0xc6)
 		{
 			uint32_t count{};
-			if (auto err = read_uint32(count)) return err;
+			if (auto err = read_uint32(count))
+			{
+				return err;
+			}
 			return count;
 		}
 		else
@@ -510,33 +661,50 @@ namespace core::msgpack
 		else if (prefix == 0xcc)
 		{
 			uint8_t v{};
-			if (auto err = read_uint8(v)) return err;
+			if (auto err = read_uint8(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xcd)
 		{
 			uint16_t v{};
-			if (auto err = read_uint16(v)) return err;
+			if (auto err = read_uint16(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xce)
 		{
 			uint32_t v{};
-			if (auto err = read_uint32(v)) return err;
+			if (auto err = read_uint32(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xcf)
 		{
 			uint64_t v{};
-			if (auto err = read_uint64(v)) return err;
+			if (auto err = read_uint64(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else
 		{
 			int64_t v{};
-			if (auto err = read_int(prefix, v)) return errf(m_allocator, "invalid uint prefix: {:x}"_sv, prefix);
+			if (auto err = read_int(prefix, v))
+			{
+				return errf(m_allocator, "invalid uint prefix: {:x}"_sv, prefix);
+			}
 			if (v < 0)
+			{
 				return errf(m_allocator, "expected uint but found int '{}' instead"_sv, v);
+			}
 			value = (uint64_t)v;
 		}
 		return {};
@@ -551,33 +719,50 @@ namespace core::msgpack
 		else if (prefix == 0xd0)
 		{
 			int8_t v{};
-			if (auto err = read_int8(v)) return err;
+			if (auto err = read_int8(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xd1)
 		{
 			int16_t v{};
-			if (auto err = read_int16(v)) return err;
+			if (auto err = read_int16(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xd2)
 		{
 			int32_t v{};
-			if (auto err = read_int32(v)) return err;
+			if (auto err = read_int32(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xd3)
 		{
 			int64_t v{};
-			if (auto err = read_int64(v)) return err;
+			if (auto err = read_int64(v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else
 		{
 			uint64_t v{};
-			if (auto err = read_uint(prefix, v)) return errf(m_allocator, "invalid int prefix: {:x}"_sv, prefix);
+			if (auto err = read_uint(prefix, v))
+			{
+				return errf(m_allocator, "invalid int prefix: {:x}"_sv, prefix);
+			}
 			if (v > INT64_MAX)
+			{
 				return errf(m_allocator, "expected int but found uint '{}' instead"_sv, v);
+			}
 			value = (int64_t)v;
 		}
 		return {};
@@ -586,27 +771,42 @@ namespace core::msgpack
 	HumanError Reader::skip()
 	{
 		uint8_t prefix{};
-		if (auto err = read_uint8(prefix)) return err;
+		if (auto err = read_uint8(prefix))
+		{
+			return err;
+		}
 
 		if (prefix <= 0x7f || (prefix >= 0xcc && prefix <= 0xcf))
 		{
 			uint64_t value{};
-			if (auto err = read_uint(prefix, value)) return err;
+			if (auto err = read_uint(prefix, value))
+			{
+				return err;
+			}
 		}
 		else if (prefix >= 0xe0 || (prefix >= 0xd0 && prefix <= 0xd3))
 		{
 			int64_t value{};
-			if (auto err = read_int(prefix, value)) return err;
+			if (auto err = read_int(prefix, value))
+			{
+				return err;
+			}
 		}
 		else if (prefix == 0xca)
 		{
 			float value{};
-			if (auto err = read_float32(value)) return err;
+			if (auto err = read_float32(value))
+			{
+				return err;
+			}
 		}
 		else if (prefix == 0xcb)
 		{
 			double value{};
-			if (auto err = read_float64(value)) return err;
+			if (auto err = read_float64(value))
+			{
+				return err;
+			}
 		}
 		else if (prefix == 0xc2 || prefix == 0xc3)
 		{
@@ -617,42 +817,75 @@ namespace core::msgpack
 			String value{m_allocator};
 
 			auto count = read_string_count(prefix);
-			if (count.isError()) return count.releaseError();
+			if (count.isError())
+			{
+				return count.releaseError();
+			}
 
 			value.resize(count.value());
-			if (auto err = read_blob(value.data(), value.count())) return err;
+			if (auto err = read_blob(value.data(), value.count()))
+			{
+				return err;
+			}
 		}
 		else if (prefix >= 0xc4 && prefix <= 0xc6)
 		{
 			Buffer value{m_allocator};
 
 			auto count = read_bin_count(prefix);
-			if (count.isError()) return count.releaseError();
+			if (count.isError())
+			{
+				return count.releaseError();
+			}
 
 			value.resize(count.value());
-			if (auto err = read_blob(value.data(), value.count())) return err;
+			if (auto err = read_blob(value.data(), value.count()))
+			{
+				return err;
+			}
 		}
 		else if (prefix >= 0x90 && prefix <= 0x9f)
 		{
 			auto count = prefix & 0xf;
 			for (int i = 0; i < count; ++i)
-				if (auto err = skip()) return err;
+			{
+				if (auto err = skip())
+				{
+					return err;
+				}
+			}
 		}
 		else if (prefix == 0xdc)
 		{
 			uint16_t count{};
-			if (auto err = read_uint16(count)) return err;
+			if (auto err = read_uint16(count))
+			{
+				return err;
+			}
 
 			for (uint16_t i = 0; i < count; ++i)
-				if (auto err = skip()) return err;
+			{
+				if (auto err = skip())
+				{
+					return err;
+				}
+			}
 		}
 		else if (prefix == 0xdd)
 		{
 			uint32_t count{};
-			if (auto err = read_uint32(count)) return err;
+			if (auto err = read_uint32(count))
+			{
+				return err;
+			}
 
 			for (uint32_t i = 0; i < count; ++i)
-				if (auto err = skip()) return err;
+			{
+				if (auto err = skip())
+				{
+					return err;
+				}
+			}
 		}
 		else if (prefix >= 0x80 && prefix <= 0x8f)
 		{
@@ -660,35 +893,59 @@ namespace core::msgpack
 			for (int i = 0; i < count; ++i)
 			{
 				// name
-				if (auto err = skip()) return err;
+				if (auto err = skip())
+				{
+					return err;
+				}
 				// value
-				if (auto err = skip()) return err;
+				if (auto err = skip())
+				{
+					return err;
+				}
 			}
 		}
 		else if (prefix == 0xde)
 		{
 			uint16_t count{};
-			if (auto err = read_uint16(count)) return err;
+			if (auto err = read_uint16(count))
+			{
+				return err;
+			}
 
 			for (uint16_t i = 0; i < count; ++i)
 			{
 				// name
-				if (auto err = skip()) return err;
+				if (auto err = skip())
+				{
+					return err;
+				}
 				// value
-				if (auto err = skip()) return err;
+				if (auto err = skip())
+				{
+					return err;
+				}
 			}
 		}
 		else if (prefix == 0xdf)
 		{
 			uint32_t count{};
-			if (auto err = read_uint32(count)) return err;
+			if (auto err = read_uint32(count))
+			{
+				return err;
+			}
 
 			for (uint32_t i = 0; i < count; ++i)
 			{
 				// name
-				if (auto err = skip()) return err;
+				if (auto err = skip())
+				{
+					return err;
+				}
 				// value
-				if (auto err = skip()) return err;
+				if (auto err = skip())
+				{
+					return err;
+				}
 			}
 		}
 		else
@@ -703,29 +960,46 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, bool& value)
 	{
 		uint8_t rep{};
-		if (auto err = reader.read_uint8(rep)) return err;
+		if (auto err = reader.read_uint8(rep))
+		{
+			return err;
+		}
 		if (rep == 0xc3)
+		{
 			value = true;
+		}
 		else if (rep == 0xc2)
+		{
 			value = false;
+		}
 		else
+		{
 			return errf(reader.allocator(), "invalid bool representation: {:x}"_sv, rep);
+		}
 		return {};
 	}
 
 	HumanError msgpack(Reader& reader, uint64_t& value)
 	{
 		uint8_t prefix{};
-		if (auto err = reader.read_uint8(prefix)) return err;
+		if (auto err = reader.read_uint8(prefix))
+		{
+			return err;
+		}
 		return reader.read_uint(prefix, value);
 	}
 
 	HumanError msgpack(Reader& reader, uint8_t& value)
 	{
 		uint64_t v{};
-		if (auto err = msgpack(reader, v)) return err;
+		if (auto err = msgpack(reader, v))
+		{
+			return err;
+		}
 		if (v > UINT8_MAX)
+		{
 			return errf(reader.allocator(), "expected uint8 but found uint64 '{}'"_sv, v);
+		}
 		value = (uint8_t)v;
 		return {};
 	}
@@ -733,9 +1007,14 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, uint16_t& value)
 	{
 		uint64_t v{};
-		if (auto err = msgpack(reader, v)) return err;
+		if (auto err = msgpack(reader, v))
+		{
+			return err;
+		}
 		if (v > UINT16_MAX)
+		{
 			return errf(reader.allocator(), "expected uint16 but found uint64 '{}'"_sv, v);
+		}
 		value = (uint16_t)v;
 		return {};
 	}
@@ -743,9 +1022,14 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, uint32_t& value)
 	{
 		uint64_t v{};
-		if (auto err = msgpack(reader, v)) return err;
+		if (auto err = msgpack(reader, v))
+		{
+			return err;
+		}
 		if (v > UINT32_MAX)
+		{
 			return errf(reader.allocator(), "expected uint32 but found uint64 '{}'"_sv, v);
+		}
 		value = (uint32_t)v;
 		return {};
 	}
@@ -753,18 +1037,28 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, int64_t& value)
 	{
 		uint8_t prefix{};
-		if (auto err = reader.read_uint8(prefix)) return err;
+		if (auto err = reader.read_uint8(prefix))
+		{
+			return err;
+		}
 		return reader.read_int(prefix, value);
 	}
 
 	HumanError msgpack(Reader& reader, int8_t& value)
 	{
 		int64_t v{};
-		if (auto err = msgpack(reader, v)) return err;
+		if (auto err = msgpack(reader, v))
+		{
+			return err;
+		}
 		if (v > INT8_MAX)
+		{
 			return errf(reader.allocator(), "int8 overflow, value is '{}'"_sv, v);
+		}
 		else if (v < INT8_MIN)
+		{
 			return errf(reader.allocator(), "int8 underflow, value is '{}'"_sv, v);
+		}
 		value = (int8_t)v;
 		return {};
 	}
@@ -772,11 +1066,18 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, int16_t& value)
 	{
 		int64_t v{};
-		if (auto err = msgpack(reader, v)) return err;
+		if (auto err = msgpack(reader, v))
+		{
+			return err;
+		}
 		if (v > INT16_MAX)
+		{
 			return errf(reader.allocator(), "int16 overflow, value is '{}'"_sv, v);
+		}
 		else if (v < INT16_MIN)
+		{
 			return errf(reader.allocator(), "int16 underflow, value is '{}'"_sv, v);
+		}
 		value = (int16_t)v;
 		return {};
 	}
@@ -784,11 +1085,18 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, int32_t& value)
 	{
 		int64_t v{};
-		if (auto err = msgpack(reader, v)) return err;
+		if (auto err = msgpack(reader, v))
+		{
+			return err;
+		}
 		if (v > INT32_MAX)
+		{
 			return errf(reader.allocator(), "int32 overflow, value is '{}'"_sv, v);
+		}
 		else if (v < INT32_MIN)
+		{
 			return errf(reader.allocator(), "int32 underflow, value is '{}'"_sv, v);
+		}
 		value = (int32_t)v;
 		return {};
 	}
@@ -796,13 +1104,21 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, float& value)
 	{
 		uint8_t prefix{};
-		if (auto err = reader.read_uint8(prefix)) return err;
+		if (auto err = reader.read_uint8(prefix))
+		{
+			return err;
+		}
 
 		if (prefix != 0xca)
+		{
 			return errf(reader.allocator(), "invalid float prefix: {:x}"_sv, prefix);
+		}
 
 		float v{};
-		if (auto err = reader.read_float32(v)) return err;
+		if (auto err = reader.read_float32(v))
+		{
+			return err;
+		}
 		value = v;
 		return {};
 	}
@@ -810,13 +1126,21 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, double& value)
 	{
 		uint8_t prefix{};
-		if (auto err = reader.read_uint8(prefix)) return err;
+		if (auto err = reader.read_uint8(prefix))
+		{
+			return err;
+		}
 
 		if (prefix != 0xcb)
+		{
 			return errf(reader.allocator(), "invalid double prefix: {:x}"_sv, prefix);
+		}
 
 		double v{};
-		if (auto err = reader.read_float64(v)) return err;
+		if (auto err = reader.read_float64(v))
+		{
+			return err;
+		}
 		value = v;
 		return {};
 	}
@@ -824,39 +1148,57 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, String& value)
 	{
 		uint8_t prefix{};
-		if (auto err = reader.read_uint8(prefix)) return err;
+		if (auto err = reader.read_uint8(prefix))
+		{
+			return err;
+		}
 
 		auto count = reader.read_string_count(prefix);
 		if (count.isError())
+		{
 			return count.releaseError();
+		}
 
 		value.resize(count.value());
-		if (auto err = reader.read_blob(value.data(), value.count())) return err;
+		if (auto err = reader.read_blob(value.data(), value.count()))
+		{
+			return err;
+		}
 		return {};
 	}
 
 	HumanError msgpack(Reader& reader, Buffer& value)
 	{
 		uint8_t prefix{};
-		if (auto err = reader.read_uint8(prefix)) return err;
+		if (auto err = reader.read_uint8(prefix))
+		{
+			return err;
+		}
 
 		auto count = reader.read_bin_count(prefix);
 		if (count.isError())
+		{
 			return count.releaseError();
+		}
 
 		value.resize(count.value());
-		if (auto err = reader.read_blob(value.data(), value.count())) return err;
+		if (auto err = reader.read_blob(value.data(), value.count()))
+		{
+			return err;
+		}
 		return {};
 	}
 
-	Value::Value(StringView value, Allocator* allocator) : m_kind{KIND_STRING}
+	Value::Value(StringView value, Allocator* allocator)
+		: m_kind{KIND_STRING}
 	{
 		m_string = allocator->allocSingleT<String>();
 		allocator->commitSingleT(m_string);
 		new (m_string) String{value, allocator};
 	}
 
-	Value::Value(const std::byte* data, size_t size, Allocator* allocator) : m_kind{KIND_BYTES}
+	Value::Value(const std::byte* data, size_t size, Allocator* allocator)
+		: m_kind{KIND_BYTES}
 	{
 		m_bytes = allocator->allocSingleT<Buffer>();
 		allocator->commitSingleT(m_bytes);
@@ -864,7 +1206,8 @@ namespace core::msgpack
 		m_bytes->push(data, size);
 	}
 
-	Value::Value(Array<Value> value) : m_kind{KIND_ARRAY}
+	Value::Value(Array<Value> value)
+		: m_kind{KIND_ARRAY}
 	{
 		auto allocator = value.allocator();
 		m_array = allocator->allocSingleT<Array<Value>>();
@@ -872,7 +1215,8 @@ namespace core::msgpack
 		new (m_array) Array<Value>{std::move(value)};
 	}
 
-	Value::Value(Map<String, Value> value) : m_kind{KIND_MAP}
+	Value::Value(Map<String, Value> value)
+		: m_kind{KIND_MAP}
 	{
 		auto allocator = value.allocator();
 		m_map = allocator->allocSingleT<Map<String, Value>>();
@@ -973,7 +1317,7 @@ namespace core::msgpack
 
 	String Value::release_string()
 	{
-		validate(m_kind == KIND_STRING);
+		assertTrue(m_kind == KIND_STRING);
 		auto allocator = m_string->allocator();
 		auto res = std::move(*m_string);
 		allocator->releaseSingleT(m_string);
@@ -983,7 +1327,7 @@ namespace core::msgpack
 
 	Buffer Value::release_bytes()
 	{
-		validate(m_kind == KIND_BYTES);
+		assertTrue(m_kind == KIND_BYTES);
 		auto allocator = m_bytes->allocator();
 		auto res = std::move(*m_bytes);
 		allocator->releaseSingleT(m_bytes);
@@ -993,7 +1337,7 @@ namespace core::msgpack
 
 	Array<Value> Value::release_array()
 	{
-		validate(m_kind == KIND_ARRAY);
+		assertTrue(m_kind == KIND_ARRAY);
 		auto allocator = m_array->allocator();
 		auto res = std::move(*m_array);
 		allocator->releaseSingleT(m_array);
@@ -1003,7 +1347,7 @@ namespace core::msgpack
 
 	Map<String, Value> Value::release_map()
 	{
-		validate(m_kind == KIND_MAP);
+		assertTrue(m_kind == KIND_MAP);
 		auto allocator = m_map->allocator();
 		auto res = std::move(*m_map);
 		allocator->releaseSingleT(m_map);
@@ -1192,7 +1536,10 @@ namespace core::msgpack
 	HumanError msgpack(Reader& reader, Value& value)
 	{
 		uint8_t prefix{};
-		if (auto err = reader.read_uint8(prefix)) return err;
+		if (auto err = reader.read_uint8(prefix))
+		{
+			return err;
+		}
 
 		if (prefix <= 0x7f)
 		{
@@ -1208,70 +1555,100 @@ namespace core::msgpack
 		{
 			// uint8
 			uint8_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xcd)
 		{
 			// uint16
 			uint16_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xce)
 		{
 			// uint32
 			uint32_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xcf)
 		{
 			// uint64
 			uint64_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xd0)
 		{
 			// int8
 			int8_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xd1)
 		{
 			// int16
 			int16_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xd2)
 		{
 			// int32
 			int32_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xd3)
 		{
 			// int64
 			int64_t v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xca)
 		{
 			// float
 			float v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xcb)
 		{
 			// double
 			double v{};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = v;
 		}
 		else if (prefix == 0xc2)
@@ -1292,25 +1669,37 @@ namespace core::msgpack
 		else if ((prefix >= 0xa0 && prefix <= 0xbf) || prefix == 0xd9 || prefix == 0xda || prefix == 0xdb)
 		{
 			String v{reader.allocator()};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = std::move(v);
 		}
 		else if (prefix == 0xc4 || prefix == 0xc5 || prefix == 0xc6)
 		{
 			Buffer v{reader.allocator()};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = std::move(v);
 		}
 		else if ((prefix >= 0x90 && prefix <= 0x9f) || prefix == 0xdc || prefix == 0xdd)
 		{
 			Array<Value> v{reader.allocator()};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = std::move(v);
 		}
 		else if ((prefix >= 0x80 && prefix <= 0x8f) || prefix == 0xde || prefix == 0xdf)
 		{
 			Map<String, Value> v{reader.allocator()};
-			if (auto err = msgpack(reader, v)) return err;
+			if (auto err = msgpack(reader, v))
+			{
+				return err;
+			}
 			value = std::move(v);
 		}
 		else

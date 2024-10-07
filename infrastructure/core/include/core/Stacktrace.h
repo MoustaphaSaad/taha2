@@ -1,12 +1,12 @@
 #pragma once
 
-#include "core/Stream.h"
 #include "core/MemoryStream.h"
+#include "core/Stream.h"
 
 #include <cpptrace/cpptrace.hpp>
 
-#include <streambuf>
 #include <ostream>
+#include <streambuf>
 
 namespace core
 {
@@ -15,6 +15,7 @@ namespace core
 		class StreamBuffer: public std::streambuf
 		{
 			Stream* m_stream = nullptr;
+
 		public:
 			StreamBuffer(Stream* stream)
 				: m_stream(stream)
@@ -40,6 +41,7 @@ namespace core
 		class OutputStream: public std::ostream
 		{
 			StreamBuffer m_streamBuffer;
+
 		public:
 			OutputStream(Stream* stream)
 				: std::ostream(nullptr),
@@ -53,6 +55,7 @@ namespace core
 	class Stacktrace
 	{
 		cpptrace::stacktrace m_trace;
+
 	public:
 		explicit Stacktrace(cpptrace::stacktrace trace)
 			: m_trace(std::move(trace))
@@ -80,6 +83,7 @@ namespace core
 	class Rawtrace
 	{
 		cpptrace::raw_trace m_trace;
+
 	public:
 		explicit Rawtrace(cpptrace::raw_trace trace)
 			: m_trace(std::move(trace))

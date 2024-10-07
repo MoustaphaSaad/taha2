@@ -16,6 +16,7 @@ namespace core
 	{
 		friend class SHA1Hasher;
 		std::byte m_digest[20];
+
 	public:
 		static SHA1 hash(Span<std::byte> bytes)
 		{
@@ -29,7 +30,7 @@ namespace core
 			return sha;
 		}
 
-		template<typename T>
+		template <typename T>
 		static SHA1 hash(Span<T> s)
 		{
 			return hash(s.asBytes());
@@ -54,6 +55,7 @@ namespace core
 	class SHA1Hasher
 	{
 		SHA_CTX m_ctx;
+
 	public:
 		SHA1Hasher()
 		{
@@ -65,7 +67,7 @@ namespace core
 			SHA1_Update(&m_ctx, bytes.data(), bytes.count());
 		}
 
-		template<typename T>
+		template <typename T>
 		void hash(Span<T> s)
 		{
 			hash(s.asBytes());
@@ -87,16 +89,16 @@ namespace core
 
 namespace fmt
 {
-	template<>
+	template <>
 	struct formatter<core::SHA1>
 	{
-		template<typename ParseContext>
+		template <typename ParseContext>
 		constexpr auto parse(ParseContext& ctx)
 		{
 			return ctx.begin();
 		}
 
-		template<typename FormatContext>
+		template <typename FormatContext>
 		auto format(const core::SHA1& str, FormatContext& ctx)
 		{
 			auto bytes = str.asBytes();

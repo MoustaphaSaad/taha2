@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/Exports.h"
-#include "core/Unique.h"
 #include "core/Func.h"
+#include "core/Unique.h"
 
 namespace core
 {
@@ -10,6 +10,7 @@ namespace core
 	{
 		struct IThread;
 		Unique<IThread> m_thread;
+
 	public:
 		CORE_EXPORT Thread(Allocator* allocator, Func<void()> func, size_t stackSize = 0);
 		CORE_EXPORT Thread(Thread&& other);

@@ -20,8 +20,7 @@ namespace core
 
 	Thread::Thread(Allocator* allocator, Func<void()> func, size_t stackSize)
 	{
-		auto thread_start = +[](void* userData) -> void*
-		{
+		auto thread_start = +[](void* userData) -> void* {
 			auto funcData = (ThreadFuncData*)userData;
 			Unique threadFuncData{funcData->allocator, funcData};
 			threadFuncData->func();
@@ -34,16 +33,16 @@ namespace core
 
 		pthread_attr_t attr{};
 		[[maybe_unused]] auto res = pthread_attr_init(&attr);
-		validate(res == 0);
+		assertTrue(res == 0);
 		if (stackSize != 0)
 		{
 			res = pthread_attr_setstacksize(&attr, stackSize);
-			validate(res == 0);
+			assertTrue(res == 0);
 		}
 
 		m_thread = unique_from<IThread>(allocator);
 		res = pthread_create(&m_thread->handle, &attr, thread_start, threadFuncData.leak());
-		validate(res == 0);
+		assertTrue(res == 0);
 
 		pthread_attr_destroy(&attr);
 	}
@@ -55,7 +54,7 @@ namespace core
 	void Thread::join()
 	{
 		[[maybe_unused]] auto res = pthread_join(m_thread->handle, nullptr);
-		validate(res == 0);
+		assertTrue(res == 0);
 	}
 
 	void Thread::detach()
@@ -63,7 +62,7 @@ namespace core
 		if (m_thread->detached == false)
 		{
 			[[maybe_unused]] auto res = pthread_detach(m_thread->handle);
-			validate(res == 0);
+			assertTrue(res == 0);
 		}
 		m_thread->detached = true;
 	}

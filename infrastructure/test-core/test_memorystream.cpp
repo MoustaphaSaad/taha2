@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
-#include <core/MemoryStream.h>
-#include <core/Mallocator.h>
 #include <core/File.h>
+#include <core/Mallocator.h>
+#include <core/MemoryStream.h>
 
 TEST_CASE("core::MemoryStream strf")
 {

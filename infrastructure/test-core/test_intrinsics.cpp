@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include <core/Intrinsics.h>
 #include <core/File.h>
+#include <core/Intrinsics.h>
 
 TEST_CASE("report endianness")
 {

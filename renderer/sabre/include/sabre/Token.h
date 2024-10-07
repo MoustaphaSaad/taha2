@@ -100,7 +100,10 @@ namespace sabre
 		KIND kind = KIND_NULL;
 		Location location;
 
-		bool is_null() const { return kind == KIND_NULL; }
+		bool is_null() const
+		{
+			return kind == KIND_NULL;
+		}
 
 		bool can_ignore() const
 		{
@@ -110,73 +113,41 @@ namespace sabre
 		bool is_cmp() const
 		{
 			return (
-				kind == KIND_LESS ||
-				kind == KIND_GREATER ||
-				kind == KIND_LESS_EQUAL ||
-				kind == KIND_GREATER_EQUAL ||
-				kind == KIND_EQUAL_EQUAL ||
-				kind == KIND_NOT_EQUAL
-			);
+				kind == KIND_LESS || kind == KIND_GREATER || kind == KIND_LESS_EQUAL || kind == KIND_GREATER_EQUAL ||
+				kind == KIND_EQUAL_EQUAL || kind == KIND_NOT_EQUAL);
 		}
 
 		bool is_add() const
 		{
-			return (
-				kind == KIND_PLUS ||
-				kind == KIND_MINUS ||
-				kind == KIND_BIT_XOR ||
-				kind == KIND_BIT_OR
-			);
+			return (kind == KIND_PLUS || kind == KIND_MINUS || kind == KIND_BIT_XOR || kind == KIND_BIT_OR);
 		}
 
 		bool is_unary() const
 		{
 			return (
-				kind == KIND_INC ||
-				kind == KIND_DEC ||
-				kind == KIND_PLUS ||
-				kind == KIND_MINUS ||
-				kind == KIND_LOGICAL_NOT ||
-				kind == KIND_BIT_NOT
-			);
+				kind == KIND_INC || kind == KIND_DEC || kind == KIND_PLUS || kind == KIND_MINUS ||
+				kind == KIND_LOGICAL_NOT || kind == KIND_BIT_NOT);
 		}
 
 		bool is_mul() const
 		{
 			return (
-				kind == KIND_STAR ||
-				kind == KIND_DIVIDE ||
-				kind == KIND_MODULUS ||
-				kind == KIND_BIT_AND ||
-				kind == KIND_BIT_SHIFT_LEFT ||
-				kind == KIND_BIT_SHIFT_RIGHT
-			);
+				kind == KIND_STAR || kind == KIND_DIVIDE || kind == KIND_MODULUS || kind == KIND_BIT_AND ||
+				kind == KIND_BIT_SHIFT_LEFT || kind == KIND_BIT_SHIFT_RIGHT);
 		}
 
 		bool is_assign() const
 		{
 			return (
-				kind == KIND_EQUAL ||
-				kind == KIND_PLUS_EQUAL ||
-				kind == KIND_MINUS_EQUAL ||
-				kind == KIND_STAR_EQUAL ||
-				kind == KIND_DIVIDE_EQUAL ||
-				kind == KIND_MODULUS_EQUAL ||
-				kind == KIND_BIT_OR_EQUAL ||
-				kind == KIND_BIT_AND_EQUAL ||
-				kind == KIND_BIT_XOR_EQUAL ||
-				kind == KIND_BIT_SHIFT_LEFT_EQUAL ||
-				kind == KIND_BIT_SHIFT_RIGHT_EQUAL ||
-				kind == KIND_BIT_SHIFT_NOT_EQUAL ||
-			);
+				kind == KIND_EQUAL || kind == KIND_PLUS_EQUAL || kind == KIND_MINUS_EQUAL || kind == KIND_STAR_EQUAL ||
+				kind == KIND_DIVIDE_EQUAL || kind == KIND_MODULUS_EQUAL || kind == KIND_BIT_OR_EQUAL ||
+				kind == KIND_BIT_AND_EQUAL || kind == KIND_BIT_XOR_EQUAL || kind == KIND_BIT_SHIFT_LEFT_EQUAL ||
+				kind == KIND_BIT_SHIFT_RIGHT_EQUAL || kind == KIND_BIT_SHIFT_NOT_EQUAL ||);
 		}
 
 		bool is_keyword() const
 		{
-			return (
-				kind >= KIND_KEYWORDS__BEGIN &&
-				kind < KIND_KEYWORDS__END
-			);
+			return (kind >= KIND_KEYWORDS__BEGIN && kind < KIND_KEYWORDS__END);
 		}
 	};
 }

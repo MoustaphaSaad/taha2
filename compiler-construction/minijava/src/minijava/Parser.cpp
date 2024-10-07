@@ -6,7 +6,9 @@ namespace minijava
 	Token Parser::lookahead(size_t k)
 	{
 		if (m_it + k < m_unit->tokens().count())
+		{
 			return m_unit->tokens()[m_it + k];
+		}
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
@@ -18,7 +20,9 @@ namespace minijava
 	Token Parser::eat()
 	{
 		if (m_it >= m_unit->tokens().count())
+		{
 			return Token{Token::KIND_NONE, ""_sv, Location{}};
+		}
 		auto token = m_unit->tokens()[m_it];
 		++m_it;
 		return token;
@@ -27,7 +31,9 @@ namespace minijava
 	Token Parser::eatKind(Token::KIND kind)
 	{
 		if (auto token = look(); token.kind() == kind)
+		{
 			return eat();
+		}
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
 	}
 
@@ -41,7 +47,9 @@ namespace minijava
 
 		auto token = eat();
 		if (token.kind() == kind)
+		{
 			return token;
+		}
 
 		m_unit->pushError(errf(m_allocator, token.location(), "expected '{}' but found '{}'"_sv, kind, token.text()));
 		return Token{Token::KIND_NONE, ""_sv, Location{}};
@@ -57,10 +65,14 @@ namespace minijava
 				while (true)
 				{
 					if (auto arg = parseExpr())
+					{
 						arguments.push(std::move(arg));
+					}
 
 					if (eatKind(Token::KIND_COMMA).kind() != Token::KIND_COMMA)
+					{
 						break;
+					}
 				}
 				eatMust(Token::KIND_CLOSE_PAREN);
 			}
@@ -111,7 +123,8 @@ namespace minijava
 			else
 			{
 				auto token = look();
-				m_unit->pushError(errf(m_allocator, token.location(), "unknown new expression type '{}'"_sv, token.text()));
+				m_unit->pushError(
+					errf(m_allocator, token.location(), "unknown new expression type '{}'"_sv, token.text()));
 			}
 		}
 		else if (token.kind() == Token::KIND_OPEN_PAREN)
@@ -202,12 +215,8 @@ namespace minijava
 
 	core::Unique<Expr> Parser::parseAddExpr()
 	{
-		auto isAddToken = +[](Token::KIND kind) {
-			return (
-				kind == Token::KIND_OPERATOR_PLUS ||
-				kind == Token::KIND_OPERATOR_MINUS
-			);
-		};
+		auto isAddToken =
+			+[](Token::KIND kind) { return (kind == Token::KIND_OPERATOR_PLUS || kind == Token::KIND_OPERATOR_MINUS); };
 		auto expr = parseMulExpr();
 
 		while (isAddToken(look().kind()))
@@ -355,14 +364,12 @@ namespace minijava
 	Parser::Parser(Unit* unit, core::Allocator* allocator)
 		: m_allocator(allocator),
 		  m_unit(unit)
-	{
-
-	}
+	{}
 
 	core::Unique<Program> Parser::parse()
 	{
-//		auto mainClass = parseMainClass();
-//		Program program{}
+		//		auto mainClass = parseMainClass();
+		//		Program program{}
 		return nullptr;
 	}
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/Exports.h"
-#include "core/Unique.h"
 #include "core/StringView.h"
+#include "core/Unique.h"
 
 namespace core
 {
@@ -10,6 +10,7 @@ namespace core
 	{
 		struct IIPCMutex;
 		Unique<IIPCMutex> m_mutex;
+
 	public:
 		CORE_EXPORT IPCMutex(StringView name, Allocator* allocator);
 		CORE_EXPORT IPCMutex(IPCMutex&& other);

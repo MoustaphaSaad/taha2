@@ -1,12 +1,12 @@
 #pragma once
 
+#include "core/BufferedReader.h"
 #include "core/Exports.h"
-#include "core/ws/Message.h"
+#include "core/Mutex.h"
 #include "core/Result.h"
 #include "core/Socket.h"
-#include "core/BufferedReader.h"
 #include "core/Url.h"
-#include "core/Mutex.h"
+#include "core/ws/Message.h"
 
 namespace core::ws
 {
@@ -41,9 +41,12 @@ namespace core::ws
 			  m_maxHandshakeSize(maxHandshakeSize),
 			  m_maxMessageSize(maxMessageSize)
 		{}
+
 	public:
-		CORE_EXPORT static Result<Client> connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator);
-		CORE_EXPORT static Result<Client> acceptFromServer(Unique<Socket> socket, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator);
+		CORE_EXPORT static Result<Client>
+		connect(StringView url, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator);
+		CORE_EXPORT static Result<Client> acceptFromServer(
+			Unique<Socket> socket, size_t maxHandshakeSize, size_t maxMessageSize, Log* log, Allocator* allocator);
 
 		CORE_EXPORT Result<Message> readMessage();
 		CORE_EXPORT HumanError handleMessage(const Message& message);

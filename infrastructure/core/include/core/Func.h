@@ -6,10 +6,10 @@
 
 namespace core
 {
-	template<typename>
+	template <typename>
 	class Func;
 
-	template<typename TReturn, typename ... TArgs>
+	template <typename TReturn, typename... TArgs>
 	class Func<TReturn(TArgs...)>
 	{
 		struct Concept
@@ -17,34 +17,41 @@ namespace core
 			void (*dtor)(void*) noexcept;
 			void (*move)(void*, void*) noexcept;
 			bool (*isEmpty)() noexcept;
-			TReturn (*invoke)(void*, TArgs&& ...);
+			TReturn (*invoke)(void*, TArgs&&...);
 		};
 
 		static constexpr size_t SMALL_SIZE = sizeof(void*) * 4;
-		inline static constexpr Concept EMPTY_CONCEPT{[](void*) noexcept {}, [](void*, void*) noexcept {}, []() noexcept { return true; }};
+		inline static constexpr Concept EMPTY_CONCEPT{
+			[](void*) noexcept {}, [](void*, void*) noexcept {}, []() noexcept { return true; }};
 		alignas(Concept) std::byte m_model[SMALL_SIZE];
 		const Concept* m_concept = &EMPTY_CONCEPT;
 
-		template<typename TFunc, bool IsSmall>
+		template <typename TFunc, bool IsSmall>
 		struct Model;
 
-		template<typename TFunc>
+		template <typename TFunc>
 		struct Model<TFunc, true>
 		{
 			TFunc m_func;
 
-			template<typename F>
+			template <typename F>
 			Model(Allocator*, F&& f)
 				: m_func(std::forward<F>(f))
 			{}
 
-			static void dtor(void* self) noexcept { static_cast<Model*>(self)->~Model(); }
+			static void dtor(void* self) noexcept
+			{
+				static_cast<Model*>(self)->~Model();
+			}
 			static void move(void* self, void* p) noexcept
 			{
 				new (p) Model(std::move(*static_cast<Model*>(self)));
 			}
-			static bool isEmpty() noexcept { return false; }
-			static TReturn invoke(void* self, TArgs&& ... args)
+			static bool isEmpty() noexcept
+			{
+				return false;
+			}
+			static TReturn invoke(void* self, TArgs&&... args)
 			{
 				return std::invoke(static_cast<Model*>(self)->m_func, std::forward<TArgs>(args)...);
 			}
@@ -52,23 +59,29 @@ namespace core
 			static constexpr Concept vtable{dtor, move, isEmpty, invoke};
 		};
 
-		template<typename TFunc>
+		template <typename TFunc>
 		struct Model<TFunc, false>
 		{
 			Unique<TFunc> m_func;
 
-			template<typename F>
+			template <typename F>
 			Model(Allocator* allocator, F&& f)
 				: m_func(unique_from<TFunc>(allocator, std::forward<F>(f)))
 			{}
 
-			static void dtor(void* self) noexcept { static_cast<Model*>(self)->~Model(); }
+			static void dtor(void* self) noexcept
+			{
+				static_cast<Model*>(self)->~Model();
+			}
 			static void move(void* self, void* p) noexcept
 			{
 				new (p) Model(std::move(*static_cast<Model*>(self)));
 			}
-			static bool isEmpty() noexcept { return false; }
-			static TReturn invoke(void* self, TArgs&& ... args)
+			static bool isEmpty() noexcept
+			{
+				return false;
+			}
+			static TReturn invoke(void* self, TArgs&&... args)
 			{
 				return std::invoke(*static_cast<Model*>(self)->m_func, std::forward<TArgs>(args)...);
 			}
@@ -79,7 +92,7 @@ namespace core
 	public:
 		Func() = default;
 
-		template<typename F>
+		template <typename F>
 		Func(F&& f)
 		{
 			constexpr bool is_small = sizeof(Model<std::decay_t<F>, true>) <= SMALL_SIZE;
@@ -88,7 +101,7 @@ namespace core
 			m_concept = &Model<std::decay_t<F>, is_small>::vtable;
 		}
 
-		template<typename F>
+		template <typename F>
 		Func(Allocator* allocator, F&& f)
 		{
 			constexpr bool is_small = sizeof(Model<std::decay_t<F>, true>) <= SMALL_SIZE;
@@ -115,13 +128,19 @@ namespace core
 		Func(const Func&) = delete;
 		Func& operator=(const Func&) = delete;
 
-		~Func() { m_concept->dtor(&m_model); }
+		~Func()
+		{
+			m_concept->dtor(&m_model);
+		}
 
-		TReturn operator()(TArgs ... args)
+		TReturn operator()(TArgs... args)
 		{
 			return m_concept->invoke(&m_model, std::forward<TArgs>(args)...);
 		}
 
-		operator bool() const { return m_concept->isEmpty() == false; }
+		operator bool() const
+		{
+			return m_concept->isEmpty() == false;
+		}
 	};
 }

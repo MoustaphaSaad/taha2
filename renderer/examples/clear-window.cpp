@@ -5,12 +5,12 @@
 
 #include <GLFW/glfw3.h>
 #if TAHA_OS_WINDOWS
-#define GLFW_EXPOSE_NATIVE_WIN32 1
-#define NOMINMAX 1
-#define WIN32_LEAN_AND_MEAN 1
-#define _CRT_SECURE_NO_WARNINGS 1
+	#define GLFW_EXPOSE_NATIVE_WIN32 1
+	#define NOMINMAX 1
+	#define WIN32_LEAN_AND_MEAN 1
+	#define _CRT_SECURE_NO_WARNINGS 1
 #elif TAHA_OS_LINUX
-#define GLFW_EXPOSE_NATIVE_WAYLAND 1
+	#define GLFW_EXPOSE_NATIVE_WAYLAND 1
 #endif
 #include <GLFW/glfw3native.h>
 
@@ -21,12 +21,12 @@ taha::NativeWindowDesc getNativeWindowDesc(GLFWwindow* window)
 	glfwGetWindowSize(window, &windowWidth, &windowHeight);
 
 	taha::NativeWindowDesc nativeWindowDesc{};
-	#if TAHA_OS_WINDOWS
+#if TAHA_OS_WINDOWS
 	nativeWindowDesc.windowHandle = glfwGetWin32Window(window);
-	#elif TAHA_OS_LINUX
+#elif TAHA_OS_LINUX
 	nativeWindowDesc.display = glfwGetWaylandDisplay();
 	nativeWindowDesc.surface = glfwGetWaylandWindow(window);
-	#endif
+#endif
 	nativeWindowDesc.width = windowWidth;
 	nativeWindowDesc.height = windowHeight;
 
@@ -67,11 +67,11 @@ int main()
 	glfwMakeContextCurrent(window);
 	while (glfwWindowShouldClose(window) == false)
 	{
-		auto encoder = frame->createEncoderAndRecord({
-			.color = {
-				taha::FrameColorAction{.value = {1, 1, 0, 1}}
+		auto encoder = frame->createEncoderAndRecord(
+			{
+				.color = {taha::FrameColorAction{.value = {1, 1, 0, 1}}},
 			},
-		}, &allocator);
+			&allocator);
 		encoder.endEncodingAndSubmit();
 
 		glfwPollEvents();

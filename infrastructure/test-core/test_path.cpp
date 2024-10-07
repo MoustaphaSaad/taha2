@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
-#include <core/Path.h>
-#include <core/Mallocator.h>
 #include <core/Log.h>
+#include <core/Mallocator.h>
+#include <core/Path.h>
 
 TEST_CASE("core::Path::tmpDir")
 {

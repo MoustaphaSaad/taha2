@@ -17,7 +17,9 @@ namespace core
 	Mutex::~Mutex()
 	{
 		if (m_mutex)
+		{
 			DeleteCriticalSection(&m_mutex->cs);
+		}
 	}
 
 	void Mutex::lock()

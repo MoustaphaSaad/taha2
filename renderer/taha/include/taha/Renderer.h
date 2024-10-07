@@ -1,8 +1,8 @@
 #pragma once
 
+#include "taha/Encoder.h"
 #include "taha/Frame.h"
 #include "taha/NativeWindowDesc.h"
-#include "taha/Encoder.h"
 
 #include <core/Unique.h>
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "core/Exports.h"
 #include "core/Allocator.h"
+#include "core/Assert.h"
+#include "core/Exports.h"
 #include "core/Rune.h"
 #include "core/StringView.h"
-#include "core/Assert.h"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
@@ -82,28 +82,55 @@ namespace core
 
 		char& operator[](size_t i)
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 
 		const char& operator[](size_t i) const
 		{
-			validate(i < m_count);
+			assertTrue(i < m_count);
 			return m_memory[i];
 		}
 
-		operator StringView() const { return StringView{m_memory.sliceLeft(m_count)}; }
-		explicit operator Span<const std::byte>() const { return Span<const std::byte>{(const std::byte*)m_memory.data(), m_count}; }
+		operator StringView() const
+		{
+			return StringView{m_memory.sliceLeft(m_count)};
+		}
+		explicit operator Span<const std::byte>() const
+		{
+			return Span<const std::byte>{(const std::byte*)m_memory.data(), m_count};
+		}
 
-		size_t count() const { return m_count; }
-		size_t capacity() const { return m_memory.count(); }
-		size_t runeCount() const { return Rune::count(m_memory.data(), m_memory.data() + m_count); }
-		char* data() { return m_memory.data(); }
-		const char* data() const { return m_memory.data(); }
-		Allocator* allocator() const { return m_allocator; }
+		size_t count() const
+		{
+			return m_count;
+		}
+		size_t capacity() const
+		{
+			return m_memory.count();
+		}
+		size_t runeCount() const
+		{
+			return Rune::count(m_memory.data(), m_memory.data() + m_count);
+		}
+		char* data()
+		{
+			return m_memory.data();
+		}
+		const char* data() const
+		{
+			return m_memory.data();
+		}
+		Allocator* allocator() const
+		{
+			return m_allocator;
+		}
 
 		CORE_EXPORT void resize(size_t new_count);
-		void reserve(size_t extra_count) { ensureSpaceExists(extra_count); }
+		void reserve(size_t extra_count)
+		{
+			ensureSpaceExists(extra_count);
+		}
 
 		CORE_EXPORT void push(StringView str);
 		CORE_EXPORT void push(Rune r);
@@ -113,39 +140,106 @@ namespace core
 		CORE_EXPORT size_t findIgnoreCase(StringView str, size_t start = 0) const;
 		CORE_EXPORT size_t find(Rune target, size_t start = 0) const;
 		CORE_EXPORT size_t findLast(StringView str, size_t start) const;
-		size_t findLast(StringView str) const { return findLast(str, m_count); }
+		size_t findLast(StringView str) const
+		{
+			return findLast(str, m_count);
+		}
 
-		bool operator==(const String& other) const { return StringView::cmp(*this, other) == 0; }
-		bool operator!=(const String& other) const { return StringView::cmp(*this, other) != 0; }
-		bool operator<(const String& other) const { return StringView::cmp(*this, other) < 0; }
-		bool operator<=(const String& other) const { return StringView::cmp(*this, other) <= 0; }
-		bool operator>(const String& other) const { return StringView::cmp(*this, other) > 0; }
-		bool operator>=(const String& other) const { return StringView::cmp(*this, other) >= 0; }
-		bool operator==(StringView other) const { return StringView::cmp(*this, other) == 0; }
-		bool operator!=(StringView other) const { return StringView::cmp(*this, other) != 0; }
-		bool operator<(StringView other) const { return StringView::cmp(*this, other) < 0; }
-		bool operator<=(StringView other) const { return StringView::cmp(*this, other) <= 0; }
-		bool operator>(StringView other) const { return StringView::cmp(*this, other) > 0; }
-		bool operator>=(StringView other) const { return StringView::cmp(*this, other) >= 0; }
+		bool operator==(const String& other) const
+		{
+			return StringView::cmp(*this, other) == 0;
+		}
+		bool operator!=(const String& other) const
+		{
+			return StringView::cmp(*this, other) != 0;
+		}
+		bool operator<(const String& other) const
+		{
+			return StringView::cmp(*this, other) < 0;
+		}
+		bool operator<=(const String& other) const
+		{
+			return StringView::cmp(*this, other) <= 0;
+		}
+		bool operator>(const String& other) const
+		{
+			return StringView::cmp(*this, other) > 0;
+		}
+		bool operator>=(const String& other) const
+		{
+			return StringView::cmp(*this, other) >= 0;
+		}
+		bool operator==(StringView other) const
+		{
+			return StringView::cmp(*this, other) == 0;
+		}
+		bool operator!=(StringView other) const
+		{
+			return StringView::cmp(*this, other) != 0;
+		}
+		bool operator<(StringView other) const
+		{
+			return StringView::cmp(*this, other) < 0;
+		}
+		bool operator<=(StringView other) const
+		{
+			return StringView::cmp(*this, other) <= 0;
+		}
+		bool operator>(StringView other) const
+		{
+			return StringView::cmp(*this, other) > 0;
+		}
+		bool operator>=(StringView other) const
+		{
+			return StringView::cmp(*this, other) >= 0;
+		}
 
 		CORE_EXPORT void replace(StringView search, StringView replace);
-		StringRunes runes() const { return StringView{*this}.runes(); }
-		size_t findFirstByte(StringView str, size_t start = 0) const { return StringView{*this}.findFirstByte(str, start); }
+		StringRunes runes() const
+		{
+			return StringView{*this}.runes();
+		}
+		size_t findFirstByte(StringView str, size_t start = 0) const
+		{
+			return StringView{*this}.findFirstByte(str, start);
+		}
 
-		const char* begin() const { return m_memory.begin(); }
-		char* begin() { return m_memory.begin(); }
-		const char* end() const { return m_memory.sliceLeft(m_count).end(); }
-		char* end() { return m_memory.sliceLeft(m_count).end(); }
+		const char* begin() const
+		{
+			return m_memory.begin();
+		}
+		char* begin()
+		{
+			return m_memory.begin();
+		}
+		const char* end() const
+		{
+			return m_memory.sliceLeft(m_count).end();
+		}
+		char* end()
+		{
+			return m_memory.sliceLeft(m_count).end();
+		}
 
-		Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const { return StringView{*this}.split(delim, skipEmpty, allocator); }
+		Array<StringView> split(StringView delim, bool skipEmpty, Allocator* allocator) const
+		{
+			return StringView{*this}.split(delim, skipEmpty, allocator);
+		}
 
-		bool startsWith(StringView other) const { return StringView{*this}.startsWith(other); }
-		bool endsWith(StringView other) const { return StringView{*this}.endsWith(other); }
+		bool startsWith(StringView other) const
+		{
+			return StringView{*this}.startsWith(other);
+		}
+		bool endsWith(StringView other) const
+		{
+			return StringView{*this}.endsWith(other);
+		}
 	};
 
 	class StringBackInserter
 	{
 		String* m_str = nullptr;
+
 	public:
 		using iterator_category = std::output_iterator_tag;
 
@@ -159,13 +253,22 @@ namespace core
 			return *this;
 		}
 
-		StringBackInserter& operator*() { return *this; }
-		StringBackInserter& operator++() { return *this; }
-		StringBackInserter& operator++(int) { return *this; }
+		StringBackInserter& operator*()
+		{
+			return *this;
+		}
+		StringBackInserter& operator++()
+		{
+			return *this;
+		}
+		StringBackInserter& operator++(int)
+		{
+			return *this;
+		}
 	};
 
-	template<typename ... Args>
-	[[nodiscard]] inline String strf(Allocator* allocator, StringView format, Args&& ... args)
+	template <typename... Args>
+	[[nodiscard]] inline String strf(Allocator* allocator, StringView format, Args&&... args)
 	{
 		String out{allocator};
 		StringBackInserter it{&out};
@@ -176,7 +279,7 @@ namespace core
 
 namespace std
 {
-	template<>
+	template <>
 	struct iterator_traits<core::StringBackInserter>
 	{
 		typedef ptrdiff_t difference_type;
@@ -189,16 +292,16 @@ namespace std
 
 namespace fmt
 {
-	template<>
+	template <>
 	struct formatter<core::String>
 	{
-		template<typename ParseContext>
+		template <typename ParseContext>
 		constexpr auto parse(ParseContext& ctx)
 		{
 			return ctx.begin();
 		}
 
-		template<typename FormatContext>
+		template <typename FormatContext>
 		auto format(const core::String& str, FormatContext& ctx)
 		{
 			return format_to(ctx.out(), fmt::runtime("{}"), core::StringView{str});

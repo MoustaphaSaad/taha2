@@ -7,7 +7,7 @@ TEST_CASE("basic core::Queue test")
 {
 	core::Mallocator allocator;
 
-	core::Queue<int> queue{ &allocator };
+	core::Queue<int> queue{&allocator};
 	REQUIRE(queue.count() == 0);
 
 	queue.push_back(1);
@@ -23,10 +23,12 @@ TEST_CASE("core::Queue numbers")
 {
 	core::Mallocator allocator;
 
-	core::Queue<int> queue{ &allocator };
+	core::Queue<int> queue{&allocator};
 
 	for (int i = 0; i < 100; ++i)
+	{
 		queue.push_back(i);
+	}
 
 	for (int i = 0; i < 100; ++i)
 	{

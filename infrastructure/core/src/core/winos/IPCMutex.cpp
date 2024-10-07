@@ -14,7 +14,7 @@ namespace core
 	{
 		auto osName = OSString{name, allocator};
 		auto handle = CreateMutex(0, false, (LPCWSTR)osName.data());
-		validate(handle != INVALID_HANDLE_VALUE);
+		assertTrue(handle != INVALID_HANDLE_VALUE);
 
 		m_mutex = unique_from<IIPCMutex>(allocator);
 		m_mutex->handle = handle;
@@ -28,7 +28,7 @@ namespace core
 		if (m_mutex)
 		{
 			[[maybe_unused]] auto res = CloseHandle(m_mutex->handle);
-			validate(res == TRUE);
+			assertTrue(res == TRUE);
 		}
 	}
 
@@ -40,15 +40,12 @@ namespace core
 	bool IPCMutex::tryLock()
 	{
 		auto res = WaitForSingleObject(m_mutex->handle, 0);
-		return (
-			res == WAIT_OBJECT_0 ||
-			res == WAIT_ABANDONED
-		);
+		return (res == WAIT_OBJECT_0 || res == WAIT_ABANDONED);
 	}
 
 	void IPCMutex::unlock()
 	{
 		[[maybe_unused]] auto res = ReleaseMutex(m_mutex->handle);
-		validate(res == TRUE);
+		assertTrue(res == TRUE);
 	}
 }

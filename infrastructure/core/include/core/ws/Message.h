@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/Exports.h"
 #include "core/Buffer.h"
+#include "core/Exports.h"
 #include "core/Result.h"
 #include "core/Stream.h"
 
@@ -27,9 +27,19 @@ namespace core::ws
 			return (op & 0b1000);
 		}
 
-		OPCODE opcode() const { return m_opcode; }
-		bool isFin() const { return m_isFin; }
-		Buffer releasePayload() { return std::move(m_payload); }
+		OPCODE opcode() const
+		{
+			return m_opcode;
+		}
+		bool isFin() const
+		{
+			return m_isFin;
+		}
+		Buffer releasePayload()
+		{
+			return std::move(m_payload);
+		}
+
 	private:
 		explicit Frame(Allocator* allocator)
 			: m_payload(allocator)
@@ -66,6 +76,7 @@ namespace core::ws
 	{
 		size_t m_maxPayloadSize = 0;
 		Message m_fragmentedMessage;
+
 	public:
 		MessageParser(size_t maxPayloadSize, Allocator* allocator)
 			: m_maxPayloadSize(maxPayloadSize),

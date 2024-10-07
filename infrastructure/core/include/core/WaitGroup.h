@@ -1,9 +1,9 @@
 #pragma once
 
-#include "core/Mutex.h"
-#include "core/Lock.h"
-#include "core/ConditionVariable.h"
 #include "core/Assert.h"
+#include "core/ConditionVariable.h"
+#include "core/Lock.h"
+#include "core/Mutex.h"
 
 namespace core
 {
@@ -12,10 +12,11 @@ namespace core
 		Mutex m_mutex;
 		ConditionVariable m_condition_variable;
 		int m_count = 0;
+
 	public:
 		WaitGroup(Allocator* allocator)
-			: m_mutex(allocator)
-			, m_condition_variable(allocator)
+			: m_mutex(allocator),
+			  m_condition_variable(allocator)
 		{}
 
 		WaitGroup(WaitGroup&& other) = default;
@@ -24,7 +25,7 @@ namespace core
 
 		void add(int count)
 		{
-			validate(count > 0);
+			assertTrue(count > 0);
 
 			auto lock = lockGuard(m_mutex);
 			m_count += count;
@@ -34,7 +35,7 @@ namespace core
 		{
 			auto lock = lockGuard(m_mutex);
 			m_count--;
-			validate(m_count >= 0);
+			assertTrue(m_count >= 0);
 			if (m_count == 0)
 			{
 				m_condition_variable.notify_all();
@@ -45,8 +46,10 @@ namespace core
 		{
 			auto lock = lockGuard(m_mutex);
 			while (m_count > 0)
+			{
 				m_condition_variable.wait(m_mutex);
-			validate(m_count == 0);
+			}
+			assertTrue(m_count == 0);
 		}
 	};
 }

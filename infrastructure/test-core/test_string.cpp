@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
-#include <core/StringView.h>
 #include <core/Mallocator.h>
 #include <core/String.h>
+#include <core/StringView.h>
 
 TEST_CASE("core::StringView basics")
 {

@@ -33,10 +33,9 @@ namespace core
 		{
 			// NCS backward compatibility (with the obsolete Apollo Network Computing System 1.5 UUID format)
 			// N bit pattern: 0xxx
-			// > the first 6 octets of the UUID are a 48-bit timestamp (the number of 4 microsecond units of time since 1 Jan 1980 UTC);
-			// > the next 2 octets are reserved;
-			// > the next octet is the "address family";
-			// > the final 7 octets are a 56-bit host ID in the form specified by the address family
+			// > the first 6 octets of the UUID are a 48-bit timestamp (the number of 4 microsecond units of time since
+			// 1 Jan 1980 UTC); > the next 2 octets are reserved; > the next octet is the "address family"; > the final
+			// 7 octets are a 56-bit host ID in the form specified by the address family
 			UUID_VARIANT_NCS,
 
 			// RFC 4122/DCE 1.1
@@ -129,7 +128,9 @@ namespace core
 			for (size_t i = 0; i < 16; ++i)
 			{
 				if (data.bytes[i] != 0)
+				{
 					return false;
+				}
 			}
 			return true;
 		}
@@ -137,48 +138,66 @@ namespace core
 		UUID_VARIANT variant() const
 		{
 			if ((data.bytes[8] & 0x80) == 0)
+			{
 				return UUID_VARIANT_NCS;
+			}
 			else if ((data.bytes[8] & 0xc0) == 0x80)
+			{
 				return UUID_VARIANT_RFC;
+			}
 			else if ((data.bytes[8] & 0xe0) == 0xc0)
+			{
 				return UUID_VARIANT_MICROSOFT;
+			}
 			else
+			{
 				return UUID_VARIANT_RESERVED;
+			}
 		}
 
 		UUID_VERSION version() const
 		{
 			if ((data.bytes[6] & 0xf0) == 0x10)
+			{
 				return UUID_VERSION_TIME_BASED;
+			}
 			else if ((data.bytes[6] & 0xf0) == 0x20)
+			{
 				return UUID_VERSION_DCE_SECURITY;
+			}
 			else if ((data.bytes[6] & 0xf0) == 0x30)
+			{
 				return UUID_VERSION_NAME_BASED_MD5;
+			}
 			else if ((data.bytes[6] & 0xf0) == 0x40)
+			{
 				return UUID_VERSION_RANDOM_NUMBER_BASED;
+			}
 			else if ((data.bytes[6] & 0xf0) == 0x50)
+			{
 				return UUID_VERSION_NAME_BASED_SHA1;
+			}
 			else
+			{
 				return UUID_VERSION_NONE;
+			}
 		}
 	};
 }
 
 namespace fmt
 {
-	template<>
+	template <>
 	struct formatter<core::UUID>
 	{
-		template<typename ParseContext>
-		constexpr auto
-		parse(ParseContext &ctx)
+		template <typename ParseContext>
+		constexpr auto parse(ParseContext& ctx)
 		{
 			return ctx.begin();
 		}
 
-		template<typename FormatContext>
-		auto
-		format(core::UUID value, FormatContext &ctx)
+		template <typename FormatContext>
+		auto format(core::UUID value, FormatContext& ctx)
 		{
 			return format_to(
 				ctx.out(),
@@ -198,8 +217,7 @@ namespace fmt
 				value[12],
 				value[13],
 				value[14],
-				value[15]
-			);
+				value[15]);
 		}
 	};
 }

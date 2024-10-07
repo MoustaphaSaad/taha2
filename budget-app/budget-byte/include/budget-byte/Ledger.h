@@ -54,6 +54,7 @@ namespace budget
 		}
 
 		Ledger(sqlite3* db, core::String path, core::Allocator* allocator);
+
 	public:
 		enum DB_FLAG
 		{
@@ -95,7 +96,6 @@ namespace budget
 			core::StringView src_account,
 			core::StringView dst_account,
 			std::chrono::year_month_day date,
-			core::StringView notes = ""_sv
-		);
+			core::StringView notes = ""_sv);
 	};
 }

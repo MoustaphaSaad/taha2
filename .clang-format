@@ -35,3 +35,8 @@ ColumnLimit: 120
 IndentPPDirectives: BeforeHash
 FixNamespaceComments: false
 AllowShortBlocksOnASingleLine: Always
+AlwaysBreakTemplateDeclarations: Yes
+PackConstructorInitializers: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Empty
+InsertBraces: true

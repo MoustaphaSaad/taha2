@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/Exports.h"
 #include "core/Allocator.h"
+#include "core/Exports.h"
 
 #include <atomic>
 
@@ -11,6 +11,7 @@ namespace core
 	{
 		std::atomic<size_t> atomic_size = 0;
 		std::atomic<size_t> atomic_count = 0;
+
 	public:
 		CORE_EXPORT FastLeak() = default;
 		CORE_EXPORT ~FastLeak() override;

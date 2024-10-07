@@ -24,8 +24,7 @@ namespace core
 		0,	  0,	0,	  0,	0,	  0,	0,	  0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0,	  0,	0,	  0,	0,	  0,	0,	  0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0,	  0,	0,	  0,	0,	  0,	0,	  0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0,	  0,	0,	  0,	0,	  0,	0,	  0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	};
+		0,	  0,	0,	  0,	0,	  0,	0,	  0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	constexpr static auto HEX_DIGITS = "0123456789ABCDEF";
 
@@ -37,26 +36,38 @@ namespace core
 	static bool isAllowedStr(StringView str, uint8_t mask)
 	{
 		for (auto b: str)
+		{
 			if (isAllowedChar(b, mask) == false)
+			{
 				return false;
+			}
+		}
 		return true;
 	}
 
 	static int hexDigit(char c)
 	{
 		if (c >= '0' && c <= '9')
+		{
 			return c - '0';
+		}
 		else if (c >= 'A' && c <= 'F')
+		{
 			return c - 'A' + 10;
+		}
 		else if (c >= 'a' && c <= 'f')
+		{
 			return c - 'a' + 10;
+		}
 		return -1;
 	}
 
 	static Result<String> decodePlusStr(StringView str, Allocator* allocator)
 	{
 		if (str.count() == 0)
+		{
 			return String{allocator};
+		}
 
 		String res{allocator};
 		res.reserve(str.count());
@@ -73,21 +84,29 @@ namespace core
 			{
 				++i;
 				if (i >= str.count())
+				{
 					return errf(allocator, "Invalid percent encoding in '{}'"_sv, str);
+				}
 				c = str[i];
 
 				auto a = hexDigit(c);
 				if (a == -1)
+				{
 					return errf(allocator, "Invalid percent encoding in '{}'"_sv, str);
+				}
 
 				++i;
 				if (i >= str.count())
+				{
 					return errf(allocator, "Invalid percent encoding in '{}'"_sv, str);
+				}
 				c = str[i];
 
 				auto b = hexDigit(c);
 				if (b == -1)
+				{
 					return errf(allocator, "Invalid percent encoding in '{}'"_sv, str);
+				}
 
 				c = (a << 4) | b;
 			}
@@ -124,20 +143,30 @@ namespace core
 		return (ALLOWED_CHAR[uint8_t(c)] & mask) != 0;
 	}
 
-	static bool is_allowed_str(const char *begin, const char *end, uint8_t mask)
+	static bool is_allowed_str(const char* begin, const char* end, uint8_t mask)
 	{
 		for (auto it = begin; it != end; ++it)
+		{
 			if (is_allowed_char(*it, mask) == false)
+			{
 				return false;
+			}
+		}
 		return true;
 	}
 
-	static const char * find_first_of(const char *begin, const char *end, const char *search)
+	static const char* find_first_of(const char* begin, const char* end, const char* search)
 	{
 		for (auto it = begin; it != end; ++it)
+		{
 			for (auto search_it = search; *search_it; ++search_it)
+			{
 				if (*it == *search_it)
+				{
 					return it;
+				}
+			}
+		}
 		return end;
 	}
 
@@ -156,7 +185,7 @@ namespace core
 		return is_alpha(c) || is_num(c);
 	}
 
-	static bool is_scheme(const char *begin, const char *end)
+	static bool is_scheme(const char* begin, const char* end)
 	{
 		if (begin == nullptr || end == nullptr || begin == end || is_alpha(*begin) == false)
 		{
@@ -174,11 +203,15 @@ namespace core
 		return true;
 	}
 
-	static const char * find_char(const char *begin, const char *end, char c)
+	static const char* find_char(const char* begin, const char* end, char c)
 	{
 		for (auto it = begin; it != end; ++it)
+		{
 			if (*it == c)
+			{
 				return it;
+			}
+		}
 		return end;
 	}
 
@@ -190,75 +223,97 @@ namespace core
 	static int get_hex_digit(char c)
 	{
 		if (c >= '0' && c <= '9')
+		{
 			return c - '0';
+		}
 		else if (c >= 'A' && c <= 'F')
+		{
 			return c - 'A' + 10;
+		}
 		else if (c >= 'a' && c <= 'f')
+		{
 			return c - 'a' + 10;
+		}
 		return -1;
 	}
 
-	static bool is_ipv6(const char *begin, const char *end)
+	static bool is_ipv6(const char* begin, const char* end)
 	{
 		size_t len = end - begin;
 		if (len < 2 || len > 254)
+		{
 			return false;
+		}
 		for (auto it = begin; it != end; ++it)
 		{
 			char c = *it;
 			if (c != ':' && c != '.' && is_hexdigit(c) == false)
+			{
 				return false;
+			}
 		}
 		return true;
 	}
 
-	static bool is_ipv4(const char *begin, const char *end)
+	static bool is_ipv4(const char* begin, const char* end)
 	{
 		size_t len = end - begin;
 		if (len < 7 || len > 254)
+		{
 			return false;
+		}
 		for (auto it = begin; it != end; ++it)
 		{
 			char c = *it;
 			if (c != '.' && is_num(c) == false)
+			{
 				return false;
+			}
 		}
 		return true;
 	}
 
-	static bool is_reg_domain_name(const char *begin, const char *end)
+	static bool is_reg_domain_name(const char* begin, const char* end)
 	{
 		return is_allowed_str(begin, end, 0x01);
 	}
 
-	static bool is_port(const char *begin, const char *end)
+	static bool is_port(const char* begin, const char* end)
 	{
 		if (begin == end || is_num(*begin) == false)
+		{
 			return false;
+		}
 
-		auto it		 = begin;
+		auto it = begin;
 		uint32_t val = 0;
 		for (; it != end; ++it)
 		{
 			char c = *it;
-			val	   = val * 10 + (c - '0');
+			val = val * 10 + (c - '0');
 		}
 
 		if (val > 0xFFFF)
+		{
 			return false;
+		}
 		return it == end;
 	}
 
 	static void normalize_scheme(String& scheme)
 	{
-		for (auto &c : scheme)
+		for (auto& c: scheme)
+		{
 			c = ::tolower(c);
+		}
 	}
 
 	static bool decode_str(String& str)
 	{
 		if (str.count() == 0)
+		{
 			return true;
+		}
 
 		String res{str.allocator()};
 		res.reserve(str.count());
@@ -271,21 +326,29 @@ namespace core
 			{
 				++it;
 				if (it == str.end())
+				{
 					return false;
+				}
 				c = *it;
 
 				a = get_hex_digit(c);
 				if (a == -1)
+				{
 					return false;
+				}
 
 				++it;
 				if (it == str.end())
+				{
 					return false;
+				}
 				c = *it;
 
 				b = get_hex_digit(c);
 				if (b == -1)
+				{
 					return false;
+				}
 
 				c = (a << 4) | b;
 			}
@@ -298,41 +361,50 @@ namespace core
 
 	static void normalize_reg_domain_name(String& scheme)
 	{
-		for (auto &c : scheme)
+		for (auto& c: scheme)
+		{
 			c = ::tolower(c);
+		}
 	}
 
-	String
-	normalize_ipv6(const char *begin, const char *end, Allocator* allocator)
+	String normalize_ipv6(const char* begin, const char* end, Allocator* allocator)
 	{
 		if ((end - begin) == 2 && begin[0] == ':' && begin[1] == ':')
+		{
 			return String{StringView{begin, end}, allocator};
+		}
 
 		// Split IPv6 at colons
-		const char *it = begin;
-		const char *tokens[10];
+		const char* it = begin;
+		const char* tokens[10];
 
 		if (*it == ':')
+		{
 			++it;
+		}
 
 		if (end[-1] == ':')
+		{
 			--end;
+		}
 
-		const char *b = it;
-		size_t i	  = 0;
+		const char* b = it;
+		size_t i = 0;
 		while (it != end)
 		{
 			if (*it++ == ':')
 			{
 				tokens[i++] = b;
-				b			= it;
+				b = it;
 			}
 		}
 
 		if (i < 8)
+		{
 			tokens[i++] = b;
+		}
 
-		tokens[i]	   = it;
+		tokens[i] = it;
 		size_t ntokens = i;
 
 		// Get IPv4 address which is normalized by default
@@ -349,7 +421,7 @@ namespace core
 		size_t null_pos = 8, null_len = 0, nfields = 0;
 		for (size_t i = 0; i < ntokens; ++i)
 		{
-			const char *p = tokens[i];
+			const char* p = tokens[i];
 			if (p == tokens[i + 1] || *p == ':')
 			{
 				null_pos = i;
@@ -358,12 +430,14 @@ namespace core
 			{
 				uint16_t field = get_hex_digit(*p++);
 				while (p != tokens[i + 1] && *p != ':')
+				{
 					field = (field << 4) | get_hex_digit(*p++);
+				}
 				fields[nfields++] = field;
 			}
 		}
 
-		i		= nfields;
+		i = nfields;
 		nfields = ipv4_b ? 6 : 8;
 		if (i < nfields)
 		{
@@ -373,29 +447,37 @@ namespace core
 				do
 				{
 					fields[--last] = fields[--i];
-				} while (i != null_pos);
+				}
+				while (i != null_pos);
 			}
 			do
 			{
 				fields[--last] = 0;
-			} while (last != null_pos);
+			}
+			while (last != null_pos);
 		}
 
 		// locate first longer sequence of zero
 		i = null_len = 0;
-		null_pos	 = nfields;
+		null_pos = nfields;
 		size_t first = 0;
 		while (true)
 		{
 			while (i < nfields && fields[i] != 0)
+			{
 				++i;
+			}
 
 			if (i == nfields)
+			{
 				break;
+			}
 
 			first = i;
 			while (i < nfields && fields[i] == 0)
+			{
 				++i;
+			}
 
 			if ((i - first) > null_len)
 			{
@@ -404,7 +486,9 @@ namespace core
 			}
 
 			if (i == nfields)
+			{
 				break;
+			}
 		}
 
 		if (null_len == 1)
@@ -419,24 +503,32 @@ namespace core
 		if (null_pos == 0)
 		{
 			strf(&stream, ":"_sv);
-			i	= null_len;
+			i = null_len;
 		}
 		else
 		{
 			strf(&stream, "{:x}"_sv, fields[0]);
 			for (i = 1; i < null_pos; ++i)
+			{
 				strf(&stream, ":{:x}"_sv, fields[i]);
+			}
 
 			if (i < nfields)
+			{
 				strf(&stream, ":"_sv);
+			}
 
 			i += null_len;
 			if (i == 8 && null_len != 0)
+			{
 				strf(&stream, ":"_sv);
+			}
 		}
 
 		for (; i < nfields; ++i)
+		{
 			strf(&stream, ":{:x}"_sv, fields[i]);
+		}
 
 		if (ipv4_b)
 		{
@@ -450,30 +542,40 @@ namespace core
 	static void normalize_path(String& path, Allocator* allocator)
 	{
 		if (path.count() == 0)
+		{
 			return;
+		}
 
 		auto parts = path.split("/"_sv, true, allocator);
 
 		// filter parts without . and ..
 		Array<StringView> parts_filtered{allocator};
-		for (const auto &part : parts)
+		for (const auto& part: parts)
 		{
 			if (part == ""_sv || part == "."_sv)
+			{
 				continue;
+			}
 			else if (part == ".."_sv && parts_filtered.count() > 0)
+			{
 				parts_filtered.pop();
+			}
 			parts_filtered.push(part);
 		}
 
 		MemoryStream stream{allocator};
 
 		if (path[0] == '/')
+		{
 			strf(&stream, "/"_sv);
+		}
 
 		for (size_t i = 0; i < parts_filtered.count(); ++i)
 		{
 			if (i != 0)
+			{
 				strf(&stream, "/"_sv);
+			}
 			strf(&stream, "{}"_sv, parts_filtered[i]);
 		}
 
@@ -483,7 +585,9 @@ namespace core
 	static bool decode_plus_str(String& str)
 	{
 		if (str.count() == 0)
+		{
 			return true;
+		}
 
 		String res{str.allocator()};
 		res.reserve(str.count());
@@ -500,21 +604,29 @@ namespace core
 			{
 				++it;
 				if (it == str.end())
+				{
 					return false;
+				}
 				c = *it;
 
 				a = get_hex_digit(c);
 				if (a == -1)
+				{
 					return false;
+				}
 
 				++it;
 				if (it == str.end())
+				{
 					return false;
+				}
 				c = *it;
 
 				b = get_hex_digit(c);
 				if (b == -1)
+				{
 					return false;
+				}
 
 				c = (a << 4) | b;
 			}
@@ -525,7 +637,7 @@ namespace core
 		return true;
 	}
 
-	Result<UrlQuery> UrlQuery::parse(core::StringView query, core::Allocator *allocator)
+	Result<UrlQuery> UrlQuery::parse(core::StringView query, core::Allocator* allocator)
 	{
 		UrlQuery res{allocator};
 
@@ -536,7 +648,9 @@ namespace core
 		{
 			it = find_first_of(begin, end, "=;&");
 			if (is_allowed_str(begin, it, 0x3F) == false)
+			{
 				return errf(allocator, "Invalid query string '{}'"_sv, StringView{begin, it});
+			}
 
 			String value{allocator};
 			String key{StringView{begin, it}, allocator};
@@ -553,7 +667,9 @@ namespace core
 				begin = it + 1;
 				it = find_first_of(begin, end, ";&");
 				if (is_allowed_str(begin, it, 0x3F) == false)
+				{
 					return errf(allocator, "invalid query string '{}'"_sv, StringView{begin, it});
+				}
 				value = String{StringView{begin, it}, allocator};
 				decode_plus_str(value);
 			}
@@ -565,10 +681,11 @@ namespace core
 		return res;
 	}
 
-	UrlQuery::UrlQuery(core::Allocator *allocator)
-		: m_allocator(allocator), m_keyValues(allocator), m_keyToIndex(allocator)
-	{
-	}
+	UrlQuery::UrlQuery(core::Allocator* allocator)
+		: m_allocator(allocator),
+		  m_keyValues(allocator),
+		  m_keyToIndex(allocator)
+	{}
 
 	void UrlQuery::add(StringView key, StringView value)
 	{
@@ -584,7 +701,7 @@ namespace core
 
 	StringView UrlQuery::get(KeyConstIterator it) const
 	{
-		validate(it != m_keyToIndex.end());
+		assertTrue(it != m_keyToIndex.end());
 		return m_keyValues[it->value].value;
 	}
 
@@ -633,10 +750,14 @@ namespace core
 		Url res{allocator};
 
 		if (str.count() == 0)
+		{
 			return res;
+		}
 
 		if (str.count() > 8000)
+		{
 			return errf(allocator, "URL is longer than 8000 characters"_sv);
+		}
 
 		//          userinfo       host      port
 		//          ┌──┴───┐ ┌──────┴──────┐ ┌┴┐
@@ -649,13 +770,13 @@ namespace core
 		//  scheme   authority   path      query
 
 		// this might be string begin and end
-		const char *str_end = str.end();
+		const char* str_end = str.end();
 
 		// let's start by finding [scheme ':', path '/', query '?', fragment '#']
 		const char *str_begin = str.begin(), *str_it = find_first_of(str_begin, str_end, ":/?#");
 
-		const char *query_begin = nullptr;
-		const char *query_end	= nullptr;
+		const char* query_begin = nullptr;
+		const char* query_end = nullptr;
 
 		// if we didn't find any of the above things then this is a path
 		// /forum/questions/
@@ -663,7 +784,9 @@ namespace core
 		{
 			// check the characters in the path part if it has any unallowed character then there's an error
 			if (!is_allowed_str(str_begin, str_it, 0x2F))
+			{
 				return errf(allocator, "Path is invalid"_sv);
+			}
 
 			// yay: we have path
 			res.m_path = String{StringView{str_begin, str_end}, allocator};
@@ -675,14 +798,16 @@ namespace core
 			if (*str_it == ':')
 			{
 				if (is_scheme(str_begin, str_it) == false)
+				{
 					return errf(allocator, "Scheme is invalid"_sv);
+				}
 
 				// yay: we have scheme
 				res.m_scheme = String{StringView{str_begin, str_it}, allocator};
 
 				// update the p pointer to the search for [path '/', query '?', fragment '#']
 				str_begin = str_it + 1;
-				str_it	  = find_first_of(str_begin, str_end, "/?#");
+				str_it = find_first_of(str_begin, str_end, "/?#");
 			}
 
 			// get authority if any
@@ -696,7 +821,7 @@ namespace core
 				str_begin += 2; // eat "//" at the start of authority
 
 				// locate end of authority [path '/', query '?', fragment '#']
-				const char *end_authority = find_first_of(str_begin, str_end, "/?#");
+				const char* end_authority = find_first_of(str_begin, str_end, "/?#");
 
 				// authority consists of [userinfo, host, port]
 
@@ -707,7 +832,9 @@ namespace core
 				if (str_it != end_authority)
 				{
 					if (is_allowed_str(str_begin, str_it, 0x2F) == false)
+					{
 						return errf(allocator, "User info is invalid"_sv);
+					}
 
 					// yay: we have user info
 					res.m_user = String{StringView{str_begin, str_it}, allocator};
@@ -727,7 +854,9 @@ namespace core
 
 					// we didn't find the end of ip literal
 					if (*str_it != ']')
+					{
 						return errf(allocator, "missing ] in ipv6 literal"_sv);
+					}
 
 					// decode IPvFuture protocol version
 					if (*str_begin == 'v')
@@ -738,7 +867,9 @@ namespace core
 							res.m_ipVersion = get_hex_digit(*str_begin);
 							str_begin += 1; // eat the first hex digit
 							if (is_hexdigit(*str_begin))
+							{
 								res.m_ipVersion = (res.m_ipVersion << 8) | get_hex_digit(*str_begin);
+							}
 						}
 
 						str_begin += 1; // eat second hex digit
@@ -797,7 +928,9 @@ namespace core
 				{
 					str_begin += 1; // eat the ':'
 					if (is_port(str_begin, end_authority) == false)
+					{
 						return errf(allocator, "Port is invalid"_sv);
+					}
 					// yay: we have a port
 					res.m_port = String{StringView{str_begin, end_authority}, allocator};
 				}
@@ -810,7 +943,9 @@ namespace core
 
 			// let's try finding the path
 			if (is_allowed_str(str_begin, str_it, 0x2F) == false)
+			{
 				return errf(allocator, "Path is invalid"_sv);
+			}
 
 			// yay: we have path
 			res.m_path = String{StringView{str_begin, str_it}, allocator};
@@ -824,14 +959,16 @@ namespace core
 
 				// yay: we have query
 				query_begin = str_begin;
-				query_end	= str_it;
+				query_end = str_it;
 			}
 
 			// try to find a fragment if it exists
 			if (str_it != str_end && *str_it == '#')
 			{
 				if (is_allowed_str(str_it + 1, str_end, 0x3F) == false)
+				{
 					return errf(allocator, "Fragment is invalid"_sv);
+				}
 
 				// yay: we have a fragment
 				res.m_fragment = String{StringView{str_it + 1, str_end}, allocator};
@@ -862,7 +999,9 @@ namespace core
 		{
 			auto parsedQuery = UrlQuery::parse(StringView{query_begin, query_end}, allocator);
 			if (parsedQuery.isError())
+			{
 				return parsedQuery.releaseError();
+			}
 			res.m_query = parsedQuery.releaseValue();
 		}
 
@@ -870,50 +1009,72 @@ namespace core
 		return res;
 	}
 
-	Result<String> Url::toString(core::Allocator *allocator) const
+	Result<String> Url::toString(core::Allocator* allocator) const
 	{
 		MemoryStream stream{allocator};
 
 		if (m_scheme.count() > 0)
+		{
 			strf(&stream, "{}:"_sv, m_scheme);
+		}
 
 		if (m_host.count() > 0)
 		{
 			strf(&stream, "//"_sv);
 			if (m_user.count() > 0)
+			{
 				strf(&stream, "{}@"_sv, encodeString(m_user, 0x05, allocator));
+			}
 
 			if (m_ipVersion == 0 || m_ipVersion == 4)
+			{
 				strf(&stream, "{}"_sv, m_host);
+			}
 			else if (m_ipVersion == 6)
+			{
 				strf(&stream, "[{}]"_sv, m_host);
+			}
 			else
+			{
 				strf(&stream, "[v{:x}.{}]"_sv, m_ipVersion, m_host);
+			}
 
 			if (m_port.count() > 0)
+			{
 				if (isDefaultPort() == false)
+				{
 					strf(&stream, ":{}"_sv, m_port);
+				}
+			}
 		}
 		else
 		{
 			if (m_user.count() > 0)
+			{
 				return errf(allocator, "User is only allowed if host is present"_sv);
+			}
 
 			if (m_port.count() > 0)
+			{
 				return errf(allocator, "Port is only allowed if host is present"_sv);
+			}
 
 			if (m_path.count() > 0)
 			{
 				auto p = m_path.findFirstByte(":/"_sv);
 				if (p != SIZE_MAX && m_path[p] == ':')
+				{
 					return errf(allocator, "Port is only allowed if host is present"_sv);
+				}
 			}
 		}
 
 		if (m_path.count() > 0)
 		{
 			if (m_path[0] != '/' && m_host.count() > 0)
+			{
 				return errf(allocator, "Path must start with '/' if host is empty"_sv);
+			}
 			strf(&stream, "{}"_sv, encodeString(m_path, 0x0F, allocator));
 		}
 
@@ -923,19 +1084,27 @@ namespace core
 			for (size_t i = 0; i < m_query.count(); ++i)
 			{
 				if (m_query[i].key.count() == 0)
+				{
 					return errf(allocator, "Empty key in query"_sv);
+				}
 
 				if (i != 0)
+				{
 					strf(&stream, "&"_sv);
+				}
 
 				strf(&stream, "{}"_sv, encodeQueryElement(m_query[i].key, allocator));
 				if (m_query[i].value.count() > 0)
+				{
 					strf(&stream, "={}"_sv, encodeQueryElement(m_query[i].value, allocator));
+				}
 			}
 		}
 
 		if (m_fragment.count() > 0)
+		{
 			strf(&stream, "#{}"_sv, encodeString(m_fragment, 0x1F, allocator));
+		}
 
 		return stream.releaseString();
 	}
@@ -947,7 +1116,9 @@ namespace core
 		if (m_path.count() > 0)
 		{
 			if (m_path[0] != '/' && m_host.count() > 0)
+			{
 				return errf(allocator, "Path must start with '/' if host is empty"_sv);
+			}
 			strf(&stream, "{}"_sv, encodeString(m_path, 0x0F, allocator));
 		}
 
@@ -957,19 +1128,27 @@ namespace core
 			for (size_t i = 0; i < m_query.count(); ++i)
 			{
 				if (m_query[i].key.count() == 0)
+				{
 					return errf(allocator, "Empty key in query"_sv);
+				}
 
 				if (i != 0)
+				{
 					strf(&stream, "&"_sv);
+				}
 
 				strf(&stream, "{}"_sv, encodeQueryElement(m_query[i].key, allocator));
 				if (m_query[i].value.count() > 0)
+				{
 					strf(&stream, "={}"_sv, encodeQueryElement(m_query[i].value, allocator));
+				}
 			}
 		}
 
 		if (m_fragment.count() > 0)
+		{
 			strf(&stream, "#{}"_sv, encodeString(m_fragment, 0x1F, allocator));
+		}
 
 		return stream.releaseString();
 	}
