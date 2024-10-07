@@ -8,10 +8,10 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.ACCESS_TOKEN }}
-          submodules: 'true'
+          submodules: true
+          fetch-depth: 0
 
       - name: check formatting
         run: ./lint-clang-format.sh
