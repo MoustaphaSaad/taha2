@@ -4,8 +4,6 @@
 
 #include <source_location>
 
-#undef assert
-
 namespace core
 {
 	class Log;
